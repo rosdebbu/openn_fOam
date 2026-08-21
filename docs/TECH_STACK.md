@@ -51,9 +51,10 @@ Frontend (Vue 3 + TypeScript)
 
 ---
 
-## 🧠 2. Backend Architectures: Python vs. Rust 2024
+## 🧠 2. Backend Technology Stack Options
 
-### A. Current Python Backend (Python 3.10+)
+### Option A: Python Backend (Current Implementation)
+
 ```
 Backend (Python 3.10+)
 ├── FastAPI & Uvicorn ───────────> Async REST Endpoints & WebSocket Server (/ws/simulate_3d)
@@ -64,18 +65,41 @@ Backend (Python 3.10+)
 └── VTK 3.0 Writer ──────────────> Legacy Structured Points Dataset Generator
 ```
 
+#### Key Python Modules:
+- **`fastapi` & `uvicorn`**: Asynchronous event loop enabling low-latency WebSocket simulation streaming.
+- **`numpy`**: 3D spatial stencils (2nd-order Laplacians $\nabla^2$, 1st-order upwind advection, divergence).
+- **`scipy`**: Sparse matrix constructors (`dok_matrix`, `csr_matrix`) and direct solvers (`spla.spsolve`).
+- **`zipfile` & `io`**: In-memory packaging of complete OpenFOAM case directories with `Allrun` scripts.
+
 ---
 
-### B. High-Performance Rust Architecture (Rust 2024 Edition)
+### Option B: High-Performance Rust Backend (Rust 2024 Edition)
+
 ```
 Backend (Rust 2024 Edition)
 ├── Axum + Tokio ───────────────> Ultra-low latency Async REST APIs & WebSocket Server (/ws/simulate_3d)
 ├── ndarray / faer ─────────────> 3D Cartesian Grid Math, SIMD-Vectorized Advection & Laplacians
 ├── sprs / nalgebra-sparse ─────> Multi-Threaded Sparse Poisson Solver (CG / BiCGSTAB)
 ├── image crate ────────────────> 2D Image Silhouette Extraction & 3D Voxel Extrusion
-├── zip + askama ───────────────> Compile-Time Checked OpenFOAM v2312 Templates & Case Packaging
+├── askama + zip ───────────────> Compile-Time Checked OpenFOAM v2312 Templates & Case Packaging
 └── vtkio / Direct Byte Writer ─> ParaView 3D Structured Points (.vtk) Exporter
 ```
+
+#### Key Rust 2024 Crates & Capabilities:
+- **`axum` + `tokio`**:
+  - Handles 100,000+ requests/sec with $<0.5\text{ ms}$ WebSocket delivery and zero Garbage Collection (GC) pauses.
+- **`ndarray` + `rayon`**:
+  - Cache-coherent 3D memory buffers with automatic CPU SIMD vectorization (AVX-512 / AVX2) and multi-threaded parallel stencils across all CPU cores via `.par_iter()`.
+- **`sprs` / `nalgebra-sparse`**:
+  - High-performance sparse iterative Conjugate Gradient (CG) and BiCGSTAB solvers for the 3D Pressure Poisson equation.
+- **`image` + `imageproc`**:
+  - Instant image decoding (PNG, JPEG, WebP) and morphological 2D contour / depth silhouette extraction.
+- **`askama` + `zip`**:
+  - Type-safe, compile-time verified OpenFOAM v2312 dictionary templates with zero runtime syntax errors.
+- **`vtkio` / `BufWriter`**:
+  - Direct binary or ASCII streaming of 3D structured point grids to disk for ParaView.
+
+---
 
 ### 📊 Python vs. Rust 2024 Performance & Latency Matrix:
 
