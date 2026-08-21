@@ -30,6 +30,12 @@ Welcome to the **OpenZess 3D Studio** documentation library. All technical, math
 8. **[📦 OpenFOAM & ParaView 3D Data Export](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/docs/OPENFOAM_AND_VTK_EXPORT.md)**
    - OpenFOAM v2312 dictionary generation (`buoyantBoussinesqSimpleFoam`), one-click ZIP packaging, and ParaView `.vtk` structured points format.
 
+9. **[💻 Local Hardware Runtime Architecture (Colab-Style)](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/docs/LOCAL_HARDWARE_RUNTIME_ARCHITECTURE.md)**
+   - Google Colab-style local bridge connecting the web studio directly to local CPU cores, dedicated GPUs (CUDA), NVMe storage, and native OpenFOAM installations.
+
+10. **[🎨 UI/UX Design System & Layout Specification](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/docs/UI_UX_DESIGN_SYSTEM.md)**
+    - 4-Tier OKLCH color token architecture, brand logo gradient, Google Colab runtime widget, OpenFOAM Case Hub layout, and 60–120 FPS zero-latency rendering.
+
 ---
 
 ## 🔗 Quick Links
