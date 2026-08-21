@@ -30,8 +30,8 @@ The design system is engineered with a **4-tier OKLCH surface and typography hie
    - **Primary High-Contrast Text**: `oklch(88.2% 0.059 254.128)` — Crisp, high-contrast headings, numerical values, and active status text.
 4. **Header Navbar & Sidebar Base (4th Layer)**: `oklch(26.9% 0 none)`
    - Solid, elevated navigation bar, modal containers, and case tree root background.
-5. **Colab Widget & Button Surfaces**: `oklch(20.5% 0 none)`
-   - Dark charcoal buttons with `border border-white/10` and high-contrast text.
+5. **Colab Widget & Button Surfaces**: `oklch(26.9% 0 none)`
+   - Elevated dark graphite buttons with `border border-white/10` and high-contrast text.
 
 ### 🌟 Accent & Brand Tokens:
 - **Brand Logo Gradient**: `linear-gradient(135deg, oklch(43.8% 0.218 303.724), oklch(40.5% 0.101 131.063))` — Royal Magenta/Violet $\to$ Deep Emerald Moss (3D Isometric Cube Icon)
@@ -42,11 +42,11 @@ The design system is engineered with a **4-tier OKLCH surface and typography hie
 
 ---
 
-## 🖼️ 3. Visual UI/UX Studio Target (Google Colab Runtime Widget + OKLCH Tokens)
+## 🖼️ 3. Visual UI/UX Studio Target (Final Approved Mockup)
 
-Below is the design target showcasing the **exact Google Colab-style runtime button (`✓ RAM [===] Disk [===] ▾`)**, the **`oklch(20.5% 0 none)` button surfaces**, and the **OpenFOAM Case Hub**:
+Below is the approved visual design target for **OpenZess 3D Studio** with the **Brand Logo Gradient**, **Google Colab Runtime Widget**, **`oklch(26.9% 0 none)` Buttons**, and **OpenFOAM Case Hub**:
 
-![OpenZess 3D Studio Colab Runtime Mockup](C:/Users/ROSHNI/.gemini/antigravity-ide/brain/aafa7b9b-5719-4def-a430-b10ecd4260c7/openzess_colab_runtime_studio_1787341947927.jpg)
+![OpenZess 3D Studio Final Approved Mockup](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/docs/assets/openzess_studio_ui.jpg)
 
 ---
 
