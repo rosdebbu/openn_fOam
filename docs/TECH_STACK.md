@@ -24,12 +24,14 @@ A comprehensive guide to all technologies, libraries, frameworks, numerical meth
 ## 🌐 1. Frontend Technology Stack
 
 ```
-Frontend (Vue 3 + TypeScript)
-├── Three.js WebGL Engine ───────> 3D Room Box, Animated Particle Streamlines, Cut-Plane Contours
+Frontend (Vue 3 + TypeScript + Tailwind CSS)
+├── Three.js WebGL Engine ───────> 3D Volumetric Thermal Plume, Streamlines, Cut-Plane Heatmaps
+├── OpenFOAM Case Hub ───────────> system/, constant/, 0/ Case Tree, AI / Manual Mode Switcher
+├── Google Colab Runtime Widget ─> Live Memory/Disk Meters (✓ RAM [===] Disk [===] ▾), Local & SSH Connect
 ├── Vue 3 Composition API ───────> Reactive State (Parameters, Status, Slices, Messages)
 ├── Chart.js ────────────────────> Logarithmic Convergence Residual Monitor
 ├── Vite 8 & TypeScript ─────────> Fast HMR, Build Optimization, Strict Type Safety
-└── Dark Glassmorphism CSS ──────> Modern UI Layout, Glowing Accents, Responsive Panels
+└── 4-Tier OKLCH Design System ──> Deep Obsidian Canvas, Elevated Card Panels, High-Contrast Text
 ```
 
 ### Key Libraries & Roles:
