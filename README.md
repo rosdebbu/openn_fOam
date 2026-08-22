@@ -40,4 +40,4 @@ Welcome to the **OpenZess 3D Studio** documentation library. All technical, math
 
 ## 🔗 Quick Links
 - **Project Root README**: [README.md](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/README.md)
-- **Backend Entry Point**: [main.py](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/main.py)
+- **Backend Entry Point**: [main.py](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/main.py) 
