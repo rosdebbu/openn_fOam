@@ -1,13 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap');
 
 :root {
-  /* 4-Tier OKLCH Color Design System */
-  --bg-canvas: oklch(20.5% 0 0);           /* Layer 1: Base dark obsidian canvas */
-  --bg-surface: oklch(26.9% 0 0);          /* Layer 4: Header navbar, sidebar base, button surface */
-  --bg-card: oklch(37.8% 0.015 216);       /* Layer 3: Card panels, container boxes, inputs */
-  --bg-card-hover: oklch(42% 0.018 216);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-active: rgba(255, 255, 255, 0.18);
+  /* User-Specified OKLCH Palette */
+  --bg-canvas: oklch(14.5% 0.008 326);           /* Layer 1: Deep obsidian plum canvas */
+  --bg-surface: oklch(26.8% 0.007 34.298);        /* Layer 2: Header navbar, sidebar base */
+  --btn-surface: oklch(27.4% 0.006 286.033);      /* Layer 3: Button surfaces, control pills */
+  --bg-card: oklch(37% 0.013 285.805);            /* Layer 4: Primary card panels (Case tree, params) */
+  --bg-card-alt: oklch(36.7% 0.016 35.7);         /* Layer 5: Card panel variant, dropzone */
+  --accent-border: oklch(37.4% 0.01 67.558);      /* Layer 6: Subtle borders, badges, warm accents */
+
+  --bg-card-hover: oklch(40% 0.015 285.805);
+  --border-subtle: oklch(37.4% 0.01 67.558 / 0.25);
+  --border-active: oklch(37.4% 0.01 67.558 / 0.55);
 
   /* Typography Colors */
   --text-primary: oklch(88.2% 0.059 254.128);  /* Crisp high-contrast text */

@@ -689,7 +689,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 3px;
-  background: var(--bg-surface);
+  background: var(--btn-surface);
   border: 1px solid var(--border-subtle);
   padding: 3px;
   border-radius: 7px;
@@ -734,7 +734,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg-surface);
+  background: var(--btn-surface);
   color: #e2e8f0;
   border: 1px solid var(--border-subtle);
   padding: 6px 12px;

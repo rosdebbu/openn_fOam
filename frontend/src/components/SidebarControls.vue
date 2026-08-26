@@ -82,7 +82,7 @@
       <div class="hub-card tree-card">
         <div class="card-header">
           <span class="card-title">OpenFOAM case</span>
-          <span class="token-tag">oklch(37.8% 0.015)</span>
+          <span class="token-tag">oklch(37% 0.013 285.805)</span>
         </div>
 
         <div class="file-tree-container">
@@ -157,7 +157,7 @@
         <div class="hub-card params-card">
           <div class="card-header">
             <span class="card-title">Parameters</span>
-            <span class="token-tag">oklch(67.3% 0.182 278.935)</span>
+            <span class="token-tag">oklch(27.4% 0.006 286.033)</span>
           </div>
 
           <div class="sliders-list">
@@ -231,7 +231,7 @@
         <div class="hub-card geometry-card">
           <div class="card-header">
             <span class="card-title">Geometry input</span>
-            <span class="token-tag">oklch(88.2% 0.059 254.128)</span>
+            <span class="token-tag">oklch(36.7% 0.016 35.7)</span>
           </div>
 
           <div
@@ -259,7 +259,7 @@
                 </svg>
               </div>
               <span class="dropzone-title">Photo dropzone</span>
-              <span class="dropzone-sub">oklch(70.7% 0.022 281.325)</span>
+              <span class="dropzone-sub">oklch(37.4% 0.01 67.558)</span>
               <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
             </div>
           </div>
