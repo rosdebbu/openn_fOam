@@ -387,9 +387,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(168, 85, 247, 0.15);
-  border: 1px solid rgba(168, 85, 247, 0.4);
-  color: #e9d5ff;
+  background: var(--btn-surface);
+  border: 1px solid var(--accent-border);
+  color: #f1f5f9;
   padding: 5px 10px;
   border-radius: 6px;
   font-size: 12px;
@@ -399,8 +399,8 @@ onUnmounted(() => {
 }
 
 .archetype-pill-btn:hover {
-  background: rgba(168, 85, 247, 0.25);
-  border-color: rgba(168, 85, 247, 0.7);
+  background: var(--bg-card);
+  border-color: #ffffff;
 }
 
 .archetype-icon {
@@ -409,7 +409,7 @@ onUnmounted(() => {
 
 .dropdown-arrow {
   font-size: 10px;
-  color: #c084fc;
+  color: var(--accent-border);
 }
 
 .archetype-menu {
@@ -417,7 +417,7 @@ onUnmounted(() => {
   top: calc(100% + 8px);
   left: 0;
   width: 320px;
-  background: #19202c;
+  background: var(--bg-surface);
   border: 1px solid var(--border-active);
   border-radius: 8px;
   padding: 6px;
@@ -440,22 +440,23 @@ onUnmounted(() => {
   width: 100%;
   padding: 8px 10px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 6px;
   color: #cbd5e1;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .archetype-menu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   color: #ffffff;
 }
 
 .archetype-menu-item.selected {
-  background: rgba(168, 85, 247, 0.2);
-  color: #e9d5ff;
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
 }
 
 .menu-item-icon {
@@ -489,8 +490,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
   color: #cbd5e1;
   padding: 6px 10px;
   border-radius: 6px;
@@ -501,14 +502,15 @@ onUnmounted(() => {
 }
 
 .ai-key-status-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  border-color: var(--accent-border);
   color: #ffffff;
 }
 
 .ai-key-status-btn.configured {
-  background: rgba(168, 85, 247, 0.12);
-  border-color: rgba(168, 85, 247, 0.35);
-  color: #d8b4fe;
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #f1f5f9;
 }
 
 .ai-sparkle {
@@ -529,9 +531,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.28);
+  background: var(--btn-surface);
+  color: #f1f5f9;
+  border: 1px solid var(--border-subtle);
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 11.5px;
@@ -541,24 +543,26 @@ onUnmounted(() => {
 }
 
 .colab-btn:hover {
-  background: rgba(16, 185, 129, 0.18);
-  border-color: rgba(16, 185, 129, 0.5);
+  background: var(--bg-card);
+  border-color: var(--accent-border);
 }
 
 .colab-icon {
   font-size: 11px;
   font-weight: 800;
+  color: var(--accent-border);
 }
 
 .colab-label {
-  color: #94a3b8;
+  color: var(--text-secondary);
   font-size: 10.5px;
 }
 
 .colab-gauge {
   width: 36px;
   height: 5px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
   border-radius: 3px;
   overflow: hidden;
   display: inline-block;
@@ -567,7 +571,7 @@ onUnmounted(() => {
 .gauge-bar {
   display: block;
   height: 100%;
-  background: #10b981;
+  background: var(--accent-border);
   border-radius: 3px;
   transition: width 0.3s ease;
 }

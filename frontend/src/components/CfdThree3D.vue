@@ -929,18 +929,18 @@ onUnmounted(() => {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
   font-weight: 600;
-  color: #34d399;
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #f1f5f9;
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
 }
 
 .telemetry-pill.forces {
-  color: #fbbf24;
-  background: rgba(251, 191, 36, 0.12);
-  border-color: rgba(251, 191, 36, 0.3);
+  color: #f1f5f9;
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
 }
 
 .header-tools-line {
@@ -1020,9 +1020,9 @@ onUnmounted(() => {
 }
 
 .hud-tool-btn.active {
-  background: rgba(168, 85, 247, 0.22);
-  border-color: rgba(168, 85, 247, 0.5);
-  color: #e9d5ff;
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
 }
 
 .webgl-canvas-mount {

@@ -96,7 +96,6 @@
         <div class="card-header">
           <div class="card-title-row">
             <span class="card-title">🧪 Fluid Substance & Thermodynamic Density (ρ)</span>
-            <span class="token-tag">oklch(37% 0.013 285.805)</span>
           </div>
           <p class="card-desc">Equation of State: Continuity & Momentum properties</p>
         </div>
@@ -121,7 +120,6 @@
         <div class="card-header">
           <div class="card-title-row">
             <span class="card-title">🌍 Natural Gravity Vector (g) & Temperature (T)</span>
-            <span class="token-tag">oklch(27.4% 0.006 286.033)</span>
           </div>
           <p class="card-desc">Momentum source: ρg + Energy equation: ∇·(k∇T)</p>
         </div>
@@ -226,7 +224,6 @@
         <div class="hub-card tree-card">
           <div class="card-header">
             <span class="card-title">Case File Tree</span>
-            <span class="token-tag">oklch(37% 0.013 285.805)</span>
           </div>
 
           <div class="file-tree-container">
@@ -301,7 +298,6 @@
           <div class="hub-card bc-repair-card">
             <div class="card-header">
               <span class="card-title">Boundary Repair</span>
-              <span class="token-tag">oklch(27.4% 0.006 286.033)</span>
             </div>
 
             <div class="bc-list">
@@ -345,7 +341,6 @@
           <div class="hub-card geometry-card">
             <div class="card-header">
               <span class="card-title">Geometry input</span>
-              <span class="token-tag">oklch(36.7% 0.016 35.7)</span>
             </div>
 
             <div
@@ -373,7 +368,7 @@
                   </svg>
                 </div>
                 <span class="dropzone-title">Photo / CAD Dropzone</span>
-                <span class="dropzone-sub">oklch(37.4% 0.01 67.558)</span>
+                <span class="dropzone-sub">Drag & drop .stl / .obj / .step / photo</span>
                 <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
               </div>
             </div>
@@ -822,7 +817,7 @@ function applyAiSnippet(code: string) {
   justify-content: space-between;
   align-items: center;
   background: var(--btn-surface);
-  border: 1px solid rgba(168, 85, 247, 0.35);
+  border: 1px solid var(--border-subtle);
   border-radius: 7px;
   padding: 6px 10px;
   cursor: pointer;
@@ -830,8 +825,8 @@ function applyAiSnippet(code: string) {
 }
 
 .ai-slide-toggle-bar:hover {
-  background: rgba(168, 85, 247, 0.18);
-  border-color: rgba(168, 85, 247, 0.6);
+  background: var(--bg-card);
+  border-color: var(--accent-border);
 }
 
 .toggle-left {
@@ -847,14 +842,15 @@ function applyAiSnippet(code: string) {
 .toggle-label {
   font-size: 11.5px;
   font-weight: 700;
-  color: #e9d5ff;
+  color: #f1f5f9;
 }
 
 .ai-chip {
   font-family: 'JetBrains Mono', monospace;
   font-size: 9px;
-  background: rgba(168, 85, 247, 0.2);
-  color: #c084fc;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   padding: 1px 5px;
   border-radius: 4px;
 }
@@ -862,7 +858,7 @@ function applyAiSnippet(code: string) {
 .slide-arrow-btn {
   background: transparent;
   border: none;
-  color: #cbd5e1;
+  color: var(--text-secondary);
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
@@ -870,8 +866,8 @@ function applyAiSnippet(code: string) {
 
 /* AI Slide Drawer Content */
 .ai-slide-drawer {
-  background: rgba(20, 16, 24, 0.95);
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   padding: 10px;
   display: flex;
@@ -894,19 +890,19 @@ function applyAiSnippet(code: string) {
 }
 
 .chat-msg.user {
-  background: rgba(56, 189, 248, 0.12);
-  border-left: 2px solid #38bdf8;
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 2px solid var(--accent-border);
 }
 
 .chat-msg.ai {
-  background: rgba(168, 85, 247, 0.12);
-  border-left: 2px solid #a855f7;
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 2px solid var(--text-secondary);
 }
 
 .msg-author {
   font-size: 9.5px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin-bottom: 2px;
 }
 
@@ -917,10 +913,10 @@ function applyAiSnippet(code: string) {
 
 .apply-snippet-btn {
   margin-top: 4px;
-  padding: 2px 8px;
-  background: #a855f7;
-  color: white;
-  border: none;
+  padding: 3px 8px;
+  background: var(--btn-surface);
+  border: 1px solid var(--accent-border);
+  color: #ffffff;
   border-radius: 4px;
   font-size: 9.5px;
   font-weight: 600;
@@ -934,18 +930,19 @@ function applyAiSnippet(code: string) {
 }
 
 .chip-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 2px 8px;
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 3px 8px;
   font-size: 9.5px;
-  color: #cbd5e1;
+  color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .chip-btn:hover {
-  background: rgba(168, 85, 247, 0.2);
+  background: var(--bg-card-hover);
+  border-color: var(--accent-border);
   color: #ffffff;
 }
 
@@ -956,8 +953,8 @@ function applyAiSnippet(code: string) {
 
 .copilot-input {
   flex: 1;
-  background: #0f1016;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
   border-radius: 5px;
   padding: 5px 8px;
   color: #f1f5f9;
@@ -966,16 +963,21 @@ function applyAiSnippet(code: string) {
 }
 
 .copilot-input:focus {
-  border-color: #a855f7;
+  border-color: var(--accent-border);
 }
 
 .copilot-send-btn {
-  background: linear-gradient(135deg, #a855f7, #6366f1);
-  border: none;
+  background: var(--btn-surface);
+  border: 1px solid var(--accent-border);
   border-radius: 5px;
   color: white;
-  padding: 0 10px;
+  padding: 0 12px;
   cursor: pointer;
+  font-weight: 600;
+}
+
+.copilot-send-btn:hover {
+  background: var(--bg-card-hover);
 }
 
 /* Tabs: Natural Physics vs Manual Repair */
@@ -1006,7 +1008,7 @@ function applyAiSnippet(code: string) {
   background: var(--btn-surface);
   border-color: var(--accent-border);
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Physics Tab */
@@ -1026,7 +1028,7 @@ function applyAiSnippet(code: string) {
   display: flex;
   flex-direction: column;
   background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
   padding: 6px 8px;
   cursor: pointer;
@@ -1035,13 +1037,14 @@ function applyAiSnippet(code: string) {
 }
 
 .substance-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
   border-color: var(--accent-border);
 }
 
 .substance-btn.active {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.6);
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 1px var(--accent-border);
 }
 
 .sub-name {
@@ -1053,7 +1056,7 @@ function applyAiSnippet(code: string) {
 .sub-prop {
   font-family: 'JetBrains Mono', monospace;
   font-size: 9px;
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
 
 .preset-pills {
@@ -1064,17 +1067,17 @@ function applyAiSnippet(code: string) {
 }
 
 .preset-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 9.5px;
-  color: #cbd5e1;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
 .preset-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--bg-card-hover);
   color: #ffffff;
 }
 
@@ -1089,8 +1092,8 @@ function applyAiSnippet(code: string) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   padding: 8px 10px;
   gap: 8px;
@@ -1113,13 +1116,13 @@ function applyAiSnippet(code: string) {
 
 .diag-left p {
   font-size: 9.5px;
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
 
 .run-diag-btn {
-  background: #10b981;
+  background: var(--btn-surface);
+  border: 1px solid var(--accent-border);
   color: white;
-  border: none;
   border-radius: 5px;
   padding: 6px 10px;
   font-size: 10.5px;
@@ -1129,7 +1132,8 @@ function applyAiSnippet(code: string) {
 }
 
 .run-diag-btn:hover {
-  background: #059669;
+  background: var(--bg-card-hover);
+  border-color: #ffffff;
 }
 
 .diag-report-banner {
