@@ -474,12 +474,20 @@ function evaluateVelocityField(x: number, y: number, z: number): [number, number
     vx = -y * 1.3;
     vy = x * 1.3;
   } else {
-    // Thermal Plume
+    // Thermal Plume / Atmospheric Convection
     const dist = Math.sqrt(y * y + z * z);
     const spread = (0.2 + (x + 2.2) * 0.35) * (0.8 + iris * 1.5);
     vx = 1.2 * Math.exp(-Math.pow(dist / spread, 2));
     vz = 0.4 * Math.exp(-Math.pow(dist / spread, 2)); // Buoyancy lift
   }
+
+  // Natural Forces Coupling (Gravity & Buoyancy)
+  const gy = props.params.naturalForces?.gravity?.[1] ?? -9.81;
+  const temp = props.params.naturalForces?.ambientTemp ?? 293.15;
+  const buoyancy = (temp - 293.15) * 0.008; // Thermal expansion lift
+  const gravityAcc = (gy / 9.81) * 0.12;     // Downward acceleration
+
+  vy += gravityAcc + buoyancy;
 
   return [vx, vy, vz];
 }

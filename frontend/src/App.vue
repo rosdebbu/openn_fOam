@@ -128,6 +128,12 @@ import SettingsModal from './components/SettingsModal.vue';
 const params = reactive<SimulationParams>({
   archetype: 'airfoil',
   activeField: 'U',
+  substance: 'air',
+  naturalForces: {
+    gravity: [0, -9.81, 0],
+    ambientTemp: 293.15,
+    referencePressure: 101325
+  },
   caseType: 'channel',
   solverMode: 'cfd',
   turbulenceModel: 'k-omega-sst',

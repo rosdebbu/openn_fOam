@@ -1,6 +1,6 @@
 export type CaseType = 'cavity' | 'channel' | 'obstacle' | 'pipe';
 
-export type SimulationArchetype = 'plume' | 'airfoil' | 'cylinder' | 'venturi' | 'cavity' | 'cad';
+export type SimulationArchetype = 'plume' | 'airfoil' | 'cylinder' | 'venturi' | 'cavity' | 'cad' | 'water_dam' | 'weather_plume';
 
 export type SolverMode = 'cfd' | 'ai';
 
@@ -13,6 +13,24 @@ export type VizMode = 'speed' | 'pressure' | 'streamlines' | 'vectors' | 'three3
 export type ColormapScheme = 'inferno' | 'jet' | 'coolwarm' | 'viridis' | 'turbo' | 'pressure';
 
 export type AiProviderType = 'gemini' | 'openai' | 'claude' | 'deepseek' | 'groq' | 'ollama';
+
+export type FluidSubstanceId = 'air' | 'water' | 'co2' | 'oil' | 'ethanol';
+
+export interface FluidProperties {
+  id: FluidSubstanceId;
+  name: string;
+  density: number;             // rho [kg/m^3]
+  kinematicViscosity: number;  // nu [m^2/s]
+  specificHeat: number;        // Cp [J/(kg*K)]
+  thermalExpansion: number;    // beta [1/K]
+  surfaceTension?: number;     // sigma [N/m] (for multiphase/water)
+}
+
+export interface NaturalForces {
+  gravity: [number, number, number]; // g vector [m/s^2], e.g. [0, -9.81, 0]
+  ambientTemp: number;               // T0 [K], e.g. 293.15
+  referencePressure: number;         // p0 [Pa], e.g. 101325
+}
 
 export interface AiProviderConfig {
   provider: AiProviderType;
@@ -40,6 +58,8 @@ export interface StudioParameters {
 export interface SimulationParams {
   archetype: SimulationArchetype;
   activeField: FieldVariable;
+  substance: FluidSubstanceId;
+  naturalForces: NaturalForces;
   caseType: CaseType;
   solverMode: SolverMode;
   turbulenceModel: TurbulenceModel;

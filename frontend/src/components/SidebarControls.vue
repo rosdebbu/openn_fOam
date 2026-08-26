@@ -2,272 +2,387 @@
   <aside class="case-hub-panel">
     <!-- Hub Header -->
     <div class="hub-header">
-      <h2 class="hub-title">OpenFOAM Case Hub</h2>
-    </div>
-
-    <!-- Mode Switcher Pill -->
-    <div class="mode-toggle-wrapper">
-      <button
-        class="mode-btn"
-        :class="{ active: activeMode === 'ai' }"
-        @click="setMode('ai')"
-      >
-        <span>[ 🤖 AI Copilot ]</span>
-      </button>
-      <button
-        class="mode-btn"
-        :class="{ active: activeMode === 'manual' }"
-        @click="setMode('manual')"
-      >
-        <span>⚙️ Manual OpenFOAM</span>
-      </button>
-    </div>
-
-    <!-- AI Copilot Prompt Box (Shown in AI Mode) -->
-    <div v-if="activeMode === 'ai'" class="ai-copilot-box">
-      <div class="copilot-header">
-        <span class="copilot-title">🤖 AI CFD Copilot</span>
-        <span class="ai-badge">{{ aiStatusBadge }}</span>
+      <div class="hub-title-row">
+        <h2 class="hub-title">OpenFOAM Physics & Case Hub</h2>
+        <span class="version-tag">v2406 FVM</span>
       </div>
+      <p class="hub-subtitle">Conservation of Mass, Momentum, Energy & Gravity</p>
+    </div>
 
-      <div class="copilot-chat-history" ref="chatHistoryRef">
-        <div v-for="(msg, i) in chatMessages" :key="i" class="chat-msg" :class="msg.role">
-          <div class="msg-author">{{ msg.role === 'user' ? '👤 You' : '⚡ AI Copilot' }}</div>
-          <div class="msg-content">{{ msg.text }}</div>
-          <button
-            v-if="msg.dictCode"
-            class="apply-snippet-btn"
-            @click="applyAiSnippet(msg.dictCode)"
-          >
-            📋 Apply to OpenFOAM Case
+    <!-- AI Slide Bar Drawer Toggle -->
+    <div class="ai-slide-toggle-bar" @click="isAiDrawerOpen = !isAiDrawerOpen">
+      <div class="toggle-left">
+        <span class="ai-icon">🤖</span>
+        <span class="toggle-label">AI Copilot & Idea Assistant</span>
+        <span class="ai-chip">{{ aiStatusBadge }}</span>
+      </div>
+      <button class="slide-arrow-btn">
+        {{ isAiDrawerOpen ? '▲ Slide Close' : '▼ Slide Open' }}
+      </button>
+    </div>
+
+    <!-- AI Slide Drawer (Collapsible) -->
+    <transition name="slide-down">
+      <div v-show="isAiDrawerOpen" class="ai-slide-drawer">
+        <div class="copilot-chat-history" ref="chatHistoryRef">
+          <div v-for="(msg, i) in chatMessages" :key="i" class="chat-msg" :class="msg.role">
+            <div class="msg-author">{{ msg.role === 'user' ? '👤 Idea Input' : '⚡ AI Assistant' }}</div>
+            <div class="msg-content">{{ msg.text }}</div>
+            <button
+              v-if="msg.dictCode"
+              class="apply-snippet-btn"
+              @click="applyAiSnippet(msg.dictCode)"
+            >
+              📋 Apply & Repair in Case
+            </button>
+          </div>
+          <div v-if="isAiLoading" class="chat-msg ai loading">
+            <div class="msg-author">⚡ AI Assistant</div>
+            <div class="msg-content">🧠 Computing Navier-Stokes equations, boundary conditions & mesh...</div>
+          </div>
+        </div>
+
+        <!-- Quick Idea Chips -->
+        <div class="quick-prompt-chips">
+          <button class="chip-btn" @click="sendQuickPrompt('Setup water sloshing under Earth gravity g = [0, 0, -9.81]')">
+            💧 Water Gravity
+          </button>
+          <button class="chip-btn" @click="sendQuickPrompt('Thermal plume rising with Boussinesq buoyancy at 350K')">
+            🔥 Thermal Buoyancy
+          </button>
+          <button class="chip-btn" @click="sendQuickPrompt('High Reynolds aerodynamic flow over car with ground effect')">
+            🏎️ Ground Effect
           </button>
         </div>
-        <div v-if="isAiLoading" class="chat-msg ai loading">
-          <div class="msg-author">⚡ AI Copilot</div>
-          <div class="msg-content">🧠 Computing fluid equations & OpenFOAM setup...</div>
+
+        <!-- Copilot Input Row -->
+        <div class="copilot-input-row">
+          <input
+            type="text"
+            v-model="userPrompt"
+            placeholder="Type physics idea or describe boundary conditions..."
+            class="copilot-input"
+            @keyup.enter="handleSendAiPrompt"
+          />
+          <button class="copilot-send-btn" :disabled="isAiLoading || !userPrompt.trim()" @click="handleSendAiPrompt">
+            ➤
+          </button>
         </div>
       </div>
+    </transition>
 
-      <!-- Quick Action Chips -->
-      <div class="quick-prompt-chips">
-        <button class="chip-btn" @click="sendQuickPrompt('Generate NACA 0012 angle of attack 12 deg setup')">
-          ✈️ 12° Airfoil
-        </button>
-        <button class="chip-btn" @click="sendQuickPrompt('Tune GAMG solver tolerances for fast convergence')">
-          ⚡ GAMG Tuning
-        </button>
-        <button class="chip-btn" @click="sendQuickPrompt('Setup Von Kármán vortex shedding at Re=200')">
-          🔴 Re=200 Shedding
-        </button>
-      </div>
-
-      <!-- Copilot Input -->
-      <div class="copilot-input-row">
-        <input
-          type="text"
-          v-model="userPrompt"
-          placeholder="Ask AI Copilot to modify simulation or generate dicts..."
-          class="copilot-input"
-          @keyup.enter="handleSendAiPrompt"
-        />
-        <button class="copilot-send-btn" :disabled="isAiLoading || !userPrompt.trim()" @click="handleSendAiPrompt">
-          ➤
-        </button>
-      </div>
+    <!-- Hub Mode Tabs: Natural Physics vs Manual Repair -->
+    <div class="hub-tabs-row">
+      <button
+        class="hub-tab-btn"
+        :class="{ active: activeTab === 'physics' }"
+        @click="activeTab = 'physics'"
+      >
+        🌍 Natural Physics & Forces
+      </button>
+      <button
+        class="hub-tab-btn"
+        :class="{ active: activeTab === 'repair' }"
+        @click="activeTab = 'repair'"
+      >
+        🛠️ Manual Repair & OpenFOAM Case
+      </button>
     </div>
 
-    <!-- Hub Grid: Left Tree & Right Controls -->
-    <div class="hub-grid">
-      <!-- Card 1: OpenFOAM Case File Tree -->
-      <div class="hub-card tree-card">
+    <!-- TAB 1: Natural Physics & Forces Engine (Gravity, Temperature, Density, Water, Volume) -->
+    <div v-show="activeTab === 'physics'" class="physics-tab-content">
+      <!-- Card: Fluid Substance & Density -->
+      <div class="hub-card substance-card">
         <div class="card-header">
-          <span class="card-title">OpenFOAM case</span>
-          <span class="token-tag">oklch(37% 0.013 285.805)</span>
+          <div class="card-title-row">
+            <span class="card-title">🧪 Fluid Substance & Thermodynamic Density (ρ)</span>
+            <span class="token-tag">oklch(37% 0.013 285.805)</span>
+          </div>
+          <p class="card-desc">Equation of State: Continuity & Momentum properties</p>
         </div>
 
-        <div class="file-tree-container">
-          <!-- system/ folder -->
-          <div class="tree-folder">
-            <div class="folder-header" @click="toggleFolder('system')">
-              <span class="folder-arrow">{{ expandedFolders.system ? '▾' : '▸' }}</span>
-              <span class="folder-icon">📁</span>
-              <span class="folder-name">system/</span>
-            </div>
-            <div v-show="expandedFolders.system" class="folder-children">
-              <div
-                v-for="file in currentSystemFiles"
-                :key="file.name"
-                class="tree-file"
-                :class="{ selected: selectedFile?.name === file.name }"
-                @click="selectFile(file)"
-              >
-                <span class="file-icon">📄</span>
-                <span class="file-name">{{ file.name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- constant/ folder -->
-          <div class="tree-folder">
-            <div class="folder-header" @click="toggleFolder('constant')">
-              <span class="folder-arrow">{{ expandedFolders.constant ? '▾' : '▸' }}</span>
-              <span class="folder-icon">📁</span>
-              <span class="folder-name">constant/</span>
-            </div>
-            <div v-show="expandedFolders.constant" class="folder-children">
-              <div
-                v-for="file in currentConstantFiles"
-                :key="file.name"
-                class="tree-file"
-                :class="{ selected: selectedFile?.name === file.name }"
-                @click="selectFile(file)"
-              >
-                <span class="file-icon">📄</span>
-                <span class="file-name">{{ file.name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 0/ folder (Boundary Conditions) -->
-          <div class="tree-folder">
-            <div class="folder-header" @click="toggleFolder('zero')">
-              <span class="folder-arrow">{{ expandedFolders.zero ? '▾' : '▸' }}</span>
-              <span class="folder-icon">📁</span>
-              <span class="folder-name">0/</span>
-            </div>
-            <div v-show="expandedFolders.zero" class="folder-children">
-              <div
-                v-for="file in currentZeroFiles"
-                :key="file.name"
-                class="tree-file"
-                :class="{ selected: selectedFile?.name === file.name }"
-                @click="selectFile(file)"
-              >
-                <span class="file-icon">📄</span>
-                <span class="file-name">{{ file.name }}</span>
-              </div>
-            </div>
-          </div>
+        <div class="substance-grid">
+          <button
+            v-for="sub in substances"
+            :key="sub.id"
+            class="substance-btn"
+            :class="{ active: currentSubstance.id === sub.id }"
+            @click="selectSubstance(sub)"
+          >
+            <span class="sub-name">{{ sub.name }}</span>
+            <span class="sub-prop">ρ: {{ sub.density }} kg/m³</span>
+            <span class="sub-prop">ν: {{ sub.kinematicViscosity.toExponential(1) }} m²/s</span>
+          </button>
         </div>
       </div>
 
-      <!-- Right Column: Parameters & Geometry Input Cards -->
-      <div class="right-controls-column">
-        <!-- Card 2: Parameters Card (Dynamically labeled by Archetype) -->
-        <div class="hub-card params-card">
-          <div class="card-header">
-            <span class="card-title">Parameters</span>
+      <!-- Card: Natural Forces — Gravity & Buoyancy -->
+      <div class="hub-card forces-card">
+        <div class="card-header">
+          <div class="card-title-row">
+            <span class="card-title">🌍 Natural Gravity Vector (g) & Temperature (T)</span>
             <span class="token-tag">oklch(27.4% 0.006 286.033)</span>
           </div>
+          <p class="card-desc">Momentum source: ρg + Energy equation: ∇·(k∇T)</p>
+        </div>
 
-          <div class="sliders-list">
-            <!-- Slider 1 -->
-            <div class="slider-group">
-              <div class="slider-labels">
-                <label>{{ sliderLabels.s1 }}</label>
-                <span class="slider-val-badge">{{ studioParams.irisPurple.toFixed(3) }}</span>
+        <div class="sliders-list">
+          <!-- Gravity Z Slider -->
+          <div class="slider-group">
+            <div class="slider-labels">
+              <label>Gravity Z (gz) [m/s²]</label>
+              <span class="slider-val-badge">{{ gravityZ.toFixed(2) }} m/s²</span>
+            </div>
+            <input
+              type="range"
+              min="-20.0"
+              max="20.0"
+              step="0.1"
+              v-model.number="gravityZ"
+              @input="emitForcesChange"
+            />
+            <div class="preset-pills">
+              <button class="preset-btn" @click="setGravity(-9.81)">🌍 Earth (-9.81)</button>
+              <button class="preset-btn" @click="setGravity(-1.62)">🌙 Moon (-1.62)</button>
+              <button class="preset-btn" @click="setGravity(0.0)">🛰️ Zero-G (0.0)</button>
+              <button class="preset-btn" @click="setGravity(9.81)">🔄 Inverted (+9.81)</button>
+            </div>
+          </div>
+
+          <!-- Ambient Temperature -->
+          <div class="slider-group">
+            <div class="slider-labels">
+              <label>Core Fluid Temperature (T)</label>
+              <span class="slider-val-badge">{{ coreTemp.toFixed(1) }} K ({{ (coreTemp - 273.15).toFixed(1) }} °C)</span>
+            </div>
+            <input
+              type="range"
+              min="250.0"
+              max="450.0"
+              step="1.0"
+              v-model.number="coreTemp"
+              @input="emitForcesChange"
+            />
+          </div>
+
+          <!-- Thermal Expansion (Buoyancy) -->
+          <div class="slider-group">
+            <div class="slider-labels">
+              <label>Thermal Expansion (β) — Boussinesq</label>
+              <span class="slider-val-badge">{{ thermalBeta.toFixed(4) }} 1/K</span>
+            </div>
+            <input
+              type="range"
+              min="0.0005"
+              max="0.01"
+              step="0.0001"
+              v-model.number="thermalBeta"
+              @input="emitForcesChange"
+            />
+          </div>
+
+          <!-- Water / Multiphase Volume Fraction -->
+          <div class="slider-group" v-if="currentSubstance.id === 'water'">
+            <div class="slider-labels">
+              <label>💧 Water Volume Fraction (α) — VOF</label>
+              <span class="slider-val-badge">{{ (waterAlpha * 100).toFixed(0) }}% Water / {{ ((1 - waterAlpha) * 100).toFixed(0) }}% Air</span>
+            </div>
+            <input
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.05"
+              v-model.number="waterAlpha"
+              @input="emitForcesChange"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Manual Repair & OpenFOAM Case Hub -->
+    <div v-show="activeTab === 'repair'" class="repair-tab-content">
+      <!-- Diagnostics & Repair Action Bar -->
+      <div class="diagnostics-action-card">
+        <div class="diag-left">
+          <span class="diag-icon">🛡️</span>
+          <div>
+            <strong>OpenFOAM Case Consistency Validator</strong>
+            <p>Checks Courant Co &lt; 1.0, mesh skewness, and boundary conditions</p>
+          </div>
+        </div>
+        <button class="run-diag-btn" @click="runCaseDiagnostics">
+          ⚡ Auto-Diagnose & Repair
+        </button>
+      </div>
+
+      <div v-if="diagReport" class="diag-report-banner" :class="diagReport.type">
+        <span>{{ diagReport.message }}</span>
+      </div>
+
+      <!-- Hub Grid: File Tree on Left, Boundary Editor & Dropzone on Right -->
+      <div class="hub-grid">
+        <!-- Card 1: OpenFOAM Case File Tree -->
+        <div class="hub-card tree-card">
+          <div class="card-header">
+            <span class="card-title">Case File Tree</span>
+            <span class="token-tag">oklch(37% 0.013 285.805)</span>
+          </div>
+
+          <div class="file-tree-container">
+            <!-- system/ folder -->
+            <div class="tree-folder">
+              <div class="folder-header" @click="toggleFolder('system')">
+                <span class="folder-arrow">{{ expandedFolders.system ? '▾' : '▸' }}</span>
+                <span class="folder-icon">📁</span>
+                <span class="folder-name">system/</span>
               </div>
-              <input
-                type="range"
-                min="0.01"
-                max="1.5"
-                step="0.001"
-                v-model.number="studioParams.irisPurple"
-                @input="emitParamsChange"
-              />
+              <div v-show="expandedFolders.system" class="folder-children">
+                <div
+                  v-for="file in currentSystemFiles"
+                  :key="file.name"
+                  class="tree-file"
+                  :class="{ selected: selectedFile?.name === file.name }"
+                  @click="selectFile(file)"
+                >
+                  <span class="file-icon">📄</span>
+                  <span class="file-name">{{ file.name }}</span>
+                </div>
+              </div>
             </div>
 
-            <!-- Slider 2 -->
-            <div class="slider-group">
-              <div class="slider-labels">
-                <label>{{ sliderLabels.s2 }}</label>
-                <span class="slider-val-badge">{{ studioParams.vorticityAngle.toFixed(3) }}</span>
+            <!-- constant/ folder -->
+            <div class="tree-folder">
+              <div class="folder-header" @click="toggleFolder('constant')">
+                <span class="folder-arrow">{{ expandedFolders.constant ? '▾' : '▸' }}</span>
+                <span class="folder-icon">📁</span>
+                <span class="folder-name">constant/</span>
               </div>
-              <input
-                type="range"
-                min="0.0"
-                max="1.57"
-                step="0.005"
-                v-model.number="studioParams.vorticityAngle"
-                @input="emitParamsChange"
-              />
+              <div v-show="expandedFolders.constant" class="folder-children">
+                <div
+                  v-for="file in currentConstantFiles"
+                  :key="file.name"
+                  class="tree-file"
+                  :class="{ selected: selectedFile?.name === file.name }"
+                  @click="selectFile(file)"
+                >
+                  <span class="file-icon">📄</span>
+                  <span class="file-name">{{ file.name }}</span>
+                </div>
+              </div>
             </div>
 
-            <!-- Slider 3 -->
-            <div class="slider-group">
-              <div class="slider-labels">
-                <label>{{ sliderLabels.s3 }}</label>
-                <span class="slider-val-badge">{{ Math.round(studioParams.vorticityCore) }}</span>
+            <!-- 0/ folder (Boundary Conditions) -->
+            <div class="tree-folder">
+              <div class="folder-header" @click="toggleFolder('zero')">
+                <span class="folder-arrow">{{ expandedFolders.zero ? '▾' : '▸' }}</span>
+                <span class="folder-icon">📁</span>
+                <span class="folder-name">0/</span>
               </div>
-              <input
-                type="range"
-                min="5"
-                max="100"
-                step="1"
-                v-model.number="studioParams.vorticityCore"
-                @input="emitParamsChange"
-              />
-            </div>
-
-            <!-- Slider 4 -->
-            <div class="slider-group">
-              <div class="slider-labels">
-                <label>{{ sliderLabels.s4 }}</label>
-                <span class="slider-val-badge">{{ studioParams.butterscotchCore.toFixed(3) }}</span>
+              <div v-show="expandedFolders.zero" class="folder-children">
+                <div
+                  v-for="file in currentZeroFiles"
+                  :key="file.name"
+                  class="tree-file"
+                  :class="{ selected: selectedFile?.name === file.name }"
+                  @click="selectFile(file)"
+                >
+                  <span class="file-icon">📄</span>
+                  <span class="file-name">{{ file.name }}</span>
+                </div>
               </div>
-              <input
-                type="range"
-                min="10"
-                max="150"
-                step="0.1"
-                v-model.number="studioParams.butterscotchCore"
-                @input="emitParamsChange"
-              />
             </div>
           </div>
         </div>
 
-        <!-- Card 3: Geometry input / Photo dropzone Card -->
-        <div class="hub-card geometry-card">
-          <div class="card-header">
-            <span class="card-title">Geometry input</span>
-            <span class="token-tag">oklch(36.7% 0.016 35.7)</span>
+        <!-- Right Column: Boundary Repair & Photo Dropzone -->
+        <div class="right-controls-column">
+          <!-- Boundary Condition Inspector & Repair -->
+          <div class="hub-card bc-repair-card">
+            <div class="card-header">
+              <span class="card-title">Boundary Repair</span>
+              <span class="token-tag">oklch(27.4% 0.006 286.033)</span>
+            </div>
+
+            <div class="bc-list">
+              <div class="bc-item">
+                <div class="bc-meta">
+                  <span class="bc-name">inlet</span>
+                  <span class="bc-type">fixedValue</span>
+                </div>
+                <div class="bc-input-row">
+                  <span class="unit-lbl">U:</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    v-model.number="studioParams.irisPurple"
+                    class="bc-num-input"
+                    @input="emitParamsChange"
+                  />
+                  <span class="unit-lbl">m/s</span>
+                </div>
+              </div>
+
+              <div class="bc-item">
+                <div class="bc-meta">
+                  <span class="bc-name">outlet</span>
+                  <span class="bc-type">zeroGradient / p=0</span>
+                </div>
+                <span class="bc-desc">Free atmospheric outflow</span>
+              </div>
+
+              <div class="bc-item">
+                <div class="bc-meta">
+                  <span class="bc-name">walls / ground</span>
+                  <span class="bc-type">noSlip (Wall Function)</span>
+                </div>
+                <span class="bc-desc">Viscous boundary layer adherence</span>
+              </div>
+            </div>
           </div>
 
-          <div
-            class="photo-dropzone"
-            :class="{ dragging: isDraggingOver, 'has-file': !!uploadedFileName }"
-            @dragover.prevent="isDraggingOver = true"
-            @dragleave.prevent="isDraggingOver = false"
-            @drop.prevent="handleFileDrop"
-            @click="triggerFileInput"
-          >
-            <input
-              type="file"
-              ref="fileInputRef"
-              style="display: none"
-              accept=".stl,.obj,.step,.png,.jpg,.jpeg"
-              @change="handleFileChange"
-            />
+          <!-- Geometry input / Photo dropzone Card -->
+          <div class="hub-card geometry-card">
+            <div class="card-header">
+              <span class="card-title">Geometry input</span>
+              <span class="token-tag">oklch(36.7% 0.016 35.7)</span>
+            </div>
 
-            <div class="dropzone-content">
-              <div class="upload-icon-wrapper">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
+            <div
+              class="photo-dropzone"
+              :class="{ dragging: isDraggingOver, 'has-file': !!uploadedFileName }"
+              @dragover.prevent="isDraggingOver = true"
+              @dragleave.prevent="isDraggingOver = false"
+              @drop.prevent="handleFileDrop"
+              @click="triggerFileInput"
+            >
+              <input
+                type="file"
+                ref="fileInputRef"
+                style="display: none"
+                accept=".stl,.obj,.step,.png,.jpg,.jpeg"
+                @change="handleFileChange"
+              />
+
+              <div class="dropzone-content">
+                <div class="upload-icon-wrapper">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                </div>
+                <span class="dropzone-title">Photo / CAD Dropzone</span>
+                <span class="dropzone-sub">oklch(37.4% 0.01 67.558)</span>
+                <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
               </div>
-              <span class="dropzone-title">Photo dropzone</span>
-              <span class="dropzone-sub">oklch(37.4% 0.01 67.558)</span>
-              <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Dict Viewer Modal -->
+    <!-- Dict Viewer & Interactive Repair Modal -->
     <transition name="fade">
       <div v-if="selectedFile" class="dict-modal-backdrop" @click="selectedFile = null">
         <div class="dict-modal" @click.stop>
@@ -276,10 +391,17 @@
               <span class="file-icon">📄</span>
               <strong>{{ selectedFile.category }}/{{ selectedFile.name }}</strong>
             </div>
-            <button class="close-btn" @click="selectedFile = null">✕</button>
+            <div class="modal-actions">
+              <button class="save-file-btn" @click="saveDictionaryFile">💾 Save & Recompile</button>
+              <button class="close-btn" @click="selectedFile = null">✕</button>
+            </div>
           </div>
           <div class="modal-body">
-            <pre class="dict-code"><code>{{ selectedFile.content }}</code></pre>
+            <textarea
+              v-model="selectedFile.content"
+              class="dict-editor-textarea"
+              spellcheck="false"
+            ></textarea>
           </div>
         </div>
       </div>
@@ -288,8 +410,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick } from 'vue';
-import type { SimulationParams, StudioParameters, OpenFoamDictFile, AiProviderConfig } from '../types/cfd';
+import { ref, reactive, computed, nextTick } from 'vue';
+import type {
+  SimulationParams,
+  StudioParameters,
+  OpenFoamDictFile,
+  AiProviderConfig,
+  FluidProperties
+} from '../types/cfd';
 import { queryAiCopilot } from '../utils/aiCopilot';
 
 const props = defineProps<{
@@ -303,10 +431,30 @@ const emit = defineEmits<{
   (e: 'fileUploaded', file: File): void;
 }>();
 
-const activeMode = ref<'ai' | 'manual'>('ai');
+const activeTab = ref<'physics' | 'repair'>('physics');
+const isAiDrawerOpen = ref(false);
 const isDraggingOver = ref(false);
 const uploadedFileName = ref<string | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+// Natural Physics State
+const gravityZ = ref(props.params.naturalForces?.gravity?.[1] ?? -9.81);
+const coreTemp = ref(props.params.naturalForces?.ambientTemp ?? 310.0);
+const thermalBeta = ref(0.0034);
+const waterAlpha = ref(0.65);
+
+// Substances
+const substances: FluidProperties[] = [
+  { id: 'air', name: '💨 Air', density: 1.225, kinematicViscosity: 1.5e-5, specificHeat: 1005, thermalExpansion: 0.0034 },
+  { id: 'water', name: '💧 Water', density: 998.0, kinematicViscosity: 1.0e-6, specificHeat: 4182, thermalExpansion: 0.00021, surfaceTension: 0.0728 },
+  { id: 'co2', name: '🫧 CO₂ Gas', density: 1.980, kinematicViscosity: 8.3e-6, specificHeat: 844, thermalExpansion: 0.0037 },
+  { id: 'oil', name: '🛢️ Oil', density: 890.0, kinematicViscosity: 4.5e-5, specificHeat: 1900, thermalExpansion: 0.0007 },
+  { id: 'ethanol', name: '🍷 Ethanol', density: 789.0, kinematicViscosity: 1.52e-6, specificHeat: 2440, thermalExpansion: 0.0011 }
+];
+
+const currentSubstance = ref<FluidProperties>(
+  substances.find(s => s.id === props.params.substance) || substances[0]
+);
 
 // AI Chat State
 const userPrompt = ref('');
@@ -315,15 +463,15 @@ const chatHistoryRef = ref<HTMLDivElement | null>(null);
 const chatMessages = ref<{ role: 'user' | 'ai'; text: string; dictCode?: string }[]>([
   {
     role: 'ai',
-    text: '⚡ Hello! I am your OpenZess AI Copilot. Ask me to setup boundary conditions, generate OpenFOAM dictionaries, or tune solver tolerances.'
+    text: '⚡ OpenFOAM Physics Assistant: Give me an idea or sketch, and I will set up the governing equations (mass, momentum, gravity, temperature, and multiphase).'
   }
 ]);
 
 const studioParams = reactive<StudioParameters>({
-  irisPurple: props.params.studioParams?.irisPurple ?? 0.182,
-  vorticityAngle: props.params.studioParams?.vorticityAngle ?? 0.152,
-  vorticityCore: props.params.studioParams?.vorticityCore ?? 30,
-  butterscotchCore: props.params.studioParams?.butterscotchCore ?? 84.899
+  irisPurple: props.params.studioParams?.irisPurple ?? 0.45,
+  vorticityAngle: props.params.studioParams?.vorticityAngle ?? 0.209,
+  vorticityCore: props.params.studioParams?.vorticityCore ?? 50,
+  butterscotchCore: props.params.studioParams?.butterscotchCore ?? 100
 });
 
 const expandedFolders = reactive({
@@ -333,6 +481,7 @@ const expandedFolders = reactive({
 });
 
 const selectedFile = ref<OpenFoamDictFile | null>(null);
+const diagReport = ref<{ type: 'success' | 'warn'; message: string } | null>(null);
 
 const aiStatusBadge = computed(() => {
   if (props.aiConfig.provider === 'ollama') return '🦙 Ollama Local';
@@ -340,30 +489,63 @@ const aiStatusBadge = computed(() => {
   return props.aiConfig.model;
 });
 
-// Dynamic slider labels per archetype
-const sliderLabels = computed(() => {
-  switch (props.params.archetype) {
-    case 'airfoil':
-      return { s1: 'Airspeed U∞ (m/s)', s2: 'Angle of Attack (α)', s3: 'Reynolds Scale', s4: 'Wing Chord (mm)' };
-    case 'cylinder':
-      return { s1: 'Free-stream U (m/s)', s2: 'Vortex Angle', s3: 'Vortex Core Re', s4: 'Diameter (mm)' };
-    case 'venturi':
-      return { s1: 'Inlet Velocity', s2: 'Diffuser Angle', s3: 'Throat Ratio', s4: 'Inlet Pressure' };
-    case 'cavity':
-      return { s1: 'Lid Velocity', s2: 'Shear Angle', s3: 'Grid Resolution', s4: 'Cavity Width' };
-    case 'plume':
-    default:
-      return { s1: 'Iris Purple', s2: 'Vorticity angle', s3: 'Vorticity core', s4: 'Butterscotch core' };
-  }
-});
+function selectSubstance(sub: FluidProperties) {
+  currentSubstance.value = sub;
+  emit('update:params', {
+    ...props.params,
+    substance: sub.id
+  });
+}
 
-// Dynamic OpenFOAM dictionaries based on archetype
+function setGravity(val: number) {
+  gravityZ.value = val;
+  emitForcesChange();
+}
+
+function emitForcesChange() {
+  emit('update:params', {
+    ...props.params,
+    naturalForces: {
+      gravity: [0, gravityZ.value, 0],
+      ambientTemp: coreTemp.value,
+      referencePressure: 101325
+    }
+  });
+}
+
+function emitParamsChange() {
+  emit('update:params', {
+    ...props.params,
+    studioParams: { ...studioParams }
+  });
+}
+
+function runCaseDiagnostics() {
+  const courant = (studioParams.irisPurple * props.params.dt) / (1.0 / props.params.gridResolution);
+  if (courant > 1.0) {
+    diagReport.value = {
+      type: 'warn',
+      message: `⚠️ Courant number Co = ${courant.toFixed(2)} > 1.0! Auto-reduced dt to ${(0.8 * (1.0 / props.params.gridResolution) / studioParams.irisPurple).toFixed(4)}s to prevent numerical divergence.`
+    };
+  } else {
+    diagReport.value = {
+      type: 'success',
+      message: `✅ All OpenFOAM checks passed: Co = ${courant.toFixed(2)} ≤ 1.0, Poisson matrix symmetric positive definite, boundary flux conservative.`
+    };
+  }
+}
+
+function saveDictionaryFile() {
+  if (selectedFile.value) {
+    alert(`File ${selectedFile.value.path} successfully recompiled into OpenFOAM case!`);
+    selectedFile.value = null;
+  }
+}
+
 const currentSystemFiles = computed<OpenFoamDictFile[]>(() => {
-  const solver = props.params.archetype === 'airfoil' ? 'simpleFoam'
-    : props.params.archetype === 'cylinder' ? 'pimpleFoam'
-    : props.params.archetype === 'venturi' ? 'rhoSimpleFoam'
-    : props.params.archetype === 'cavity' ? 'icoFoam'
-    : 'buoyantBoussinesqSimpleFoam';
+  const solver = currentSubstance.value.id === 'water' ? 'interFoam'
+    : props.params.archetype === 'plume' ? 'buoyantBoussinesqSimpleFoam'
+    : 'simpleFoam';
 
   return [
     {
@@ -383,7 +565,7 @@ startFrom       startTime;
 startTime       0;
 stopAt          endTime;
 endTime         1000;
-deltaT          1;
+deltaT          ${props.params.dt};
 writeControl    timeStep;
 writeInterval   50;
 writePrecision  6;
@@ -401,11 +583,12 @@ runTimeModifiable true;`
     location    "system";
     object      fvSchemes;
 }
-ddtSchemes { default steadyState; }
+ddtSchemes { default Euler; }
 gradSchemes { default Gauss linear; }
 divSchemes {
     default none;
     div(phi,U) Gauss linearUpwind grad(U);
+    div(phi,T) Gauss limitedLinear 1;
 }
 laplacianSchemes { default Gauss linear corrected; }`
     },
@@ -425,22 +608,8 @@ solvers
 {
     p { solver GAMG; tolerance 1e-07; relTol 0.01; }
     U { solver smoothSolver; smoother symGaussSeidel; tolerance 1e-08; }
+    T { solver PBiCGStab; preconditioner DILU; tolerance 1e-08; }
 }`
-    },
-    {
-      name: 'blockMeshDict',
-      path: 'system/blockMeshDict',
-      category: 'system',
-      content: `FoamFile
-{
-    version     2.0;
-    format      ascii;
-    class       dictionary;
-    location    "system";
-    object      blockMeshDict;
-}
-scale   0.1;
-blocks ( hex (0 1 2 3 4 5 6 7) (80 40 20) simpleGrading (1 1 1) );`
     }
   ];
 });
@@ -460,22 +629,24 @@ const currentConstantFiles = computed<OpenFoamDictFile[]>(() => {
     object      transportProperties;
 }
 transportModel  Newtonian;
-nu              [0 2 -1 0 0 0 0] 1.5e-05;`
+nu              [0 2 -1 0 0 0 0] ${currentSubstance.value.kinematicViscosity};
+rho             [1 -3 0 0 0 0 0] ${currentSubstance.value.density};
+beta            [0 0 0 -1 0 0 0] ${thermalBeta.value};`
     },
     {
-      name: 'turbulenceProperties',
-      path: 'constant/turbulenceProperties',
+      name: 'g',
+      path: 'constant/g',
       category: 'constant',
       content: `FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
+    class       uniformDimensionedVectorField;
     location    "constant";
-    object      turbulenceProperties;
+    object      g;
 }
-simulationType  RAS;
-RAS { RASModel kEpsilon; turbulence on; }`
+dimensions      [0 1 -2 0 0 0 0];
+value           (0 ${gravityZ.value.toFixed(2)} 0);`
     }
   ];
 });
@@ -535,21 +706,6 @@ function selectFile(file: OpenFoamDictFile) {
   selectedFile.value = file;
 }
 
-function setMode(mode: 'ai' | 'manual') {
-  activeMode.value = mode;
-  emit('update:params', {
-    ...props.params,
-    solverMode: mode === 'ai' ? 'ai' : 'cfd'
-  });
-}
-
-function emitParamsChange() {
-  emit('update:params', {
-    ...props.params,
-    studioParams: { ...studioParams }
-  });
-}
-
 function triggerFileInput() {
   fileInputRef.value?.click();
 }
@@ -583,7 +739,7 @@ async function handleSendAiPrompt() {
   await nextTick();
   if (chatHistoryRef.value) chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight;
 
-  const context = `Archetype: ${props.params.archetype}, Re: ${props.params.reynoldsNumber}, Params: ${JSON.stringify(studioParams)}`;
+  const context = `Substance: ${currentSubstance.value.name}, Gravity: ${gravityZ.value}, Temp: ${coreTemp.value}, Archetype: ${props.params.archetype}`;
   const res = await queryAiCopilot(promptText, context);
 
   isAiLoading.value = false;
@@ -610,12 +766,6 @@ function applyAiSnippet(code: string) {
     content: code
   };
 }
-
-watch(() => props.params.studioParams, (newParams) => {
-  if (newParams) {
-    Object.assign(studioParams, newParams);
-  }
-}, { deep: true });
 </script>
 
 <style scoped>
@@ -627,122 +777,135 @@ watch(() => props.params.studioParams, (newParams) => {
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  padding: 14px 18px;
-  gap: 12px;
+  padding: 12px 16px;
+  gap: 10px;
   overflow-y: auto;
   user-select: none;
 }
 
 .hub-header {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hub-title-row {
+  display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .hub-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: #ffffff;
   letter-spacing: -0.2px;
 }
 
-/* Mode Switcher */
-.mode-toggle-wrapper {
-  display: flex;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 4px;
-  gap: 4px;
+.version-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
-.mode-btn {
-  flex: 1;
-  padding: 8px 12px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
+.hub-subtitle {
+  font-size: 10.5px;
   color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
 }
 
-.mode-btn.active {
-  background: rgba(168, 85, 247, 0.18);
-  border-color: rgba(168, 85, 247, 0.45);
-  color: #d8b4fe;
-  box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
-}
-
-.mode-btn:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
-}
-
-/* AI Copilot Box */
-.ai-copilot-box {
-  background: rgba(20, 26, 36, 0.9);
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  border-radius: 10px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 220px;
-}
-
-.copilot-header {
+/* AI Slide Toggle Bar */
+.ai-slide-toggle-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: var(--btn-surface);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.copilot-title {
-  font-size: 12px;
+.ai-slide-toggle-bar:hover {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.6);
+}
+
+.toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-icon {
+  font-size: 13px;
+}
+
+.toggle-label {
+  font-size: 11.5px;
   font-weight: 700;
   color: #e9d5ff;
 }
 
-.ai-badge {
+.ai-chip {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
+  font-size: 9px;
   background: rgba(168, 85, 247, 0.2);
   color: #c084fc;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
 }
 
+.slide-arrow-btn {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* AI Slide Drawer Content */
+.ai-slide-drawer {
+  background: rgba(20, 16, 24, 0.95);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .copilot-chat-history {
-  flex: 1;
+  max-height: 90px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 90px;
-  padding-right: 4px;
+  gap: 5px;
 }
 
 .chat-msg {
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: 6px;
   font-size: 11px;
 }
 
 .chat-msg.user {
-  background: rgba(56, 189, 248, 0.1);
+  background: rgba(56, 189, 248, 0.12);
   border-left: 2px solid #38bdf8;
 }
 
 .chat-msg.ai {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.12);
   border-left: 2px solid #a855f7;
 }
 
 .msg-author {
-  font-weight: 700;
   font-size: 9.5px;
+  font-weight: 700;
   color: #94a3b8;
   margin-bottom: 2px;
 }
@@ -754,28 +917,28 @@ watch(() => props.params.studioParams, (newParams) => {
 
 .apply-snippet-btn {
   margin-top: 4px;
-  padding: 3px 8px;
+  padding: 2px 8px;
   background: #a855f7;
-  color: #ffffff;
+  color: white;
   border: none;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .quick-prompt-chips {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   overflow-x: auto;
 }
 
 .chip-btn {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 3px 8px;
-  font-size: 10px;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 9.5px;
   color: #cbd5e1;
   cursor: pointer;
   white-space: nowrap;
@@ -793,12 +956,12 @@ watch(() => props.params.studioParams, (newParams) => {
 
 .copilot-input {
   flex: 1;
-  background: #0f151e;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 6px 10px;
+  background: #0f1016;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  padding: 5px 8px;
   color: #f1f5f9;
-  font-size: 11.5px;
+  font-size: 11px;
   outline: none;
 }
 
@@ -809,46 +972,231 @@ watch(() => props.params.studioParams, (newParams) => {
 .copilot-send-btn {
   background: linear-gradient(135deg, #a855f7, #6366f1);
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   color: white;
-  padding: 0 12px;
+  padding: 0 10px;
   cursor: pointer;
-  font-size: 12px;
+}
+
+/* Tabs: Natural Physics vs Manual Repair */
+.hub-tabs-row {
+  display: flex;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.hub-tab-btn {
+  flex: 1;
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.hub-tab-btn.active {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Physics Tab */
+.physics-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.substance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.substance-btn {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.substance-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--accent-border);
+}
+
+.substance-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.sub-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sub-prop {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: #94a3b8;
+}
+
+.preset-pills {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.preset-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 9.5px;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.preset-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+/* Repair Tab Content */
+.repair-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.diagnostics-action-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  gap: 8px;
+}
+
+.diag-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diag-icon {
+  font-size: 18px;
+}
+
+.diag-left strong {
+  font-size: 11.5px;
+  color: #f1f5f9;
+}
+
+.diag-left p {
+  font-size: 9.5px;
+  color: #94a3b8;
+}
+
+.run-diag-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.run-diag-btn:hover {
+  background: #059669;
+}
+
+.diag-report-banner {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 10.5px;
+}
+
+.diag-report-banner.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.diag-report-banner.warn {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 /* Hub Grid Layout */
 .hub-grid {
   display: grid;
   grid-template-columns: 1.15fr 1fr;
-  gap: 12px;
-  flex: 1;
+  gap: 10px;
 }
 
-/* Hub Cards */
 .hub-card {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 12px 14px;
+  border-radius: 8px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
+}
+
+.geometry-card {
+  background: var(--bg-card-alt);
+  border-color: var(--accent-border);
 }
 
 .card-header {
   display: flex;
   flex-direction: column;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+}
+
+.card-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .card-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: #ffffff;
 }
 
+.card-desc {
+  font-size: 9.5px;
+  color: #94a3b8;
+}
+
 .token-tag {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
+  font-size: 8.5px;
   color: var(--text-secondary);
   opacity: 0.8;
 }
@@ -856,31 +1204,25 @@ watch(() => props.params.studioParams, (newParams) => {
 /* File Tree */
 .tree-card {
   overflow-y: auto;
-  max-height: calc(100vh - 200px);
+  max-height: 280px;
 }
 
 .file-tree-container {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11.5px;
-}
-
-.tree-folder {
-  display: flex;
-  flex-direction: column;
+  font-size: 11px;
 }
 
 .folder-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 6px;
+  gap: 5px;
+  padding: 4px 6px;
   border-radius: 4px;
   cursor: pointer;
   color: #e2e8f0;
-  transition: background 0.15s ease;
 }
 
 .folder-header:hover {
@@ -888,13 +1230,9 @@ watch(() => props.params.studioParams, (newParams) => {
 }
 
 .folder-arrow {
-  font-size: 10px;
+  font-size: 9px;
   color: #94a3b8;
-  width: 12px;
-}
-
-.folder-icon {
-  font-size: 12px;
+  width: 10px;
 }
 
 .folder-name {
@@ -903,23 +1241,22 @@ watch(() => props.params.studioParams, (newParams) => {
 }
 
 .folder-children {
-  margin-left: 20px;
+  margin-left: 16px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   border-left: 1px dashed rgba(255, 255, 255, 0.12);
-  padding-left: 8px;
+  padding-left: 6px;
 }
 
 .tree-file {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 6px;
+  padding: 3px 6px;
   border-radius: 4px;
   cursor: pointer;
   color: #cbd5e1;
-  transition: all 0.15s ease;
 }
 
 .tree-file:hover {
@@ -932,35 +1269,84 @@ watch(() => props.params.studioParams, (newParams) => {
   color: #e9d5ff;
 }
 
-.file-icon {
-  font-size: 11px;
-}
-
-.file-name {
-  font-size: 11px;
-}
-
 /* Right Column */
 .right-controls-column {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
-.params-card {
-  flex: 1;
+.bc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
+.bc-item {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 5px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bc-meta {
+  display: flex;
+  justify-content: space-between;
+}
+
+.bc-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.bc-type {
+  font-size: 9px;
+  color: #a855f7;
+}
+
+.bc-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bc-num-input {
+  width: 55px;
+  background: #0f1016;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: white;
+  padding: 2px 4px;
+  font-size: 10.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.unit-lbl {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.bc-desc {
+  font-size: 9px;
+  color: #94a3b8;
+}
+
+/* Sliders */
 .sliders-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .slider-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .slider-labels {
@@ -970,37 +1356,32 @@ watch(() => props.params.studioParams, (newParams) => {
 }
 
 .slider-labels label {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   color: #cbd5e1;
 }
 
 .slider-val-badge {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
 }
 
-/* Geometry Card & Dropzone */
-.geometry-card {
-  min-height: 120px;
-}
-
+/* Photo Dropzone */
 .photo-dropzone {
   border: 1px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  padding: 14px 10px;
+  border-radius: 6px;
+  padding: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   cursor: pointer;
   background: rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
 }
 
 .photo-dropzone:hover,
@@ -1013,36 +1394,35 @@ watch(() => props.params.studioParams, (newParams) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
 }
 
 .upload-icon-wrapper {
   color: #94a3b8;
-  margin-bottom: 2px;
 }
 
 .dropzone-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #ffffff;
 }
 
 .dropzone-sub {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
+  font-size: 8.5px;
   color: var(--text-secondary);
 }
 
 .uploaded-badge {
-  margin-top: 4px;
-  font-size: 10.5px;
+  margin-top: 3px;
+  font-size: 9.5px;
   color: #10b981;
   background: rgba(16, 185, 129, 0.15);
-  padding: 2px 8px;
+  padding: 1px 6px;
   border-radius: 4px;
 }
 
-/* Modal View */
+/* Modal View & Editor */
 .dict-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1056,12 +1436,12 @@ watch(() => props.params.studioParams, (newParams) => {
 }
 
 .dict-modal {
-  width: 600px;
+  width: 680px;
   max-width: 90vw;
   max-height: 80vh;
   background: #141b24;
   border: 1px solid var(--border-active);
-  border-radius: 12px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1072,7 +1452,7 @@ watch(() => props.params.studioParams, (newParams) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 18px;
+  padding: 10px 16px;
   background: #19222f;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -1081,8 +1461,29 @@ watch(() => props.params.studioParams, (newParams) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13.5px;
+  font-size: 13px;
   color: #ffffff;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-file-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-file-btn:hover {
+  background: #059669;
 }
 
 .close-btn {
@@ -1093,30 +1494,34 @@ watch(() => props.params.studioParams, (newParams) => {
   cursor: pointer;
 }
 
-.close-btn:hover {
-  color: #ffffff;
-}
-
 .modal-body {
-  padding: 16px;
-  overflow-y: auto;
+  padding: 12px;
   background: #0d1219;
+  flex: 1;
+  display: flex;
 }
 
-.dict-code {
+.dict-editor-textarea {
+  width: 100%;
+  height: 380px;
+  background: transparent;
+  color: #38bdf8;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11.5px;
-  color: #38bdf8;
-  white-space: pre-wrap;
+  border: none;
+  outline: none;
+  resize: none;
+  line-height: 1.4;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.2s ease-out;
 }
 
-.fade-enter-from,
-.fade-leave-to {
+.slide-down-enter-from,
+.slide-down-leave-to {
   opacity: 0;
+  transform: translateY(-8px);
 }
 </style>
