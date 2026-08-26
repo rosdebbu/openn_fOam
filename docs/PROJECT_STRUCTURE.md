@@ -9,38 +9,54 @@ This document provides a detailed breakdown of the entire **OpenZess 3D** codeba
 ```
 openn_fOam/
 │
-├── main.py                         # 🚀 Launcher: Starts FastAPI & auto-opens Web Studio
-├── requirements.txt                # 📦 Python backend dependencies
-├── README.md                       # 📖 General overview & GitHub landing page
-├── PROJECT_STRUCTURE.md            # 🏛️ Full architectural map (This file)
+├── main.py                     # 🚀 Launcher: Starts FastAPI & auto-opens Web Studio
+├── requirements.txt            # 📦 Python backend dependencies
+├── README.md                   # 📖 GitHub landing page & quick-start guide
+├── .gitignore                  # 🧹 Ignores bytecode, tool caches, builds & secrets
 │
-├── backend/                        # 🧠 Python Aerothermal & AI Physics Engine
-│   ├── app.py                      # FastAPI REST routes & WebSocket (/ws/simulate_3d)
-│   ├── mesh_3d.py                  # 3D Cartesian Grid & 2D Image-to-3D Voxelizer
-│   ├── solver_3d.py                # 3D Navier-Stokes, Pressure Poisson & Thermal Energy Solver
-│   ├── ai_vision_engine.py         # AI Vision classifier, preset catalog & NLP Co-Pilot
-│   ├── openfoam_generator_3d.py    # OpenFOAM v2312 Case Generator & ZIP Exporter
-│   └── vtk_writer_3d.py            # ParaView 3D Legacy Structured Points (.vtk) Exporter
+├── backend/                    # 🧠 Python Aerothermal & AI Physics Engine
+│   ├── app.py                  # FastAPI REST routes & WebSocket simulation streaming
+│   ├── mesh.py                 # Structured Cartesian grid generator & obstacle masks
+│   ├── solver.py               # Navier-Stokes, Pressure Poisson & Thermal solver (SciPy sparse-accelerated)
+│   ├── ai_predictor.py         # ⚡ Instant PINN surrogate physics prediction
+│   └── vtk_writer.py           # ParaView legacy structured-points (.vtk) exporter
 │
-└── frontend/                       # 🌐 Vue 3 + TypeScript + Three.js + Tailwind Web Studio
-    ├── index.html                  # HTML5 application root entry
-    ├── package.json                # Frontend packages (Vue 3, Three.js, Lucide, Chart.js)
-    ├── vite.config.ts              # Vite bundling & Tailwind CSS configuration
-    │
-    └── src/
-        ├── App.vue                 # 🎛️ Master application coordinator (Split-Screen Studio)
-        ├── types/cfd.ts            # 📐 TypeScript interfaces for OpenFOAM cases & 3D physics
-        │
-        ├── components/
-        │   ├── HeaderNavbar.vue    # Top Bar: Brand Logo Gradient, Colab Runtime Widget, Transport & Export
-        │   ├── HardwareModal.vue   # Google Colab-style Runtime Specs & Connection Dialog
-        │   ├── OpenFoamCaseHub.vue # 📁 Left Panel: OpenFOAM Case Tree, AI / Manual Mode, Sliders & Dropzone
-        │   ├── CfdViewport3D.vue   # 🌌 Right 3D Viewport: Volumetric Plume, Streamlines, Cut-Planes & Probe HUD
-        │   └── ResidualMonitor.vue # 📈 Logarithmic Convergence Residual Monitor (Chart.js)
-        │
-        └── utils/
-            ├── colormaps.ts        # 🎨 Scientific Colormaps (Aerothermal Plume, Turbo, Viridis)
-            └── openfoamTemplates.ts# 📑 OpenFOAM v2312 Complete Case Templates
+├── frontend/                   # 🌐 Vue 3 + TypeScript + Three.js + Tailwind Web Studio
+│   ├── index.html              # HTML5 application root entry
+│   ├── package.json            # Frontend packages (Vue 3, Three.js, Chart.js, Lucide)
+│   ├── vite.config.ts          # Vite bundling configuration
+│   │
+│   ├── public/
+│   │   ├── favicon.svg         # App favicon
+│   │   └── icons.svg           # Shared SVG icon sprite
+│   │
+│   └── src/
+│       ├── main.ts             # Vue application bootstrap
+│       ├── App.vue             # 🎛️ Master application coordinator (Split-Screen Studio)
+│       ├── style.css           # Global styles & OKLCH design tokens
+│       ├── types/cfd.ts        # 📐 TypeScript interfaces for CFD cases & 3D physics
+│       │
+│       ├── components/
+│       │   ├── HeaderNavbar.vue      # Top bar: brand, runtime widget, playback & export controls
+│       │   ├── SidebarControls.vue   # Side panel: simulation parameters & mode toggles
+│       │   ├── CfdCanvas2D.vue       # 🖼️ 2D HTML5 Canvas viewport renderer
+│       │   ├── CfdThree3D.vue        # 🌌 Three.js WebGL 3D viewport renderer
+│       │   ├── ResidualChart.vue     # 📈 Logarithmic convergence residual monitor (Chart.js)
+│       │   ├── AiAssistant.vue       # 🤖 AI Co-Pilot conversational assistant panel
+│       │   ├── OpenFoamDictEditor.vue# 📑 OpenFOAM dictionary code editor
+│       │   └── HelloWorld.vue        # Vite scaffold placeholder component
+│       │
+│       └── utils/
+│           ├── colormaps.ts      # 🎨 Scientific colormaps (thermal plume, Turbo, Viridis)
+│           └── openfoamDicts.ts  # 📑 OpenFOAM dictionary case templates
+│
+├── docs/                       # 📚 Architecture, physics & design documentation
+│   └── assets/                 # Documentation images
+│
+├── saved_chats/                # 💾 Simulation session archives & design mockups
+│   └── assets/                 # UI mockup images & visual references
+│
+└── graphify-out/               # 🕸️ Codebase dependency-graph reports (agent tooling output)
 ```
 
 ---
@@ -62,8 +78,8 @@ openn_fOam/
 
 ---
 
-### Layer 2: 3D Geometry & Voxelizer (`backend/mesh_3d.py`)
-- Constructs structured 3D Cartesian meshes of size $(N_x \times N_y \times N_z)$ across domain spans $(L_x, L_y, L_z)$.
+### Layer 2: Mesh Generation (`backend/mesh.py`)
+- Constructs structured Cartesian meshes across the computational domain.
 - **Image-to-3D Extrusion**: Takes 2D image silhouettes and depth maps, extrudes them through the transverse $Y$-axis, and generates a 3D boolean obstacle mask (`obstacle_mask[i, j, k]`).
 - **Geometric Primitives**: Built-in 3D solid constructors for:
   - `table`: Tabletop plate with 4 cylindrical legs.
@@ -75,7 +91,7 @@ openn_fOam/
 
 ---
 
-### Layer 3: 3D Aerothermal CFD Physics (`backend/solver_3d.py`)
+### Layer 3: Aerothermal CFD Physics (`backend/solver.py`)
 Solves the coupled Navier-Stokes and thermal convection-diffusion equations:
 
 1. **3D Momentum (Navier-Stokes)**:
@@ -91,16 +107,16 @@ Solves the coupled Navier-Stokes and thermal convection-diffusion equations:
 
 ---
 
-### Layer 4: AI Vision & Conversational Co-Pilot (`backend/ai_vision_engine.py`)
-- Analyzes uploaded user photos or preset choices.
-- Translates natural language requests into physical parameter updates (*"Increase inlet speed to 4 m/s"*, *"Make the heater 60°C"*).
-- Eliminates manual OpenFOAM dictionary coding by auto-synchronizing domain boundary conditions and meshing parameters.
+### Layer 4: AI Surrogate Physics (`backend/ai_predictor.py`)
+- Provides instant (<50 ms) PINN-based flow-field prediction as an alternative to iterative solving.
+- Translates simulation inputs into pre-trained surrogate physics solutions used by `backend/app.py` endpoints.
+- Eliminates long solver wait times for quick design iteration directly in the Web Studio UI.
 
 ---
 
-### Layer 5: Production Exporters (`backend/openfoam_generator_3d.py` & `backend/vtk_writer_3d.py`)
-- **OpenFOAM Generator**: Produces a valid, ready-to-run OpenFOAM directory suite (`system/controlDict`, `system/blockMeshDict`, `system/fvSchemes`, `system/fvSolution`, `constant/transportProperties`, `constant/g`, `0/U`, `0/T`, `0/p_rgh`) and bundles it into `openfoam_case_3d.zip`.
-- **ParaView VTK Writer**: Produces `openzess_3d_simulation.vtk` containing 3D Velocity vectors $(u, v, w)$, Pressure $p$, Temperature $T$, Speed magnitude $\|U\|$, and solid obstacle masks.
+### Layer 5: Production Exporters (`backend/vtk_writer.py` & `frontend/src/utils/openfoamDicts.ts`)
+- **ParaView VTK Writer**: Produces legacy `.vtk` files containing velocity vectors $(u, v)$, pressure $p$, temperature $T$, speed magnitude $\|U\|$, and solid obstacle masks via the `/api/export/vtk` endpoint.
+- **OpenFOAM Case Templates**: Complete OpenFOAM dictionary suites (`system/controlDict`, `system/fvSchemes`, `constant/transportProperties`, `0/U`, `0/T`, `0/p`, etc.) generated by `openfoamDicts.ts` in the frontend for one-click OpenFOAM case export.
 
 ---
 
