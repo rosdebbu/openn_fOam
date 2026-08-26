@@ -1,100 +1,116 @@
 <template>
   <div class="three-viewport-container">
-    <!-- Viewport Top Header: Title, Telemetry, and HUD Controls in Unified Responsive Flex Bar -->
-    <div class="viewport-top-header">
-      <div class="viewport-title-bar">
-        <span class="viewport-title">Three.js CFD Viewport</span>
-        <span class="archetype-badge">{{ archetypeBadgeTitle }}</span>
-        <span class="telemetry-pill">Co_max: {{ telemetry.courantMax.toFixed(2) }}</span>
-        <span class="telemetry-pill forces">Cd: {{ telemetry.cd.toFixed(3) }} | Cl: {{ telemetry.cl.toFixed(3) }}</span>
+    <!-- Viewport Top Header: Two Distinct Structured Lines (Status Row & Tools Ribbon) -->
+    <div class="viewport-header-strip">
+      <!-- Line 1: Title, Simulation Archetype, and Aerodynamic Telemetry -->
+      <div class="header-status-line">
+        <div class="status-left">
+          <span class="viewport-title">Three.js CFD Viewport</span>
+          <span class="archetype-badge">{{ archetypeBadgeTitle }}</span>
+        </div>
+        <div class="status-right">
+          <span class="telemetry-pill">Co_max: {{ telemetry.courantMax.toFixed(2) }}</span>
+          <span class="telemetry-pill forces">Cd: {{ telemetry.cd.toFixed(3) }}</span>
+          <span class="telemetry-pill forces">Cl: {{ telemetry.cl.toFixed(3) }}</span>
+        </div>
       </div>
 
-      <!-- Top HUD Toolbar Overlay: Field Switcher & Toggles -->
-      <div class="viewport-hud-toolbar">
-        <!-- Active Field Variable Dropdown -->
-        <div class="field-select-wrapper">
-          <label for="field-var-select">Field:</label>
-          <select
-            id="field-var-select"
-            :value="activeField"
-            @change="onFieldChange(($event.target as HTMLSelectElement).value as FieldVariable)"
-            class="field-dropdown"
-          >
-            <option value="U">🌀 Velocity |U| [m/s]</option>
-            <option value="p">🔴 Pressure (p) [Pa]</option>
-            <option value="T">🌡️ Temperature (T) [K]</option>
-            <option value="omega">🌪️ Vorticity (ω) [1/s]</option>
-            <option value="q_crit">✨ Q-Criterion (Vortices)</option>
-          </select>
+      <!-- Line 2: Organized Toolbar Strip (Field, Colormap, Visualization & Camera Toggles) -->
+      <div class="header-tools-line">
+        <!-- Field & Colormap selectors -->
+        <div class="tools-left">
+          <div class="field-select-wrapper">
+            <label for="field-var-select">Field:</label>
+            <select
+              id="field-var-select"
+              :value="activeField"
+              @change="onFieldChange(($event.target as HTMLSelectElement).value as FieldVariable)"
+              class="field-dropdown"
+            >
+              <option value="U">🌀 Velocity |U| [m/s]</option>
+              <option value="p">🔴 Pressure (p) [Pa]</option>
+              <option value="T">🌡️ Temperature (T) [K]</option>
+              <option value="omega">🌪️ Vorticity (ω) [1/s]</option>
+              <option value="q_crit">✨ Q-Criterion (Vortices)</option>
+            </select>
+          </div>
+
+          <div class="colormap-select-wrapper">
+            <label for="colormap-select">Palette:</label>
+            <select
+              id="colormap-select"
+              :value="activeColormap"
+              @change="activeColormap = ($event.target as HTMLSelectElement).value as ColormapScheme"
+              class="colormap-dropdown"
+            >
+              <option value="turbo">🌈 Turbo</option>
+              <option value="coolwarm">❄️ Coolwarm</option>
+              <option value="jet">🌊 Jet</option>
+              <option value="viridis">🌌 Viridis</option>
+              <option value="inferno">🔥 Inferno</option>
+            </select>
+          </div>
         </div>
 
-        <!-- Palette Dropdown -->
-        <div class="colormap-select-wrapper">
-          <select
-            :value="activeColormap"
-            @change="activeColormap = ($event.target as HTMLSelectElement).value as ColormapScheme"
-            class="colormap-dropdown"
-          >
-            <option value="turbo">🌈 Turbo</option>
-            <option value="coolwarm">❄️ Coolwarm</option>
-            <option value="jet">🌊 Jet</option>
-            <option value="viridis">🌌 Viridis</option>
-            <option value="inferno">🔥 Inferno</option>
-          </select>
+        <!-- Action Toggles -->
+        <div class="tools-right">
+          <div class="tool-btn-group">
+            <button
+              class="hud-tool-btn"
+              :class="{ active: showParticles }"
+              @click="showParticles = !showParticles"
+              title="Toggle RK4 Particle Advection Tracers"
+            >
+              ✨ Particles
+            </button>
+
+            <button
+              class="hud-tool-btn"
+              :class="{ active: showGlyphs }"
+              @click="showGlyphs = !showGlyphs"
+              title="Toggle 3D Vector Glyph Cones (Hedgehogs)"
+            >
+              🏹 Vector Glyphs
+            </button>
+
+            <button
+              class="hud-tool-btn"
+              :class="{ active: showGeometry }"
+              @click="showGeometry = !showGeometry"
+              title="Toggle 3D Physical Obstacle Mesh"
+            >
+              🧱 3D Model
+            </button>
+
+            <button
+              class="hud-tool-btn"
+              :class="{ active: showCutplanes }"
+              @click="showCutplanes = !showCutplanes"
+              title="Toggle Orthogonal Sliced Cutplanes"
+            >
+              📐 Cut-Planes
+            </button>
+          </div>
+
+          <div class="tool-btn-group">
+            <button
+              class="hud-tool-btn"
+              :class="{ active: isAutoRotate }"
+              @click="isAutoRotate = !isAutoRotate"
+              title="Toggle 3D Orbit Auto-Rotation"
+            >
+              🔄 Auto-Rotate
+            </button>
+
+            <button
+              class="hud-tool-btn"
+              @click="resetCamera"
+              title="Reset 3D Camera View"
+            >
+              🎯 Reset
+            </button>
+          </div>
         </div>
-
-        <button
-          class="hud-tool-btn"
-          :class="{ active: showParticles }"
-          @click="showParticles = !showParticles"
-          title="Toggle RK4 Particle Advection Tracers"
-        >
-          ✨ Particles
-        </button>
-
-        <button
-          class="hud-tool-btn"
-          :class="{ active: showGlyphs }"
-          @click="showGlyphs = !showGlyphs"
-          title="Toggle 3D Vector Glyph Cones (Hedgehogs)"
-        >
-          🏹 Vector Glyphs
-        </button>
-
-        <button
-          class="hud-tool-btn"
-          :class="{ active: showGeometry }"
-          @click="showGeometry = !showGeometry"
-          title="Toggle 3D Physical Obstacle Mesh"
-        >
-          🧱 3D Model
-        </button>
-
-        <button
-          class="hud-tool-btn"
-          :class="{ active: showCutplanes }"
-          @click="showCutplanes = !showCutplanes"
-          title="Toggle Orthogonal Sliced Cutplanes"
-        >
-          📐 Cut-Planes
-        </button>
-
-        <button
-          class="hud-tool-btn"
-          :class="{ active: isAutoRotate }"
-          @click="isAutoRotate = !isAutoRotate"
-          title="Toggle 3D Orbit Auto-Rotation"
-        >
-          🔄 Auto-Rotate
-        </button>
-
-        <button
-          class="hud-tool-btn"
-          @click="resetCamera"
-          title="Reset 3D Camera View"
-        >
-          🎯 Reset
-        </button>
       </div>
     </div>
 
@@ -842,28 +858,42 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.viewport-top-header {
+.viewport-header-strip {
   position: absolute;
   top: 10px;
   left: 14px;
   right: 14px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(19, 15, 22, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.header-status-line {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  z-index: 20;
-  pointer-events: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 6px;
 }
 
-.viewport-title-bar {
+.status-left {
   display: flex;
   align-items: center;
   gap: 8px;
-  pointer-events: auto;
 }
 
 .viewport-title {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 700;
   color: #ffffff;
   letter-spacing: -0.2px;
@@ -879,6 +909,12 @@ onUnmounted(() => {
   padding: 2px 7px;
   border-radius: 4px;
   white-space: nowrap;
+}
+
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .telemetry-pill {
@@ -899,29 +935,35 @@ onUnmounted(() => {
   border-color: rgba(251, 191, 36, 0.3);
 }
 
-.viewport-hud-toolbar {
+.header-tools-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tools-left {
   display: flex;
   align-items: center;
-  gap: 6px;
-  pointer-events: auto;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  gap: 10px;
 }
 
 .field-select-wrapper,
 .colormap-select-wrapper {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 11px;
   color: #cbd5e1;
+  font-weight: 600;
 }
 
 .field-dropdown,
 .colormap-dropdown {
-  background: rgba(25, 30, 40, 0.9);
+  background: var(--btn-surface);
   color: #f1f5f9;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-subtle);
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 11px;
@@ -930,27 +972,48 @@ onUnmounted(() => {
   outline: none;
 }
 
-.hud-tool-btn {
-  background: rgba(25, 30, 40, 0.85);
-  backdrop-filter: blur(8px);
-  color: #cbd5e1;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 4px 8px;
+.field-dropdown:focus,
+.colormap-dropdown:focus {
+  border-color: var(--accent-border);
+}
+
+.tools-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px;
   border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.hud-tool-btn {
+  background: transparent;
+  color: #cbd5e1;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  border-radius: 5px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .hud-tool-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
 
 .hud-tool-btn.active {
-  background: rgba(168, 85, 247, 0.25);
-  border-color: rgba(168, 85, 247, 0.6);
+  background: rgba(168, 85, 247, 0.22);
+  border-color: rgba(168, 85, 247, 0.5);
   color: #e9d5ff;
 }
 
@@ -964,7 +1027,7 @@ onUnmounted(() => {
 .paraview-colorbar-card {
   position: absolute;
   right: 18px;
-  top: 58px;
+  top: 96px;
   background: rgba(15, 20, 30, 0.85);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.12);
