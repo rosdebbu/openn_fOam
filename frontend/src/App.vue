@@ -37,43 +37,68 @@
           @update:activeField="val => params.activeField = val"
         />
 
-        <!-- Floating Bottom Telemetry: Residual Monitor & OpenFOAM Terminal Drawer -->
-        <div class="bottom-telemetry-dock">
-          <!-- Tab selector for Bottom Dock -->
-          <div class="dock-tabs">
-            <button
-              class="dock-tab-btn"
-              :class="{ active: activeDockTab === 'residuals' }"
-              @click="activeDockTab = 'residuals'"
-            >
-              📈 Residuals ({{ latestResidualFormatted }})
-            </button>
-            <button
-              class="dock-tab-btn"
-              :class="{ active: activeDockTab === 'terminal' }"
-              @click="activeDockTab = 'terminal'"
-            >
-              📟 OpenFOAM Solver Log
-            </button>
+        <!-- Floating Bottom Slide Drawer: Telemetry & OpenFOAM Terminal Drawer -->
+        <div class="bottom-telemetry-dock" :class="{ 'dock-expanded': isBottomDockOpen }">
+          <!-- Slide Bar Handle Pill -->
+          <div class="dock-slide-bar" @click="isBottomDockOpen = !isBottomDockOpen">
+            <div class="slide-bar-left">
+              <span class="slide-icon">{{ isBottomDockOpen ? '▼' : '▲' }}</span>
+              <span class="slide-title">📟 OpenFOAM Solver Log & Telemetry</span>
+              <div class="mini-metrics" v-if="!isBottomDockOpen">
+                <span class="mini-tag res">Res: {{ latestResidualFormatted }}</span>
+                <span class="mini-tag force">Cd: {{ telemetry.cd.toFixed(3) }}</span>
+              </div>
+            </div>
+
+            <div class="slide-bar-right" @click.stop>
+              <div class="dock-tabs" v-if="isBottomDockOpen">
+                <button
+                  class="dock-tab-btn"
+                  :class="{ active: activeDockTab === 'terminal' }"
+                  @click="activeDockTab = 'terminal'"
+                >
+                  📟 Solver Log
+                </button>
+                <button
+                  class="dock-tab-btn"
+                  :class="{ active: activeDockTab === 'residuals' }"
+                  @click="activeDockTab = 'residuals'"
+                >
+                  📈 Residuals
+                </button>
+              </div>
+              <button
+                class="minimize-toggle-btn"
+                @click="isBottomDockOpen = !isBottomDockOpen"
+                :title="isBottomDockOpen ? 'Slide Down / Hide' : 'Slide Up / Show'"
+              >
+                {{ isBottomDockOpen ? '✕ Hide' : '▲ Expand' }}
+              </button>
+            </div>
           </div>
 
-          <!-- Residual Chart View -->
-          <div v-show="activeDockTab === 'residuals'" class="dock-panel">
-            <ResidualChart
-              :iterations="iterations"
-              :residuals="residuals"
-              :latestResidual="latestResidual"
-            />
-          </div>
+          <!-- Slide Drawer Content -->
+          <transition name="slide-fade">
+            <div v-show="isBottomDockOpen" class="dock-drawer-body">
+              <!-- Live OpenFOAM Terminal View -->
+              <div v-show="activeDockTab === 'terminal'" class="dock-panel terminal-panel">
+                <OpenFoamTerminal
+                  :archetype="params.archetype"
+                  :isPlaying="isPlaying"
+                  :telemetry="telemetry"
+                />
+              </div>
 
-          <!-- Live OpenFOAM Terminal View -->
-          <div v-show="activeDockTab === 'terminal'" class="dock-panel terminal-panel">
-            <OpenFoamTerminal
-              :archetype="params.archetype"
-              :isPlaying="isPlaying"
-              :telemetry="telemetry"
-            />
-          </div>
+              <!-- Residual Chart View -->
+              <div v-show="activeDockTab === 'residuals'" class="dock-panel">
+                <ResidualChart
+                  :iterations="iterations"
+                  :residuals="residuals"
+                  :latestResidual="latestResidual"
+                />
+              </div>
+            </div>
+          </transition>
         </div>
       </main>
     </div>
@@ -121,6 +146,7 @@ const params = reactive<SimulationParams>({
 
 const aiConfig = reactive<AiProviderConfig>(getStoredAiConfig());
 const isSettingsOpen = ref(false);
+const isBottomDockOpen = ref(false);
 const activeDockTab = ref<'residuals' | 'terminal'>('terminal');
 
 const isPlaying = ref(true);
@@ -304,16 +330,105 @@ onUnmounted(() => {
   display: flex;
 }
 
-/* Bottom Telemetry Dock */
+/* Bottom Telemetry Slide Drawer */
 .bottom-telemetry-dock {
   position: absolute;
-  bottom: 18px;
-  right: 18px;
+  bottom: 14px;
+  right: 14px;
   z-index: 40;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  gap: 6px;
+  max-width: 440px;
+  user-select: none;
+}
+
+/* Compact Slide Bar Pill */
+.dock-slide-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(19, 15, 22, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.dock-slide-bar:hover {
+  border-color: var(--border-active);
+  background: rgba(27, 21, 31, 0.98);
+}
+
+.slide-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slide-icon {
+  font-size: 10px;
+  color: #38bdf8;
+}
+
+.slide-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.mini-metrics {
+  display: flex;
+  align-items: center;
   gap: 4px;
+  margin-left: 4px;
+}
+
+.mini-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.mini-tag.res {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.15);
+}
+
+.mini-tag.force {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.slide-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.minimize-toggle-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  color: #cbd5e1;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.minimize-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 .dock-tabs {
@@ -329,9 +444,9 @@ onUnmounted(() => {
   background: transparent;
   border: 1px solid transparent;
   color: #94a3b8;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -347,11 +462,27 @@ onUnmounted(() => {
   color: #e9d5ff;
 }
 
+.dock-drawer-body {
+  display: flex;
+  flex-direction: column;
+}
+
 .dock-panel {
   display: flex;
 }
 
 .dock-panel.terminal-panel {
   width: 420px;
+}
+
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
 }
 </style>
