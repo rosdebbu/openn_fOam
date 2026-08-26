@@ -4,11 +4,13 @@ export type SimulationArchetype = 'plume' | 'airfoil' | 'cylinder' | 'venturi' |
 
 export type SolverMode = 'cfd' | 'ai';
 
-export type TurbulenceModel = 'laminar' | 'k-epsilon' | 'k-omega-sst';
+export type FieldVariable = 'U' | 'p' | 'T' | 'omega' | 'q_crit';
+
+export type TurbulenceModel = 'laminar' | 'k-epsilon' | 'k-omega-sst' | 'spalart-allmaras';
 
 export type VizMode = 'speed' | 'pressure' | 'streamlines' | 'vectors' | 'three3d';
 
-export type ColormapScheme = 'inferno' | 'jet' | 'coolwarm' | 'viridis' | 'pressure';
+export type ColormapScheme = 'inferno' | 'jet' | 'coolwarm' | 'viridis' | 'turbo' | 'pressure';
 
 export type AiProviderType = 'gemini' | 'openai' | 'claude' | 'deepseek' | 'groq' | 'ollama';
 
@@ -17,6 +19,15 @@ export interface AiProviderConfig {
   apiKey: string;
   model: string;
   customBaseUrl?: string;
+}
+
+export interface AerodynamicTelemetry {
+  cd: number;           // Drag Coefficient
+  cl: number;           // Lift Coefficient
+  l_d: number;          // Lift-to-Drag Ratio
+  courantMax: number;   // Maximum Courant number Co = |U| dt / dx
+  courantMean: number;  // Mean Courant number
+  continuityError: number;
 }
 
 export interface StudioParameters {
@@ -28,6 +39,7 @@ export interface StudioParameters {
 
 export interface SimulationParams {
   archetype: SimulationArchetype;
+  activeField: FieldVariable;
   caseType: CaseType;
   solverMode: SolverMode;
   turbulenceModel: TurbulenceModel;
