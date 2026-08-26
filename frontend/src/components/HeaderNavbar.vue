@@ -1,74 +1,239 @@
 <template>
   <header class="header-navbar">
+    <!-- Left: Brand Logo and Title -->
     <div class="brand">
-      <div class="logo-badge">⚡</div>
-      <div class="brand-text">
-        <span class="brand-title">OpenZess <small>Studio v2.0</small></span>
-        <span class="brand-subtitle">OpenFOAM Vue 3 + Three.js WebGL CFD Interface</span>
+      <div class="logo-cube" title="OpenZess 3D Studio">
+        <div class="cube-inner">
+          <span class="cube-face front"></span>
+          <span class="cube-face back"></span>
+          <span class="cube-face right"></span>
+          <span class="cube-face left"></span>
+          <span class="cube-face top"></span>
+          <span class="cube-face bottom"></span>
+        </div>
       </div>
+      <h1 class="brand-title">OpenZess 3D Studio</h1>
     </div>
 
-    <div class="header-actions">
-      <!-- Status Badge -->
-      <div class="status-indicator" :class="statusClass">
-        <span class="status-dot"></span>
-        <span class="status-text">{{ statusText }}</span>
-      </div>
-
-      <!-- Mode Badge -->
-      <div class="mode-indicator" :class="params.solverMode">
-        {{ params.solverMode === 'ai' ? '🧠 AI PINN Surrogate' : '🔬 SciPy CFD Solver' }}
-      </div>
-
-      <!-- Colormap Dropdown -->
-      <div class="colormap-select-wrapper">
-        <label for="colormap-select">Palette:</label>
-        <select
-          id="colormap-select"
-          :value="colormap"
-          @change="$emit('update:colormap', (($event.target as HTMLSelectElement).value as ColormapScheme))"
+    <!-- Right: Colab Runtime Widget, Transport Controls, Export Dropdown -->
+    <div class="header-right">
+      <!-- Google Colab Runtime Telemetry Widget -->
+      <div class="colab-widget-container" ref="colabWidgetRef">
+        <button
+          class="colab-btn"
+          :class="{ connected: isConnected, connecting: isConnecting }"
+          @click="showColabMenu = !showColabMenu"
+          title="Google Colab-style Local Hardware Bridge"
         >
-          <option value="inferno">🔥 Inferno</option>
-          <option value="jet">🌈 Jet</option>
-          <option value="coolwarm">❄️ Coolwarm</option>
-          <option value="viridis">🌌 Viridis</option>
-          <option value="pressure">🔴 Blue-Red (Pressure)</option>
-        </select>
+          <span class="colab-icon">✓</span>
+          <span class="colab-label">RAM</span>
+          <span class="colab-gauge">
+            <span class="gauge-bar" :style="{ width: ramUsage + '%' }"></span>
+          </span>
+          <span class="colab-label">Disk</span>
+          <span class="colab-gauge">
+            <span class="gauge-bar" :style="{ width: diskUsage + '%' }"></span>
+          </span>
+          <span class="colab-arrow">▾</span>
+        </button>
+
+        <!-- Colab Dropdown Menu -->
+        <transition name="fade-drop">
+          <div v-if="showColabMenu" class="colab-dropdown">
+            <div class="dropdown-header">
+              <div class="header-status">
+                <span class="pulse-dot"></span>
+                <strong>Connected to Local Hardware</strong>
+              </div>
+              <span class="header-host">127.0.0.1:8000</span>
+            </div>
+
+            <div class="resource-breakdown">
+              <div class="resource-item">
+                <div class="res-info">
+                  <span>System RAM</span>
+                  <strong>{{ (ramUsage * 0.32).toFixed(1) }} GB / 32.0 GB</strong>
+                </div>
+                <div class="res-meter">
+                  <div class="res-fill" :style="{ width: ramUsage + '%' }"></div>
+                </div>
+              </div>
+
+              <div class="resource-item">
+                <div class="res-info">
+                  <span>Local NVMe Disk</span>
+                  <strong>{{ (diskUsage * 10).toFixed(0) }} GB / 1024 GB</strong>
+                </div>
+                <div class="res-meter">
+                  <div class="res-fill disk" :style="{ width: diskUsage + '%' }"></div>
+                </div>
+              </div>
+
+              <div class="resource-item">
+                <div class="res-info">
+                  <span>Compute Device</span>
+                  <span class="device-tag">NVIDIA CUDA GPU (Local)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dropdown-actions">
+              <button class="menu-action-btn" @click="handleReconnect">
+                <span>🔄 Reconnect Local Bridge</span>
+              </button>
+              <button class="menu-action-btn" @click="showColabMenu = false">
+                <span>⚙️ Change Runtime Type</span>
+              </button>
+            </div>
+          </div>
+        </transition>
       </div>
 
-      <!-- Export VTK Button -->
-      <button class="btn btn-export" @click="$emit('exportVtk')" title="Export simulation for ParaView">
-        <span>📦 Export ParaView VTK</span>
-      </button>
+      <!-- Playback & Transport Controls -->
+      <div class="transport-controls">
+        <button class="transport-btn" @click="$emit('stepBack')" title="Step Back / Slow (⏪)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M11 5L3 12L11 19V5ZM20 5L12 12L20 19V5Z" />
+          </svg>
+        </button>
+
+        <button
+          class="transport-btn play-pause-btn"
+          :class="{ active: isPlaying }"
+          @click="$emit('togglePlay')"
+          :title="isPlaying ? 'Pause Simulation (⏸)' : 'Run Simulation (▶)'"
+        >
+          <svg v-if="!isPlaying" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5V19L19 12L8 5Z" />
+          </svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" />
+          </svg>
+        </button>
+
+        <button class="transport-btn" @click="$emit('stop')" title="Stop Simulation (⏹)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 6H18V18H6V6Z" />
+          </svg>
+        </button>
+
+        <button class="transport-btn" @click="$emit('fastForward')" title="Fast Forward (⏩)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4 19L12 12L4 5V19ZM13 19L21 12L13 5V19Z" />
+          </svg>
+        </button>
+
+        <button class="transport-btn" @click="$emit('reset')" title="Reset Simulation (🔄)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z" />
+          </svg>
+        </button>
+
+        <button class="transport-btn" @click="$emit('snapshot')" title="Capture Snapshot / Download (📥)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 9H15V3H9V9H5L12 16L19 9ZM5 18V20H19V18H5Z" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Export OpenFOAM Case Dropdown -->
+      <div class="export-dropdown-container" ref="exportDropdownRef">
+        <button
+          class="export-btn"
+          @click="showExportMenu = !showExportMenu"
+          title="Export OpenFOAM Case files and ParaView meshes"
+        >
+          <span>Export OpenFOAM Case (.ZIP / .VTK)</span>
+          <span class="arrow">▾</span>
+        </button>
+
+        <transition name="fade-drop">
+          <div v-if="showExportMenu" class="export-menu">
+            <button class="export-menu-item" @click="handleExport('zip')">
+              <span class="icon">📦</span>
+              <div class="item-text">
+                <strong>Full OpenFOAM Case (.ZIP)</strong>
+                <small>Includes system/, constant/, 0/ and Allrun</small>
+              </div>
+            </button>
+
+            <button class="export-menu-item" @click="handleExport('vtk')">
+              <span class="icon">📊</span>
+              <div class="item-text">
+                <strong>ParaView Grid (.VTK)</strong>
+                <small>Structured points with U, p, T scalars</small>
+              </div>
+            </button>
+
+            <button class="export-menu-item" @click="handleExport('png')">
+              <span class="icon">📸</span>
+              <div class="item-text">
+                <strong>High-Res Viewport (.PNG)</strong>
+                <small>4K render of 3D flow field</small>
+              </div>
+            </button>
+          </div>
+        </transition>
+      </div>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { SimulationParams, ColormapScheme } from '../types/cfd';
+import { ref, onMounted, onUnmounted } from 'vue';
 
 const props = defineProps<{
-  params: SimulationParams;
-  status: 'ready' | 'computing' | 'converged' | 'error';
-  colormap: ColormapScheme;
+  isPlaying: boolean;
+  isConnected: boolean;
+  isConnecting?: boolean;
 }>();
 
-defineEmits<{
-  (e: 'update:colormap', val: ColormapScheme): void;
-  (e: 'exportVtk'): void;
+const emit = defineEmits<{
+  (e: 'togglePlay'): void;
+  (e: 'stepBack'): void;
+  (e: 'stop'): void;
+  (e: 'fastForward'): void;
+  (e: 'reset'): void;
+  (e: 'snapshot'): void;
+  (e: 'exportCase', type: 'zip' | 'vtk' | 'png'): void;
 }>();
 
-const statusText = computed(() => {
-  switch (props.status) {
-    case 'computing': return 'Computing...';
-    case 'converged': return 'Converged (Residual < 1e-5)';
-    case 'error': return 'Error';
-    default: return 'Ready';
+const showColabMenu = ref(false);
+const showExportMenu = ref(false);
+const colabWidgetRef = ref<HTMLDivElement | null>(null);
+const exportDropdownRef = ref<HTMLDivElement | null>(null);
+
+// Simulating live subtle RAM/Disk fluctuation
+const ramUsage = ref(38);
+const diskUsage = ref(24);
+
+function handleReconnect() {
+  showColabMenu.value = false;
+  // Trigger reconnection
+}
+
+function handleExport(type: 'zip' | 'vtk' | 'png') {
+  showExportMenu.value = false;
+  emit('exportCase', type);
+}
+
+function handleClickOutside(e: MouseEvent) {
+  const target = e.target as Node;
+  if (colabWidgetRef.value && !colabWidgetRef.value.contains(target)) {
+    showColabMenu.value = false;
   }
+  if (exportDropdownRef.value && !exportDropdownRef.value.contains(target)) {
+    showExportMenu.value = false;
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleClickOutside);
 });
 
-const statusClass = computed(() => props.status);
+onUnmounted(() => {
+  window.removeEventListener('click', handleClickOutside);
+});
 </script>
 
 <style scoped>
@@ -76,156 +241,360 @@ const statusClass = computed(() => props.status);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 60px;
+  height: 56px;
   padding: 0 20px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+  z-index: 100;
+  user-select: none;
 }
 
+/* Brand styling */
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo-cube {
+  width: 32px;
+  height: 32px;
+  perspective: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cube-inner {
+  width: 26px;
+  height: 26px;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(-24deg) rotateY(32deg);
+  background: var(--brand-gradient);
+  border-radius: 6px;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.4), inset 0 0 8px rgba(255, 255, 255, 0.3);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.logo-cube:hover .cube-inner {
+  transform: rotateX(-10deg) rotateY(55deg) scale(1.08);
+}
+
+.brand-title {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #ffffff;
+  margin: 0;
+}
+
+/* Right header elements */
+.header-right {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.logo-badge {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+/* Colab Runtime Widget */
+.colab-widget-container {
+  position: relative;
+}
+
+.colab-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+  gap: 7px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.brand-text {
-  display: flex;
-  flex-direction: column;
+.colab-btn:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.5);
 }
 
-.brand-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: #ffffff;
-}
-
-.brand-title small {
+.colab-icon {
   font-size: 11px;
-  font-weight: 500;
-  color: #00d2ff;
-  background: rgba(0, 210, 255, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-weight: 800;
 }
 
-.brand-subtitle {
-  font-size: 11px;
+.colab-label {
   color: #94a3b8;
+  font-size: 11px;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.colab-gauge {
+  width: 44px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+  display: inline-block;
 }
 
-.status-indicator {
+.gauge-bar {
+  display: block;
+  height: 100%;
+  background: #10b981;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.colab-arrow {
+  font-size: 10px;
+  color: #94a3b8;
+  margin-left: 2px;
+}
+
+/* Colab Dropdown */
+.colab-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 310px;
+  background: #19202c;
+  border: 1px solid var(--border-active);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  z-index: 200;
+}
+
+.dropdown-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.header-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12.5px;
+  color: #ffffff;
 }
 
-.status-dot {
+.pulse-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #94a3b8;
-}
-
-.status-indicator.ready .status-dot {
-  background: #38bdf8;
-  box-shadow: 0 0 8px #38bdf8;
-}
-
-.status-indicator.computing .status-dot {
-  background: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
-  animation: pulse 1s infinite alternate;
-}
-
-.status-indicator.converged .status-dot {
   background: #10b981;
   box-shadow: 0 0 8px #10b981;
 }
 
-.mode-indicator {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
+.header-host {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-left: 16px;
+}
+
+.resource-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.resource-item .res-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.resource-item .res-info strong {
+  color: #f1f5f9;
+}
+
+.device-tag {
+  color: #a855f7;
+  font-size: 10.5px;
   font-weight: 600;
 }
 
-.mode-indicator.cfd {
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+.res-meter {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
 }
 
-.mode-indicator.ai {
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+.res-fill {
+  height: 100%;
+  background: #10b981;
 }
 
-.colormap-select-wrapper {
+.res-fill.disk {
+  background: #38bdf8;
+}
+
+.dropdown-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-action-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.menu-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+/* Transport Controls */
+.transport-controls {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #cbd5e1;
+  gap: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 3px;
+  border-radius: 7px;
 }
 
-.colormap-select-wrapper select {
-  background: #1e293b;
-  color: #f8fafc;
-  border: 1px solid #334155;
-  padding: 5px 10px;
+.transport-btn {
+  width: 32px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.transport-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.transport-btn.play-pause-btn {
+  color: #38bdf8;
+}
+
+.transport-btn.play-pause-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+/* Export Dropdown */
+.export-dropdown-container {
+  position: relative;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  color: #e2e8f0;
+  border: 1px solid var(--border-subtle);
+  padding: 7px 14px;
   border-radius: 6px;
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.btn-export {
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  color: white;
+.export-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-active);
+}
+
+.export-btn .arrow {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 270px;
+  background: #19202c;
+  border: 1px solid var(--border-active);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  z-index: 200;
+}
+
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
   border: none;
-  padding: 8px 14px;
   border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
+  color: #cbd5e1;
+  text-align: left;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+  transition: background 0.15s ease;
 }
 
-.btn-export:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.5);
+.export-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
-@keyframes pulse {
-  from { opacity: 0.5; }
-  to { opacity: 1; }
+.export-menu-item .icon {
+  font-size: 16px;
+}
+
+.export-menu-item .item-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.export-menu-item .item-text strong {
+  font-size: 12px;
+  color: #f1f5f9;
+}
+
+.export-menu-item .item-text small {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
+/* Animations */
+.fade-drop-enter-active,
+.fade-drop-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.fade-drop-enter-from,
+.fade-drop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 </style>

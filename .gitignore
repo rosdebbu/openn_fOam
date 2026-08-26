@@ -1,0 +1,30 @@
+# =====================
+# Python
+# =====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# =====================
+# Node / Frontend
+# =====================
+node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# =====================
+# AI / Agent tool output caches
+# =====================
+graphify-out/cache/
+scratch/
+
+# =====================
+# Environment & secrets
+# =====================
+.env
+.env.*

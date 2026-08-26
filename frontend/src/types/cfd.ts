@@ -8,6 +8,13 @@ export type VizMode = 'speed' | 'pressure' | 'streamlines' | 'vectors' | 'three3
 
 export type ColormapScheme = 'inferno' | 'jet' | 'coolwarm' | 'viridis' | 'pressure';
 
+export interface StudioParameters {
+  irisPurple: number;        // Inlet velocity / iris magnitude (default: 0.182)
+  vorticityAngle: number;    // Swirl angle / vorticity angle (default: 0.152)
+  vorticityCore: number;     // Core vortex intensity (default: 30)
+  butterscotchCore: number;  // Thermal core temperature / intensity (default: 84.899)
+}
+
 export interface SimulationParams {
   caseType: CaseType;
   solverMode: SolverMode;
@@ -17,6 +24,19 @@ export interface SimulationParams {
   maxIterations: number;
   dt: number;
   tolerance: number;
+  studioParams: StudioParameters;
+}
+
+export interface ProbeData {
+  x: number;
+  y: number;
+  z: number;
+  value: number;
+  u: number;
+  v: number;
+  w: number;
+  p: number;
+  t: number;
 }
 
 export interface SimulationStepData {
@@ -34,8 +54,10 @@ export interface SimulationStepData {
 export interface OpenFoamDictFile {
   name: string;
   path: string;
+  category?: 'system' | 'constant' | '0' | string;
   content: string;
-  language: string;
+  language?: string;
+  description?: string;
 }
 
 export interface AiResponse {
@@ -45,3 +67,4 @@ export interface AiResponse {
   vortexLocation?: string;
   boundaryLayer?: string;
 }
+
