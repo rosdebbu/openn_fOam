@@ -1,5 +1,7 @@
 export type CaseType = 'cavity' | 'channel' | 'obstacle' | 'pipe';
 
+export type SimulationArchetype = 'plume' | 'airfoil' | 'cylinder' | 'venturi' | 'cavity' | 'cad';
+
 export type SolverMode = 'cfd' | 'ai';
 
 export type TurbulenceModel = 'laminar' | 'k-epsilon' | 'k-omega-sst';
@@ -8,14 +10,24 @@ export type VizMode = 'speed' | 'pressure' | 'streamlines' | 'vectors' | 'three3
 
 export type ColormapScheme = 'inferno' | 'jet' | 'coolwarm' | 'viridis' | 'pressure';
 
+export type AiProviderType = 'gemini' | 'openai' | 'claude' | 'deepseek' | 'groq' | 'ollama';
+
+export interface AiProviderConfig {
+  provider: AiProviderType;
+  apiKey: string;
+  model: string;
+  customBaseUrl?: string;
+}
+
 export interface StudioParameters {
   irisPurple: number;        // Inlet velocity / iris magnitude (default: 0.182)
-  vorticityAngle: number;    // Swirl angle / vorticity angle (default: 0.152)
-  vorticityCore: number;     // Core vortex intensity (default: 30)
+  vorticityAngle: number;    // Swirl angle / vorticity angle / AoA (default: 0.152)
+  vorticityCore: number;     // Core vortex intensity / Re scale (default: 30)
   butterscotchCore: number;  // Thermal core temperature / intensity (default: 84.899)
 }
 
 export interface SimulationParams {
+  archetype: SimulationArchetype;
   caseType: CaseType;
   solverMode: SolverMode;
   turbulenceModel: TurbulenceModel;
@@ -63,8 +75,11 @@ export interface OpenFoamDictFile {
 export interface AiResponse {
   query: string;
   analysis: string;
-  reynolds: number;
+  reynolds?: number;
+  suggestedSolver?: string;
+  openfoamDictSnippet?: string;
   vortexLocation?: string;
   boundaryLayer?: string;
 }
+
 

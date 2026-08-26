@@ -2,8 +2,12 @@
   <div class="app-layout">
     <!-- Top Navigation Header -->
     <HeaderNavbar
+      :currentArchetype="params.archetype"
+      :aiConfig="aiConfig"
       :isPlaying="isPlaying"
       :isConnected="isConnected"
+      @update:archetype="setArchetype"
+      @openSettings="isSettingsOpen = true"
       @togglePlay="togglePlay"
       @stepBack="stepBack"
       @stop="stopSimulation"
@@ -18,6 +22,7 @@
       <!-- Left OpenFOAM Case Hub -->
       <SidebarControls
         :params="params"
+        :aiConfig="aiConfig"
         :isComputing="status === 'computing'"
         @update:params="updateParams"
         @fileUploaded="handleFileUploaded"
@@ -40,20 +45,30 @@
         </div>
       </main>
     </div>
+
+    <!-- AI Copilot & LLM Settings Modal -->
+    <SettingsModal
+      :isOpen="isSettingsOpen"
+      @close="isSettingsOpen = false"
+      @saved="handleAiConfigSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import type { SimulationParams, SimulationStepData } from './types/cfd';
+import type { SimulationParams, SimulationStepData, SimulationArchetype, AiProviderConfig } from './types/cfd';
+import { getStoredAiConfig } from './utils/aiCopilot';
 
 import HeaderNavbar from './components/HeaderNavbar.vue';
 import SidebarControls from './components/SidebarControls.vue';
 import CfdThree3D from './components/CfdThree3D.vue';
 import ResidualChart from './components/ResidualChart.vue';
+import SettingsModal from './components/SettingsModal.vue';
 
 // Studio Simulation Parameters matching Mockup
 const params = reactive<SimulationParams>({
+  archetype: 'plume',
   caseType: 'cavity',
   solverMode: 'ai',
   turbulenceModel: 'k-epsilon',
@@ -69,6 +84,9 @@ const params = reactive<SimulationParams>({
     butterscotchCore: 84.899
   }
 });
+
+const aiConfig = reactive<AiProviderConfig>(getStoredAiConfig());
+const isSettingsOpen = ref(false);
 
 const isPlaying = ref(true);
 const isConnected = ref(true);
@@ -86,12 +104,43 @@ const latestResidual = computed(() => {
   return residuals.value[residuals.value.length - 1];
 });
 
+function setArchetype(arch: SimulationArchetype) {
+  params.archetype = arch;
+  // Reset and populate default archetype physical parameters
+  if (arch === 'airfoil') {
+    params.studioParams.irisPurple = 0.45; // Airspeed
+    params.studioParams.vorticityAngle = 0.209; // 12 deg AoA
+    params.studioParams.vorticityCore = 50;
+    params.studioParams.butterscotchCore = 100;
+  } else if (arch === 'cylinder') {
+    params.studioParams.irisPurple = 0.35;
+    params.studioParams.vorticityAngle = 0.1;
+    params.studioParams.vorticityCore = 40;
+    params.studioParams.butterscotchCore = 60;
+  } else if (arch === 'venturi') {
+    params.studioParams.irisPurple = 0.25;
+    params.studioParams.vorticityAngle = 0.0;
+    params.studioParams.vorticityCore = 30;
+    params.studioParams.butterscotchCore = 50;
+  } else {
+    params.studioParams.irisPurple = 0.182;
+    params.studioParams.vorticityAngle = 0.152;
+    params.studioParams.vorticityCore = 30;
+    params.studioParams.butterscotchCore = 84.899;
+  }
+}
+
 function updateParams(newParams: SimulationParams) {
   Object.assign(params, newParams);
 }
 
+function handleAiConfigSaved(newConfig: AiProviderConfig) {
+  Object.assign(aiConfig, newConfig);
+}
+
 function handleFileUploaded(file: File) {
-  console.log('Geometry / photo uploaded:', file.name);
+  params.archetype = 'cad';
+  console.log('Geometry uploaded:', file.name);
 }
 
 function togglePlay() {
@@ -119,6 +168,8 @@ function fastForward() {
 function resetSimulation() {
   isPlaying.value = false;
   status.value = 'ready';
+  iterations.value = [0];
+  residuals.value = [1.0];
 }
 
 function takeSnapshot() {

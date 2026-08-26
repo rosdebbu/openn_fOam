@@ -13,10 +13,54 @@
         </div>
       </div>
       <h1 class="brand-title">OpenZess 3D Studio</h1>
+
+      <!-- Archetype Switcher Dropdown -->
+      <div class="archetype-dropdown-wrapper" ref="archetypeDropdownRef">
+        <button
+          class="archetype-pill-btn"
+          @click="showArchetypeMenu = !showArchetypeMenu"
+          title="Select Simulation Type & Physical Scenario"
+        >
+          <span class="archetype-icon">{{ currentArchetypeInfo.icon }}</span>
+          <span class="archetype-label">{{ currentArchetypeInfo.name }}</span>
+          <span class="dropdown-arrow">▾</span>
+        </button>
+
+        <transition name="fade-drop">
+          <div v-if="showArchetypeMenu" class="archetype-menu">
+            <div class="menu-heading">Simulation Scenarios</div>
+            <button
+              v-for="arch in archetypes"
+              :key="arch.id"
+              class="archetype-menu-item"
+              :class="{ selected: currentArchetype === arch.id }"
+              @click="selectArchetype(arch.id)"
+            >
+              <span class="menu-item-icon">{{ arch.icon }}</span>
+              <div class="menu-item-text">
+                <strong>{{ arch.name }}</strong>
+                <small>{{ arch.solver }} · {{ arch.desc }}</small>
+              </div>
+            </button>
+          </div>
+        </transition>
+      </div>
     </div>
 
-    <!-- Right: Colab Runtime Widget, Transport Controls, Export Dropdown -->
+    <!-- Right: AI Copilot Key Status, Colab Runtime Widget, Transport Controls, Export -->
     <div class="header-right">
+      <!-- AI Copilot Status & Key Config Button -->
+      <button
+        class="ai-key-status-btn"
+        :class="{ configured: hasAiKey }"
+        @click="$emit('openSettings')"
+        title="Configure LLM API Key (Gemini, OpenAI, Claude, DeepSeek, Ollama)"
+      >
+        <span class="ai-sparkle">{{ hasAiKey ? '⚡' : '🔑' }}</span>
+        <span class="ai-label">{{ aiModelDisplay }}</span>
+        <span class="config-gear">⚙️</span>
+      </button>
+
       <!-- Google Colab Runtime Telemetry Widget -->
       <div class="colab-widget-container" ref="colabWidgetRef">
         <button
@@ -143,7 +187,7 @@
           @click="showExportMenu = !showExportMenu"
           title="Export OpenFOAM Case files and ParaView meshes"
         >
-          <span>Export OpenFOAM Case (.ZIP / .VTK)</span>
+          <span>Export Case (.ZIP / .VTK)</span>
           <span class="arrow">▾</span>
         </button>
 
@@ -180,15 +224,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import type { SimulationArchetype, AiProviderConfig } from '../types/cfd';
 
 const props = defineProps<{
+  currentArchetype: SimulationArchetype;
+  aiConfig: AiProviderConfig;
   isPlaying: boolean;
   isConnected: boolean;
   isConnecting?: boolean;
 }>();
 
 const emit = defineEmits<{
+  (e: 'update:archetype', arch: SimulationArchetype): void;
+  (e: 'openSettings'): void;
   (e: 'togglePlay'): void;
   (e: 'stepBack'): void;
   (e: 'stop'): void;
@@ -198,18 +247,52 @@ const emit = defineEmits<{
   (e: 'exportCase', type: 'zip' | 'vtk' | 'png'): void;
 }>();
 
+const showArchetypeMenu = ref(false);
 const showColabMenu = ref(false);
 const showExportMenu = ref(false);
+
+const archetypeDropdownRef = ref<HTMLDivElement | null>(null);
 const colabWidgetRef = ref<HTMLDivElement | null>(null);
 const exportDropdownRef = ref<HTMLDivElement | null>(null);
 
-// Simulating live subtle RAM/Disk fluctuation
 const ramUsage = ref(38);
 const diskUsage = ref(24);
 
+const archetypes: { id: SimulationArchetype; name: string; icon: string; solver: string; desc: string }[] = [
+  { id: 'plume', name: 'Buoyant Thermal Plume', icon: '💨', solver: 'buoyantBoussinesqSimpleFoam', desc: 'Coupled thermal buoyancy jet' },
+  { id: 'airfoil', name: 'NACA 0012 Airfoil Flow', icon: '✈️', solver: 'simpleFoam', desc: 'Wing aerodynamics, Lift & Drag' },
+  { id: 'cylinder', name: 'Bluff Body & Vortex Street', icon: '🔴', solver: 'pimpleFoam', desc: 'Von Kármán transient wake' },
+  { id: 'venturi', name: 'Venturi Nozzle Flow', icon: '🚿', solver: 'rhoSimpleFoam', desc: 'Compressible throat acceleration' },
+  { id: 'cavity', name: '3D Lid-Driven Cavity', icon: '🌀', solver: 'icoFoam', desc: 'Shear-driven vortex recirculation' },
+  { id: 'cad', name: 'Custom CAD Upload (.STL)', icon: '📤', solver: 'snappyHexMesh + simpleFoam', desc: 'Arbitrary 3D geometry' }
+];
+
+const currentArchetypeInfo = computed(() => {
+  return archetypes.find(a => a.id === props.currentArchetype) || archetypes[0];
+});
+
+const hasAiKey = computed(() => {
+  return !!props.aiConfig.apiKey || props.aiConfig.provider === 'ollama';
+});
+
+const aiModelDisplay = computed(() => {
+  if (props.aiConfig.provider === 'ollama') return '🦙 Ollama (Local)';
+  if (!props.aiConfig.apiKey) return 'Set AI Key';
+  if (props.aiConfig.provider === 'gemini') return 'Gemini 2.5 Flash';
+  if (props.aiConfig.provider === 'openai') return 'GPT-4o';
+  if (props.aiConfig.provider === 'claude') return 'Claude 3.5';
+  if (props.aiConfig.provider === 'deepseek') return 'DeepSeek-V3';
+  if (props.aiConfig.provider === 'groq') return 'Groq Llama 3';
+  return 'AI Configured';
+});
+
+function selectArchetype(id: SimulationArchetype) {
+  showArchetypeMenu.value = false;
+  emit('update:archetype', id);
+}
+
 function handleReconnect() {
   showColabMenu.value = false;
-  // Trigger reconnection
 }
 
 function handleExport(type: 'zip' | 'vtk' | 'png') {
@@ -219,6 +302,9 @@ function handleExport(type: 'zip' | 'vtk' | 'png') {
 
 function handleClickOutside(e: MouseEvent) {
   const target = e.target as Node;
+  if (archetypeDropdownRef.value && !archetypeDropdownRef.value.contains(target)) {
+    showArchetypeMenu.value = false;
+  }
   if (colabWidgetRef.value && !colabWidgetRef.value.contains(target)) {
     showColabMenu.value = false;
   }
@@ -242,7 +328,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   height: 56px;
-  padding: 0 20px;
+  padding: 0 18px;
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   position: relative;
@@ -254,7 +340,7 @@ onUnmounted(() => {
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .logo-cube {
@@ -284,18 +370,154 @@ onUnmounted(() => {
 
 .brand-title {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: #ffffff;
   margin: 0;
 }
 
+/* Archetype Dropdown Switcher */
+.archetype-dropdown-wrapper {
+  position: relative;
+  margin-left: 8px;
+}
+
+.archetype-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  color: #e9d5ff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.archetype-pill-btn:hover {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: rgba(168, 85, 247, 0.7);
+}
+
+.archetype-icon {
+  font-size: 13px;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  color: #c084fc;
+}
+
+.archetype-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  background: #19202c;
+  border: 1px solid var(--border-active);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
+  z-index: 250;
+}
+
+.menu-heading {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 6px 10px 4px;
+}
+
+.archetype-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #cbd5e1;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.archetype-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.archetype-menu-item.selected {
+  background: rgba(168, 85, 247, 0.2);
+  color: #e9d5ff;
+}
+
+.menu-item-icon {
+  font-size: 18px;
+}
+
+.menu-item-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item-text strong {
+  font-size: 12px;
+  color: #f1f5f9;
+}
+
+.menu-item-text small {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
 /* Right header elements */
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+/* AI Key Status Button */
+.ai-key-status-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-key-status-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.ai-key-status-btn.configured {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.35);
+  color: #d8b4fe;
+}
+
+.ai-sparkle {
+  font-size: 12px;
+}
+
+.config-gear {
+  font-size: 10px;
+  opacity: 0.7;
 }
 
 /* Colab Runtime Widget */
@@ -306,11 +528,11 @@ onUnmounted(() => {
 .colab-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   background: rgba(16, 185, 129, 0.1);
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.28);
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: 6px;
   font-size: 11.5px;
   font-weight: 600;
@@ -330,11 +552,11 @@ onUnmounted(() => {
 
 .colab-label {
   color: #94a3b8;
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .colab-gauge {
-  width: 44px;
+  width: 36px;
   height: 5px;
   background: rgba(255, 255, 255, 0.12);
   border-radius: 3px;
@@ -353,7 +575,6 @@ onUnmounted(() => {
 .colab-arrow {
   font-size: 10px;
   color: #94a3b8;
-  margin-left: 2px;
 }
 
 /* Colab Dropdown */
@@ -361,7 +582,7 @@ onUnmounted(() => {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 310px;
+  width: 300px;
   background: #19202c;
   border: 1px solid var(--border-active);
   border-radius: 8px;
@@ -467,7 +688,7 @@ onUnmounted(() => {
 .transport-controls {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   padding: 3px;
@@ -475,8 +696,8 @@ onUnmounted(() => {
 }
 
 .transport-btn {
-  width: 32px;
-  height: 30px;
+  width: 30px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -512,13 +733,13 @@ onUnmounted(() => {
 .export-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: var(--bg-surface);
   color: #e2e8f0;
   border: 1px solid var(--border-subtle);
-  padding: 7px 14px;
+  padding: 6px 12px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -538,7 +759,7 @@ onUnmounted(() => {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 270px;
+  width: 260px;
   background: #19202c;
   border: 1px solid var(--border-active);
   border-radius: 8px;
@@ -577,12 +798,12 @@ onUnmounted(() => {
 }
 
 .export-menu-item .item-text strong {
-  font-size: 12px;
+  font-size: 11.5px;
   color: #f1f5f9;
 }
 
 .export-menu-item .item-text small {
-  font-size: 10.5px;
+  font-size: 10px;
   color: #94a3b8;
 }
 
