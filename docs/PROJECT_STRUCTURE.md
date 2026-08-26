@@ -22,26 +22,25 @@ openn_fOam/
 │   ├── openfoam_generator_3d.py    # OpenFOAM v2312 Case Generator & ZIP Exporter
 │   └── vtk_writer_3d.py            # ParaView 3D Legacy Structured Points (.vtk) Exporter
 │
-└── frontend/                       # 🌐 Vue 3 + TypeScript + Three.js Web Studio
+└── frontend/                       # 🌐 Vue 3 + TypeScript + Three.js + Tailwind Web Studio
     ├── index.html                  # HTML5 application root entry
-    ├── package.json                # Frontend packages (Vue 3, Three.js, Chart.js)
-    ├── vite.config.ts              # Vite bundling & development server configuration
+    ├── package.json                # Frontend packages (Vue 3, Three.js, Lucide, Chart.js)
+    ├── vite.config.ts              # Vite bundling & Tailwind CSS configuration
     │
     └── src/
-        ├── App.vue                 # 🎛️ Master application state & WebSocket coordinator
-        ├── types/cfd.ts            # 📐 TypeScript interfaces for 3D physics & AI models
+        ├── App.vue                 # 🎛️ Master application coordinator (Split-Screen Studio)
+        ├── types/cfd.ts            # 📐 TypeScript interfaces for OpenFOAM cases & 3D physics
         │
         ├── components/
-        │   ├── HeaderNavbar.vue    # Top bar: Field selector, colormaps & export buttons
-        │   ├── SidebarControls.vue # Left panel: Tabs for AI Co-Pilot, Physics, & Dicts
-        │   ├── AiCopilotChat.vue   # 🤖 Photo dropzone, presets & conversational AI chat
-        │   ├── CfdThree3D.vue      # 🌌 3D Three.js scene: Streamlines, Cut-planes & Probing
-        │   ├── OpenFoamDictEditor.vue # 📄 Live OpenFOAM dictionary inspector & editor
-        │   └── ResidualChart.vue   # 📈 Logarithmic convergence residual monitor
+        │   ├── HeaderNavbar.vue    # Top Bar: Brand Logo Gradient, Colab Runtime Widget, Transport & Export
+        │   ├── HardwareModal.vue   # Google Colab-style Runtime Specs & Connection Dialog
+        │   ├── OpenFoamCaseHub.vue # 📁 Left Panel: OpenFOAM Case Tree, AI / Manual Mode, Sliders & Dropzone
+        │   ├── CfdViewport3D.vue   # 🌌 Right 3D Viewport: Volumetric Plume, Streamlines, Cut-Planes & Probe HUD
+        │   └── ResidualMonitor.vue # 📈 Logarithmic Convergence Residual Monitor (Chart.js)
         │
         └── utils/
-            ├── colormaps.ts        # 🎨 Palettes: Turbo, Coolwarm, Inferno, Jet, Viridis
-            └── openfoamDicts3d.ts  # 📑 OpenFOAM v2312 3D dictionary templates
+            ├── colormaps.ts        # 🎨 Scientific Colormaps (Aerothermal Plume, Turbo, Viridis)
+            └── openfoamTemplates.ts# 📑 OpenFOAM v2312 Complete Case Templates
 ```
 
 ---
@@ -106,13 +105,18 @@ Solves the coupled Navier-Stokes and thermal convection-diffusion equations:
 ---
 
 ### Layer 6: 3D Web Studio UI (`frontend/src/`)
-- **`App.vue`**: Coordinates WebSocket communication, manages global state, and connects the sidebar and 3D viewport.
-- **`AiCopilotChat.vue`**: Photo upload dropzone, quick preset chips, detection summary cards, and interactive AI chat.
-- **`CfdThree3D.vue`**: Three.js WebGL viewport rendering:
-  - 3D Room / Tunnel wireframe box with floor grid.
-  - 3D Reconstructed obstacle with thermographic/pressure coloring.
-  - 3D Particle streamlines tracing fluid paths around the body.
-  - Dynamic 2D contour cut-planes on **XY (Top)**, **XZ (Side)**, or **YZ (Front)**.
-  - 3D raycast flow probe displaying local Velocity, Temperature, and Pressure.
-- **`OpenFoamDictEditor.vue`**: Real-time dictionary inspector with one-click copy and ZIP download.
-- **`ResidualChart.vue`**: Real-time logarithmic residual convergence plot.
+- **`App.vue`**: Coordinates WebSocket communication, manages global state, and coordinates the Split-Screen layout.
+- **`HeaderNavbar.vue`**:
+  - Brand Logo with isometric cube gradient (`linear-gradient(135deg, oklch(43.8% 0.218 303.724), oklch(40.5% 0.101 131.063))`).
+  - Google Colab-style runtime widget (`✓ RAM [===] Disk [===] ▾`) with `oklch(20.5% 0 none)` button surface and dropdown connection menu.
+  - Simulation playback controls (`▶ Run`, `⏸ Pause`, `↺ Reset`) and one-click **Export OpenFOAM Case (`.ZIP` / `.VTK`)**.
+- **`OpenFoamCaseHub.vue`**:
+  - Left panel: Dual mode toggle (`[ 🤖 AI Copilot ]` vs `[ ⚙️ Manual OpenFOAM ]`).
+  - Full OpenFOAM case tree (`system/`, `constant/`, `0/`), boundary patches, and physical property sliders.
+  - Photo dropzone for instant 2D image-to-3D voxelization and contextual OpenFOAM.org documentation tooltips.
+- **`CfdViewport3D.vue`**:
+  - Right 3D Viewport: Hardware-accelerated Three.js WebGL scene.
+  - 3D Volumetric thermal plume (translucent sapphire billowing edges $\to$ golden core) and animated velocity streamlines.
+  - Moveable 2D Cut-Plane slice heatmaps on $XY/XZ/YZ$ and interactive **Flow Probe HUD tooltip**.
+- **`ResidualMonitor.vue`**: Real-time logarithmic residual convergence plot ($Ux, Uy, Uz, p, T$) powered by Chart.js.
+
