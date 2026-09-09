@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UR2627GEN317 - 10% Milestone Literature Review & Scope Definition</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+  }
+  body {
+    font-family: 'Times New Roman', Times, serif;
+    line-height: 1.5;
+    color: #111;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 30px;
+    background: #fff;
+    font-size: 11pt;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    color: #0d233a;
+    margin-top: 1.2em;
+    margin-bottom: 0.4em;
+  }
+  h1 {
+    font-size: 18pt;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #0d233a;
+    padding-bottom: 12px;
+  }
+  .meta-header {
+    text-align: center;
+    font-size: 10pt;
+    margin-bottom: 24px;
+    color: #444;
+    line-height: 1.4;
+  }
+  .meta-badge {
+    display: inline-block;
+    background: #e8f0fe;
+    color: #1967d2;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 9.5pt;
+    margin-top: 6px;
+    border: 1px solid #cce0ff;
+  }
+  .abstract {
+    background: #f8f9fa;
+    border-left: 4px solid #1967d2;
+    padding: 14px 18px;
+    margin: 20px 0;
+    font-size: 10.5pt;
+    text-align: justify;
+  }
+  .abstract strong {
+    color: #0d233a;
+  }
+  h2 {
+    font-size: 13pt;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 4px;
+    margin-top: 24px;
+  }
+  h3 {
+    font-size: 11.5pt;
+    color: #2b5797;
+  }
+  p, li {
+    text-align: justify;
+    margin-bottom: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 9.5pt;
+  }
+  th, td {
+    border: 1px solid #bbb;
+    padding: 7px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background-color: #f1f4f8;
+    color: #0d233a;
+    font-weight: bold;
+  }
+  tr:nth-child(even) {
+    background-color: #fafbfc;
+  }
+  .eq-box {
+    background: #fdfdfd;
+    border: 1px dashed #bbb;
+    padding: 10px;
+    margin: 10px 0;
+    text-align: center;
+    font-family: 'Cambria Math', 'DejaVu Math TeX Gyre', serif;
+    font-size: 11pt;
+  }
+  .ref-list {
+    font-size: 9pt;
+    line-height: 1.4;
+    padding-left: 20px;
+  }
+  .ref-list li {
+    margin-bottom: 6px;
+  }
+  .footer-note {
+    margin-top: 30px;
+    border-top: 1px solid #ddd;
+    padding-top: 10px;
+    font-size: 8.5pt;
+    color: #777;
+    text-align: center;
+  }
+  @media print {
+    body {
+      padding: 0;
+      max-width: 100%;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Research Progress & Milestone Report (10%)</h1>
+
+<div class="meta-header">
+  <strong>Project Title:</strong> AI-Augmented High-Performance Web CFD Platform: Integrating Finite Volume Solvers, Physics-Informed Surrogates, and Bare-Metal Rust-Python Hybrid Compute with Real-Time 3D Telemetry<br>
+  <strong>Project Code:</strong> UR2627GEN317 &nbsp;|&nbsp; <strong>Milestone Target:</strong> 10% — Literature Review & Scope Definition<br>
+  <span class="meta-badge">Status: Milestone Completed & Ready for Review</span>
+</div>
+
+<div class="abstract">
+  <strong>Abstract:</strong> This research project addresses the critical limitations of contemporary Computational Fluid Dynamics (CFD)—namely, the dependency on expensive high-performance computing (HPC) clusters, closed-source desktop monoliths, and steep operational barriers—by engineering an indigenous, browser-based, AI-accelerated aerothermal simulation platform (<strong>OpenZess Studio</strong>). This formal milestone report documents the completion of the <strong>10% Milestone</strong>: synthesizing state-of-the-art literature across classical finite-volume/fractional-step solvers, physics-informed neural surrogates, bare-metal Rust-Python hybrid compute architectures, and client-side 3D WebGL streaming telemetry. Furthermore, it establishes the formal mathematical boundaries, governing equations, verification metrics, and research roadmap for Project UR2627GEN317.
+</div>
+
+<h2>1. Introduction & Research Objectives</h2>
+<p>
+  Aerothermal fluid dynamics analysis is essential across mechanical, aerospace, civil, and data-center thermal engineering. However, industry workflows rely on established desktop software suites (e.g., ANSYS Fluent, COMSOL Multiphysics, Star-CCM+) or complex command-line toolchains (e.g., OpenFOAM). These tools require extensive installation overhead, high licensing fees, and decoupled offline post-processing in ParaView.
+</p>
+<p>
+  <strong>Core Research Objectives for UR2627GEN317:</strong>
+</p>
+<ol>
+  <li><strong>Indigenous Numerical Solver Engine:</strong> Implement an in-memory 3D incompressible Navier-Stokes solver incorporating the Boussinesq thermal buoyancy formulation.</li>
+  <li><strong>Instant Physics-Informed Surrogate:</strong> Develop a sub-50 ms physics-informed neural surrogate model for real-time exploratory fluid design.</li>
+  <li><strong>Bare-Metal Hybrid Compute:</strong> Implement a zero-copy FFI bridge between Python and Rust (via PyO3/Maturin) to leverage multi-threaded SIMD stencils and bypass Python's Global Interpreter Lock (GIL).</li>
+  <li><strong>Web-Native 3D Telemetry:</strong> Construct an interactive Three.js/WebGL client with bi-directional WebSocket streaming for live residual tracking and dynamic cross-sectional field slicing.</li>
+  <li><strong>Two-Way OpenFOAM / ParaView Interoperability:</strong> Provide automated case compilation to ensure industrial-grade validation and continuity.</li>
+</ol>
+
+<h2>2. Comprehensive Literature Review</h2>
+
+<h3>2.1 Classical Numerical CFD & Fractional-Step Formulations</h3>
+<p>
+  The cornerstone of incompressible flow simulation is the fractional-step projection method originally introduced by <em>Chorin (1968)</em>. By decoupling momentum advection and diffusion from the incompressibility constraint, the velocity field is advanced to an intermediate state ($\vec{u}^*$), followed by a scalar Pressure-Poisson equation to enforce a divergence-free condition:
+</p>
+<div class="eq-box">
+  $$\vec{u}^* = \vec{u}^n + \Delta t \left[ \nu \nabla^2 \vec{u}^n - (\vec{u}^n \cdot \nabla) \vec{u}^n + \vec{g} \beta (T^n - T_{\text{amb}}) \right]$$
+  <br>
+  $$\nabla^2 p = \frac{\rho}{\Delta t} \nabla \cdot \vec{u}^* \quad \Longrightarrow \quad \vec{u}^{n+1} = \vec{u}^* - \Delta t \nabla p$$
+</div>
+<p>
+  <em>Jasak (1996)</em> and <em>Weller et al. (1998)</em> demonstrated that in finite-volume frameworks like OpenFOAM, co-located grids require Rhie-Chow interpolation to eliminate odd-even pressure decoupling. For aerothermal flows where density variations are primarily driven by moderate temperature differentials, the Boussinesq approximation (<em>Tritton, 1988</em>) provides exceptional fidelity without the stiff numerical penalties of fully compressible equations.
+</p>
+
+<h3>2.2 Physics-Informed Surrogates & Deep Learning for Fluid Dynamics</h3>
+<p>
+  Recent literature reveals a paradigm shift toward AI-assisted fluid simulation. <em>Raissi, Perdikaris, and Karniadakis (2019)</em> pioneered Physics-Informed Neural Networks (PINNs), embedding PDE residuals directly into network loss functions:
+</p>
+<div class="eq-box">
+  $$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{data}} + \lambda_{\text{NS}} \|\nabla \cdot \vec{u}\|^2 + \lambda_{\text{mom}} \|\partial_t \vec{u} + (\vec{u}\cdot\nabla)\vec{u} + \nabla p - \nu \nabla^2 \vec{u}\|^2$$
+</div>
+<p>
+  Concurrently, <em>Li et al. (2020)</em> introduced Fourier Neural Operators (FNO), enabling zero-shot super-resolution and mesh-invariant mapping between boundary parameters and continuous flow fields. <em>Brunton et al. (2020)</em> emphasized in their definitive survey that AI models do not displace numerical solvers; rather, they serve as ultra-fast (<50 ms) parametric surrogates, creating a compelling case for a dual-mode hybrid architecture.
+</p>
+
+<h3>2.3 Systems-Level Acceleration: Rust vs. Python/C++ in Scientific Computing</h3>
+<p>
+  While Python dominates AI and data analysis, its Global Interpreter Lock (GIL) and dynamic type overhead create severe bottlenecks in tight numerical stencil loops. Traditionally, developers have turned to C++ with OpenMP or MPI. However, modern systems research highlights <em>Rust (Matsakis & Klock, 2014)</em> as an optimal alternative offering memory safety without garbage collection, compiler-enforced thread-concurrency, and auto-vectorizing SIMD intrinsics. The PyO3 native extension bridge enables zero-copy shared memory access with NumPy array buffers, establishing an ideal hybrid compute paradigm.
+</p>
+
+<h3>2.4 Real-Time Web Telemetry & In-Browser Scientific Visualization</h3>
+<p>
+  Historically, scientific visualization required local installations of heavy desktop clients like ParaView or VisIt. Advances in WebGL 2.0, WebGPU, and Three.js (<em>Cabello et al., 2024</em>) have enabled real-time hardware-accelerated 3D rendering directly within web viewports. Coupled with binary WebSocket protocols (RFC 6455), simulation telemetry—including convergence residuals and velocity/pressure fields—can be streamed dynamically to the client with sub-16 ms frame delivery.
+</p>
+
+<div class="page-break"></div>
+
+<h2>3. Comparative Matrix & Research Gap Analysis</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Evaluation Dimension</th>
+      <th>Commercial Desktop (ANSYS / COMSOL)</th>
+      <th>Open-Source CLI (OpenFOAM)</th>
+      <th>Pure Python CFD (SciPy / PyTorch)</th>
+      <th>Proposed OpenZess Platform (UR2627GEN317)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Accessibility</strong></td>
+      <td>Proprietary licenses; heavy local install</td>
+      <td>Free; steep Linux/CLI learning curve</td>
+      <td>Open; requires Python programming setup</td>
+      <td><strong>Zero-install; universal Web Studio browser UI</strong></td>
+    </tr>
+    <tr>
+      <td><strong>Computation Latency</strong></td>
+      <td>Minutes to hours</td>
+      <td>Minutes to hours</td>
+      <td>Slow in 3D due to Python GIL limitations</td>
+      <td><strong>Dual Mode: Instant AI (&lt;50 ms) + Fast Solver</strong></td>
+    </tr>
+    <tr>
+      <td><strong>Multi-Core Acceleration</strong></td>
+      <td>High (C++ / MPI)</td>
+      <td>High (C++ / OpenMPI)</td>
+      <td>Poor CPU scaling without C-extensions</td>
+      <td><strong>Bare-Metal Rust (Rayon SIMD) via PyO3</strong></td>
+    </tr>
+    <tr>
+      <td><strong>Visualization</strong></td>
+      <td>Local desktop GUI</td>
+      <td>Decoupled offline (ParaView)</td>
+      <td>Static Matplotlib / PyVista scripts</td>
+      <td><strong>Real-time 3D Three.js WebGL + WebSocket</strong></td>
+    </tr>
+    <tr>
+      <td><strong>Case Interoperability</strong></td>
+      <td>Proprietary lock-in</td>
+      <td>Native dictionaries</td>
+      <td>Custom raw array dumps</td>
+      <td><strong>1-Click Export to OpenFOAM &amp; ParaView VTK</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  <strong>Identified Research Gap:</strong> There currently exists no open, web-native platform that bridges the gap between ultra-fast AI surrogate inference, rigorous finite-volume/fractional-step numerical physics, bare-metal memory-safe concurrency (Rust), and instantaneous full-case generation for industrial toolchains (OpenFOAM). Project UR2627GEN317 directly targets and resolves this void.
+</p>
+
+<h2>4. Formal Scope & System Boundary Definition</h2>
+
+<h3>4.1 In-Scope Deliverables</h3>
+<ul>
+  <li><strong>Physical Governing Equations:</strong> Incompressible 3D Navier-Stokes coupled with Boussinesq thermal buoyancy and advection-diffusion temperature transport.</li>
+  <li><strong>Spatial & Temporal Discretization:</strong> Structured Cartesian grid ($N_x \times N_y \times N_z$), 1st-order upwind differencing for convective stability, 2nd-order central differencing for viscous/thermal diffusion, and explicit Euler/Adams-Bashforth time stepping adhering to the Courant-Friedrichs-Lewy (CFL) stability criterion:
+  $$\Delta t \le \min \left( \frac{\Delta x}{|u|_{\max}}, \frac{\Delta x^2}{2\nu} \right)$$
+  </li>
+  <li><strong>Pressure-Poisson Solver:</strong> Iterative sparse linear system solver utilizing SciPy sparse conjugate gradients and multi-threaded Rust Gauss-Seidel kernels.</li>
+  <li><strong>Surrogate Engine:</strong> Physics-informed analytical and deep-learning surrogate for instant steady-state wake, stagnation, and thermal plume prediction.</li>
+  <li><strong>Web Telemetry:</strong> Full-duplex WebSocket streaming (30–60 FPS), live logarithmic residual chart (Chart.js), dual 2D/3D visualizers, and parametric slider steering.</li>
+  <li><strong>Industrial Validation Export:</strong> Automated generation of valid `0/`, `constant/`, and `system/` case dictionaries for `buoyantBoussinesqSimpleFoam` and `.vtk` structured points.</li>
+</ul>
+
+<h3>4.2 Out-of-Scope (Boundaries for Current Phase)</h3>
+<ul>
+  <li>Compressible, transonic, or supersonic shock-wave capturing regimes ($Ma > 0.3$).</li>
+  <li>Multiphase flows involving free-surface interface tracking (e.g., Volume of Fluid / Level Set methods).</li>
+  <li>Complex body-fitted unstructured tetrahedral meshing inside the web client (structured Cartesian voxelization is employed for real-time performance).</li>
+</ul>
+
+<h2>5. Research Roadmap & Milestone Schedule</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Milestone</th>
+      <th>Target Timeline</th>
+      <th>Key Focus Areas &amp; Deliverables</th>
+      <th>Current Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>10%</strong></td>
+      <td>Weeks 1–3</td>
+      <td>Comprehensive Literature Review, Gap Analysis, Mathematical Formulation &amp; Scope Document</td>
+      <td><strong>COMPLETED (This Report)</strong></td>
+    </tr>
+    <tr>
+      <td><strong>30%</strong></td>
+      <td>Weeks 4–9</td>
+      <td>Simulation Setup: Baseline 3D fractional-step solver, boundary condition validation &amp; CFL convergence tests</td>
+      <td>Pending (Next Target)</td>
+    </tr>
+    <tr>
+      <td><strong>50%</strong></td>
+      <td>Weeks 10–15</td>
+      <td>Hybrid Compute &amp; AI: Rust/PyO3 integration, benchmark scaling against pure Python, PINN surrogate training</td>
+      <td>Scheduled</td>
+    </tr>
+    <tr>
+      <td><strong>70%</strong></td>
+      <td>Weeks 16–20</td>
+      <td>Paper Drafting: Drafting research manuscript, validation benchmarks against OpenFOAM, comparative plots</td>
+      <td>Scheduled</td>
+    </tr>
+    <tr>
+      <td><strong>80%</strong></td>
+      <td>Weeks 21–23</td>
+      <td>Peer Review &amp; Journal/Conference Submission (CFD / AI Engineering venue)</td>
+      <td>Scheduled</td>
+    </tr>
+    <tr>
+      <td><strong>100%</strong></td>
+      <td>Weeks 24–26</td>
+      <td>Final Acceptance, Code Repository Archival, and Defense Presentation</td>
+      <td>Scheduled</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. References</h2>
+<ol class="ref-list">
+  <li><strong>Chorin, A. J.</strong> (1968). Numerical solution of the Navier-Stokes equations. <em>Mathematics of Computation</em>, 22(104), 745–762.</li>
+  <li><strong>Jasak, H.</strong> (1996). <em>Error analysis and estimation in the Finite Volume method with applications to fluid flows</em>. Ph.D. Thesis, Imperial College London.</li>
+  <li><strong>Weller, H. G., Tabor, G., Jasak, H., &amp; Fureby, C.</strong> (1998). A tensorial approach to computational continuum mechanics using object-oriented techniques. <em>Computers in Physics</em>, 12(6), 620–631.</li>
+  <li><strong>Raissi, M., Perdikaris, P., &amp; Karniadakis, G. E.</strong> (2019). Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. <em>Journal of Computational Physics</em>, 378, 686–707.</li>
+  <li><strong>Li, Z., Kovachki, N., Azizzadenesheli, K., Liu, B., Bhattacharya, K., Stuart, A., &amp; Anandkumar, A.</strong> (2020). Fourier Neural Operator for Parametric Partial Differential Equations. <em>ICLR 2021</em>, arXiv:2010.08895.</li>
+  <li><strong>Brunton, S. L., Noack, B. R., &amp; Koumoutsakos, P.</strong> (2020). Machine learning for fluid mechanics. <em>Annual Review of Fluid Mechanics</em>, 52, 477–508.</li>
+  <li><strong>Matsakis, N. D., &amp; Klock, F. S.</strong> (2014). The Rust language. <em>ACM SIGAda Ada Letters</em>, 34(3), 103–104.</li>
+  <li><strong>Patankar, S. V.</strong> (1980). <em>Numerical Heat Transfer and Fluid Flow</em>. Hemisphere Publishing Corporation.</li>
+  <li><strong>Tritton, D. J.</strong> (1988). <em>Physical Fluid Dynamics</em>. Oxford University Press.</li>
+  <li><strong>Cabello, R. et al.</strong> (2024). Three.js: JavaScript 3D Library. <em>https://threejs.org/</em>.</li>
+</ol>
+
+<div class="footer-note">
+  Project UR2627GEN317 &bull; Progress Tracker Official Log File &bull; Prepared for Academic Review
+</div>
+
+</body>
+</html>
