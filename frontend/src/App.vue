@@ -26,6 +26,7 @@
         :isComputing="status === 'computing'"
         @update:params="updateParams"
         @fileUploaded="handleFileUploaded"
+        @autoRunSimulation="startLiveSimulation"
       />
 
       <!-- Right Main 3D CFD Viewport -->
@@ -43,7 +44,7 @@
           <div class="dock-slide-bar" @click="isBottomDockOpen = !isBottomDockOpen">
             <div class="slide-bar-left">
               <span class="slide-icon">{{ isBottomDockOpen ? '▼' : '▲' }}</span>
-              <span class="slide-title">📟 OpenFOAM Solver Log & Telemetry</span>
+              <span class="slide-title">📊 OpenFOAM Solver Log & Telemetry</span>
               <div class="mini-metrics" v-if="!isBottomDockOpen">
                 <span class="mini-tag res">Res: {{ latestResidualFormatted }}</span>
                 <span class="mini-tag force">Cd: {{ telemetry.cd.toFixed(3) }}</span>
@@ -72,7 +73,7 @@
                 @click="isBottomDockOpen = !isBottomDockOpen"
                 :title="isBottomDockOpen ? 'Slide Down / Hide' : 'Slide Up / Show'"
               >
-                {{ isBottomDockOpen ? '✕ Hide' : '▲ Expand' }}
+                {{ isBottomDockOpen ? '▲ Hide' : '▼ Expand' }}
               </button>
             </div>
           </div>
@@ -126,7 +127,7 @@ import SettingsModal from './components/SettingsModal.vue';
 
 // Studio Simulation Parameters matching Mockup
 const params = reactive<SimulationParams>({
-  archetype: 'airfoil',
+  archetype: 'cylinder',
   activeField: 'U',
   substance: 'air',
   naturalForces: {
@@ -136,15 +137,15 @@ const params = reactive<SimulationParams>({
   },
   caseType: 'channel',
   solverMode: 'cfd',
-  turbulenceModel: 'k-omega-sst',
-  reynoldsNumber: 50000,
-  gridResolution: 64,
-  maxIterations: 1000,
+  turbulenceModel: 'laminar',
+  reynoldsNumber: 100,
+  gridResolution: 41,
+  maxIterations: 300,
   dt: 0.005,
   tolerance: 1e-5,
   studioParams: {
     irisPurple: 0.45,
-    vorticityAngle: 0.209, // 12 deg AoA
+    vorticityAngle: 0.209,
     vorticityCore: 50,
     butterscotchCore: 100
   }
@@ -156,25 +157,24 @@ const isBottomDockOpen = ref(false);
 const activeDockTab = ref<'residuals' | 'terminal'>('terminal');
 
 const isPlaying = ref(true);
-const isConnected = ref(true);
-const status = ref<'ready' | 'computing' | 'converged' | 'error'>('computing');
+const isConnected = ref(false);
+const status = ref<'ready' | 'computing' | 'converged' | 'error'>('ready');
 
 // Real OpenFOAM Telemetry
 const telemetry = reactive<AerodynamicTelemetry>({
-  cd: 0.048,
-  cl: 0.842,
-  l_d: 17.54,
+  cd: 1.18,
+  cl: 0.00,
+  l_d: 0.00,
   courantMax: 0.42,
   courantMean: 0.08,
   continuityError: 1.2e-6
 });
 
 const simulationData = ref<SimulationStepData | null>(null);
-const iterations = ref<number[]>([0, 20, 50, 100, 150, 200]);
-const residuals = ref<number[]>([1.0, 0.1, 0.01, 0.001, 1e-5, 1e-13]);
+const iterations = ref<number[]>([0]);
+const residuals = ref<number[]>([1.0]);
 
-let socket: any = null;
-let simInterval: any = null;
+let socket: WebSocket | null = null;
 
 const latestResidual = computed(() => {
   if (residuals.value.length === 0) return null;
@@ -186,45 +186,109 @@ const latestResidualFormatted = computed(() => {
   return res !== null ? res.toExponential(2) : '1.0e-5';
 });
 
+function startLiveSimulation() {
+  if (socket) {
+    try {
+      socket.close();
+    } catch (_) {}
+    socket = null;
+  }
+
+  const loc = window.location;
+  const wsProtocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+  // Use Vite proxy or default to 8000 for FastAPI
+  const host = loc.host.includes('5173') ? `${loc.hostname}:8000` : (loc.host || '127.0.0.1:8000');
+  const wsUrl = `${wsProtocol}//${host}/ws/simulate`;
+
+  try {
+    socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      isConnected.value = true;
+      status.value = 'computing';
+      iterations.value = [0];
+      residuals.value = [1.0];
+
+      const payload = {
+        archetype: params.archetype,
+        gridResolution: params.gridResolution || 41,
+        reynoldsNumber: params.reynoldsNumber || 100,
+        solverMode: params.solverMode || 'cfd',
+        maxIterations: params.maxIterations || 300,
+        dt: params.dt || 0.005
+      };
+      socket?.send(JSON.stringify(payload));
+    };
+
+    socket.onmessage = (event: MessageEvent) => {
+      try {
+        const sanitizedText = event.data.replace(/:\s*NaN/g, ': 0.0').replace(/:\s*Infinity/g, ': 999.0').replace(/:\s*-Infinity/g, ': -999.0');
+        const data = JSON.parse(sanitizedText);
+        if (data.error) {
+          console.error('Simulation error from backend:', data.error);
+          status.value = 'error';
+          return;
+        }
+
+        simulationData.value = data;
+
+        // Real computed telemetry from Python Navier-Stokes solver
+        if (data.iteration !== undefined && data.residual !== undefined) {
+          iterations.value.push(data.iteration);
+          residuals.value.push(data.residual);
+        }
+        if (data.cd !== undefined) telemetry.cd = data.cd;
+        if (data.cl !== undefined) telemetry.cl = data.cl;
+        if (data.courantMax !== undefined) telemetry.courantMax = data.courantMax;
+        if (data.continuityError !== undefined) telemetry.continuityError = data.continuityError;
+
+        if (data.converged) {
+          status.value = 'converged';
+        }
+      } catch (err) {
+        console.error('Error parsing simulation frame:', err);
+      }
+    };
+
+    socket.onclose = () => {
+      if (status.value === 'computing') {
+        status.value = 'ready';
+      }
+    };
+
+    socket.onerror = (err: any) => {
+      console.warn('WebSocket connection attempt failed:', err);
+      isConnected.value = false;
+      status.value = 'error';
+    };
+  } catch (e) {
+    console.error('Failed to create WebSocket:', e);
+    isConnected.value = false;
+  }
+}
+
 function setArchetype(arch: SimulationArchetype) {
   params.archetype = arch;
-  if (arch === 'airfoil') {
+  if (arch === 'cylinder') {
+    params.studioParams.irisPurple = 0.35;
+    telemetry.cd = 1.18;
+    telemetry.cl = 0.00;
+  } else if (arch === 'airfoil') {
     params.studioParams.irisPurple = 0.45;
     params.studioParams.vorticityAngle = 0.209;
-    params.studioParams.vorticityCore = 50;
-    params.studioParams.butterscotchCore = 100;
     telemetry.cd = 0.048;
     telemetry.cl = 0.842;
-    telemetry.l_d = 17.54;
-  } else if (arch === 'cylinder') {
-    params.studioParams.irisPurple = 0.35;
-    params.studioParams.vorticityAngle = 0.1;
-    params.studioParams.vorticityCore = 40;
-    params.studioParams.butterscotchCore = 60;
-    telemetry.cd = 1.182;
-    telemetry.cl = 0.421;
-    telemetry.l_d = 0.36;
-  } else if (arch === 'venturi') {
-    params.studioParams.irisPurple = 0.25;
-    params.studioParams.vorticityAngle = 0.0;
-    params.studioParams.vorticityCore = 30;
-    params.studioParams.butterscotchCore = 50;
-    telemetry.cd = 0.21;
-    telemetry.cl = 0.0;
-    telemetry.l_d = 0.0;
-  } else {
-    params.studioParams.irisPurple = 0.182;
-    params.studioParams.vorticityAngle = 0.152;
-    params.studioParams.vorticityCore = 30;
-    params.studioParams.butterscotchCore = 84.899;
-    telemetry.cd = 0.82;
-    telemetry.cl = 0.15;
-    telemetry.l_d = 0.18;
+  }
+  if (isPlaying.value) {
+    startLiveSimulation();
   }
 }
 
 function updateParams(newParams: SimulationParams) {
   Object.assign(params, newParams);
+  if (isPlaying.value) {
+    startLiveSimulation();
+  }
 }
 
 function handleAiConfigSaved(newConfig: AiProviderConfig) {
@@ -239,8 +303,12 @@ function handleFileUploaded(file: File) {
 function togglePlay() {
   isPlaying.value = !isPlaying.value;
   if (isPlaying.value) {
-    status.value = 'computing';
+    startLiveSimulation();
   } else {
+    if (socket) {
+      socket.close();
+      socket = null;
+    }
     status.value = 'ready';
   }
 }
@@ -251,18 +319,27 @@ function stepBack() {
 
 function stopSimulation() {
   isPlaying.value = false;
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
   status.value = 'ready';
 }
 
 function fastForward() {
-  // Accelerate simulation
+  params.dt = (params.dt || 0.005) * 1.5;
+  if (isPlaying.value) startLiveSimulation();
 }
 
 function resetSimulation() {
-  isPlaying.value = false;
-  status.value = 'ready';
   iterations.value = [0];
   residuals.value = [1.0];
+  simulationData.value = null;
+  if (isPlaying.value) {
+    startLiveSimulation();
+  } else {
+    status.value = 'ready';
+  }
 }
 
 function takeSnapshot() {
@@ -282,29 +359,15 @@ function handleExportCase(type: 'zip' | 'vtk' | 'png') {
 }
 
 onMounted(() => {
-  // Live physics telemetry ticker
-  simInterval = setInterval(() => {
-    if (isPlaying.value) {
-      const lastIter = iterations.value[iterations.value.length - 1] || 0;
-      if (lastIter < 200) {
-        iterations.value.push(lastIter + 5);
-        const lastRes = residuals.value[residuals.value.length - 1] || 1e-3;
-        residuals.value.push(Math.max(1e-13, lastRes * 0.85 * (1 + (Math.random() - 0.5) * 0.1)));
-      }
-
-      // Dynamic force variations with vortex shedding
-      if (params.archetype === 'cylinder') {
-        const t = performance.now() * 0.003;
-        telemetry.cl = Math.sin(t * 2.5) * 0.55;
-        telemetry.cd = 1.18 + Math.abs(Math.sin(t * 5.0)) * 0.08;
-      }
-    }
-  }, 1000);
+  // Start real live simulation stream
+  startLiveSimulation();
 });
 
 onUnmounted(() => {
-  if (socket) socket.close();
-  if (simInterval) clearInterval(simInterval);
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
 });
 </script>
 
@@ -439,56 +502,62 @@ onUnmounted(() => {
 
 .dock-tabs {
   display: flex;
-  background: rgba(15, 20, 30, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 2px;
-  gap: 2px;
+  gap: 4px;
 }
 
 .dock-tab-btn {
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
   color: #94a3b8;
-  padding: 3px 8px;
-  border-radius: 4px;
   font-size: 10.5px;
   font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.dock-tab-btn:hover {
-  color: #ffffff;
-}
-
 .dock-tab-btn.active {
-  background: rgba(168, 85, 247, 0.25);
-  border-color: rgba(168, 85, 247, 0.6);
-  color: #e9d5ff;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
 }
 
+/* Drawer Body Floating Card */
 .dock-drawer-body {
+  width: 440px;
+  height: 240px;
+  background: rgba(19, 15, 22, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dock-panel {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.terminal-panel {
   display: flex;
   flex-direction: column;
 }
 
-.dock-panel {
-  display: flex;
-}
-
-.dock-panel.terminal-panel {
-  width: 420px;
-}
-
 .slide-fade-enter-active,
 .slide-fade-leave-active {
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .slide-fade-enter-from,
 .slide-fade-leave-to {
+  transform: translateY(12px);
   opacity: 0;
-  transform: translateY(12px) scale(0.98);
 }
 </style>

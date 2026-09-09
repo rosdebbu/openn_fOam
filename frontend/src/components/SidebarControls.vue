@@ -35,6 +35,25 @@
             >
               📋 Apply & Repair in Case
             </button>
+
+            <!-- Autonomous Agent Action Card -->
+            <div v-if="msg.simConfig" class="agent-action-card">
+              <div class="agent-action-header">
+                <span class="agent-action-badge">⚡ Autonomous Agent Executed</span>
+                <span class="agent-action-title">{{ msg.simConfig.summary }}</span>
+              </div>
+              <div class="agent-pills-row">
+                <span v-if="msg.simConfig.archetype" class="agent-pill domain">Domain: {{ msg.simConfig.archetype.toUpperCase() }}</span>
+                <span v-if="msg.simConfig.substance" class="agent-pill fluid">Fluid: {{ msg.simConfig.substance.toUpperCase() }}</span>
+                <span v-if="msg.simConfig.reynoldsNumber" class="agent-pill re">Re: {{ msg.simConfig.reynoldsNumber }}</span>
+                <span v-if="msg.simConfig.angleDegrees !== undefined" class="agent-pill aoa">AoA: {{ msg.simConfig.angleDegrees }}°</span>
+              </div>
+              <div class="agent-action-footer">
+                <button class="agent-rerun-btn" @click="emit('autoRunSimulation')">
+                  🚀 Launch / Rerun Simulation
+                </button>
+              </div>
+            </div>
           </div>
           <div v-if="isAiLoading" class="chat-msg ai loading">
             <div class="msg-author">⚡ AI Assistant</div>
@@ -413,7 +432,7 @@ import type {
   AiProviderConfig,
   FluidProperties
 } from '../types/cfd';
-import { queryAiCopilot } from '../utils/aiCopilot';
+import { queryAiCopilot, type AiSimulationConfig } from '../utils/aiCopilot';
 
 const props = defineProps<{
   params: SimulationParams;
@@ -424,6 +443,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:params', params: SimulationParams): void;
   (e: 'fileUploaded', file: File): void;
+  (e: 'autoRunSimulation'): void;
 }>();
 
 const activeTab = ref<'physics' | 'repair'>('physics');
@@ -455,7 +475,7 @@ const currentSubstance = ref<FluidProperties>(
 const userPrompt = ref('');
 const isAiLoading = ref(false);
 const chatHistoryRef = ref<HTMLDivElement | null>(null);
-const chatMessages = ref<{ role: 'user' | 'ai'; text: string; dictCode?: string }[]>([
+const chatMessages = ref<{ role: 'user' | 'ai'; text: string; dictCode?: string; simConfig?: AiSimulationConfig }[]>([
   {
     role: 'ai',
     text: '⚡ OpenFOAM Physics Assistant: Give me an idea or sketch, and I will set up the governing equations (mass, momentum, gravity, temperature, and multiphase).'
@@ -741,8 +761,34 @@ async function handleSendAiPrompt() {
   chatMessages.value.push({
     role: 'ai',
     text: res.analysis,
-    dictCode: res.openfoamDictSnippet
+    dictCode: res.dictCode,
+    simConfig: res.simConfig
   });
+
+  // Autonomous Agent Parameter Injection & Auto-Launch
+  if (res.simConfig) {
+    const cfg = res.simConfig;
+    const updated = JSON.parse(JSON.stringify(props.params)) as SimulationParams;
+
+    if (cfg.archetype) updated.archetype = cfg.archetype;
+    if (cfg.substance) {
+      updated.substance = cfg.substance;
+      const subObj = substances.find(s => s.id === cfg.substance);
+      if (subObj) currentSubstance.value = subObj;
+    }
+    if (cfg.reynoldsNumber) updated.reynoldsNumber = cfg.reynoldsNumber;
+    if (cfg.angleDegrees !== undefined) {
+      updated.studioParams.vorticityAngle = (cfg.angleDegrees * Math.PI) / 180;
+    }
+
+    emit('update:params', updated);
+
+    if (cfg.autoRun) {
+      setTimeout(() => {
+        emit('autoRunSimulation');
+      }, 300);
+    }
+  }
 
   await nextTick();
   if (chatHistoryRef.value) chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight;
@@ -1528,4 +1574,79 @@ function applyAiSnippet(code: string) {
   opacity: 0;
   transform: translateY(-8px);
 }
+
+.agent-action-card {
+  margin-top: 8px;
+  background: rgba(16, 185, 129, 0.10);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-action-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agent-action-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: #10b981;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.agent-action-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.agent-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.agent-pill {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+}
+
+.agent-pill.domain { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); }
+.agent-pill.fluid { color: #a855f7; border-color: rgba(168, 85, 247, 0.3); }
+.agent-pill.re { color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
+.agent-pill.aoa { color: #ec4899; border-color: rgba(236, 72, 153, 0.3); }
+
+.agent-action-footer {
+  margin-top: 4px;
+}
+
+.agent-rerun-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #059669, #10b981);
+  border: none;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.agent-rerun-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
 </style>
