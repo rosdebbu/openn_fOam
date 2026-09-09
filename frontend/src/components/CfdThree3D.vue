@@ -203,6 +203,22 @@
             />
             <span class="slider-val">{{ Math.round(sliceOpacity * 100) }}%</span>
           </div>
+
+          <!-- SimScale Style Slice Statistics -->
+          <div class="hud-stats-row" v-if="props.data">
+            <div class="stat-pill">
+              <span class="stat-lbl">U max</span>
+              <span class="stat-val">{{ sliceStats.uMax.toFixed(2) }} m/s</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-lbl">P range</span>
+              <span class="stat-val">[{{ sliceStats.pMin.toFixed(0) }}, {{ sliceStats.pMax.toFixed(0) }}]</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-lbl">U avg</span>
+              <span class="stat-val">{{ sliceStats.uAvg.toFixed(2) }} m/s</span>
+            </div>
+          </div>
         </div>
 
         <!-- Section 2: Draggable Streamline Rake -->
@@ -366,6 +382,32 @@ const isSliceRakeOpen = ref(true); // Open by default for immediate discovery
 const sliceAxis = ref<'x' | 'y' | 'z'>('z');
 const slicePos = ref(0.0);
 const sliceOpacity = ref(0.88);
+
+const sliceStats = computed(() => {
+  if (!props.data || !props.data.speed) {
+    return { uMax: 0, pMin: 0, pMax: 0, uAvg: 0 };
+  }
+  const speeds = Array.isArray(props.data.speed) ? props.data.speed.flat() : [];
+  const ps = Array.isArray(props.data.p) ? props.data.p.flat() : [0];
+  let sum = 0, uMax = 0;
+  for (let i = 0; i < speeds.length; i++) {
+    const s = Number(speeds[i]) || 0;
+    sum += s;
+    if (s > uMax) uMax = s;
+  }
+  let pMin = Number(ps[0]) || 0, pMax = Number(ps[0]) || 0;
+  for (let i = 1; i < ps.length; i++) {
+    const pVal = Number(ps[i]) || 0;
+    if (pVal < pMin) pMin = pVal;
+    if (pVal > pMax) pMax = pVal;
+  }
+  return {
+    uMax,
+    pMin,
+    pMax,
+    uAvg: speeds.length > 0 ? sum / speeds.length : 0
+  };
+});
 
 // Draggable Streamline Rake State
 const rakeX = ref(-1.95);
@@ -1708,6 +1750,38 @@ onUnmounted(() => {
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 6px;
+}
+
+.hud-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  margin-top: 4px;
+}
+
+.stat-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-lbl {
+  font-size: 8px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-val {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: #38bdf8;
 }
 
 .hud-panel-title {

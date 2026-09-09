@@ -121,7 +121,8 @@ async def websocket_simulate(websocket: WebSocket):
             return
 
         # Traditional CFD mode with Accelerated Navier-Stokes
-        solver = AcceleratedSolver(mesh=mesh, Re=Re, archetype=archetype)
+        aoa_deg = float(params.get('aoa', params.get('angle_of_attack', params.get('angleOfAttack', 0.0))))
+        solver = AcceleratedSolver(mesh=mesh, Re=Re, archetype=archetype, aoa_deg=aoa_deg)
         
         for iteration in range(1, max_iter + 1):
             res = solver.step(dt)

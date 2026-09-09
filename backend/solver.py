@@ -112,7 +112,8 @@ class AcceleratedSolver:
                 if j < ny - 1: A[k, i * ny + (j + 1)] += diag_y
                 else: A[k, k] += diag_y
                 
-        self.A_poisson = A.tocsr()
+        self.A_poisson = A.tocsc()
+        self.solve_poisson = spla.factorized(self.A_poisson)
 
     def apply_bc(self):
         if self.archetype in ["cylinder", "obstacle", "airfoil"]:
@@ -155,14 +156,25 @@ class AcceleratedSolver:
             (self.v[1:-1, 2:] - 2*self.v[1:-1, 1:-1] + self.v[1:-1, :-2])/dy**2
         )
         
-        # 2. Upwind Convection
+        # 2. Hybrid Upwind / Central Convection (OpenFOAM blended scheme for crisp vortex shedding)
         i, j = slice(1, -1), slice(1, -1)
-        du_dx = np.where(self.u[i, j] > 0, (self.u[i, j] - self.u[:-2, j])/dx, (self.u[2:, j] - self.u[i, j])/dx)
-        du_dy = np.where(self.v[i, j] > 0, (self.u[i, j] - self.u[i, :-2])/dy, (self.u[i, 2:] - self.u[i, j])/dy)
+        du_dx_upw = np.where(self.u[i, j] > 0, (self.u[i, j] - self.u[:-2, j])/dx, (self.u[2:, j] - self.u[i, j])/dx)
+        du_dy_upw = np.where(self.v[i, j] > 0, (self.u[i, j] - self.u[i, :-2])/dy, (self.u[i, 2:] - self.u[i, j])/dy)
+        dv_dx_upw = np.where(self.u[i, j] > 0, (self.v[i, j] - self.v[:-2, j])/dx, (self.v[2:, j] - self.v[i, j])/dx)
+        dv_dy_upw = np.where(self.v[i, j] > 0, (self.v[i, j] - self.v[i, :-2])/dy, (self.v[i, 2:] - self.v[i, j])/dy)
+
+        du_dx_cen = (self.u[2:, j] - self.u[:-2, j]) / (2 * dx)
+        du_dy_cen = (self.u[i, 2:] - self.u[i, :-2]) / (2 * dy)
+        dv_dx_cen = (self.v[2:, j] - self.v[:-2, j]) / (2 * dx)
+        dv_dy_cen = (self.v[i, 2:] - self.v[i, :-2]) / (2 * dy)
+
+        gamma = 0.85 # 85% upwind (unconditionally stable), 15% central (preserves boundary layers & eddies)
+        du_dx = gamma * du_dx_upw + (1.0 - gamma) * du_dx_cen
+        du_dy = gamma * du_dy_upw + (1.0 - gamma) * du_dy_cen
+        dv_dx = gamma * dv_dx_upw + (1.0 - gamma) * dv_dx_cen
+        dv_dy = gamma * dv_dy_upw + (1.0 - gamma) * dv_dy_cen
+
         conv_u = self.u[i, j] * du_dx + self.v[i, j] * du_dy
-        
-        dv_dx = np.where(self.u[i, j] > 0, (self.v[i, j] - self.v[:-2, j])/dx, (self.v[2:, j] - self.v[i, j])/dx)
-        dv_dy = np.where(self.v[i, j] > 0, (self.v[i, j] - self.v[i, :-2])/dy, (self.v[i, 2:] - self.v[i, j])/dy)
         conv_v = self.u[i, j] * dv_dx + self.v[i, j] * dv_dy
         
         # Brinkman drag on obstacle
@@ -202,7 +214,7 @@ class AcceleratedSolver:
         else:
             rhs[0] = 0.0
             
-        p_flat = spla.spsolve(self.A_poisson, rhs)
+        p_flat = self.solve_poisson(rhs)
         self.p = np.nan_to_num(p_flat.reshape((nx, ny)), nan=0.0)
         
         # 4. Correct velocity
