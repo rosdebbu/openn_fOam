@@ -1567,8 +1567,10 @@ onUnmounted(() => {
   right: 14px;
   z-index: 25;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   background: rgba(14, 10, 18, 0.92);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -1728,7 +1730,7 @@ onUnmounted(() => {
 /* Interactive Slice & Rake Panel */
 .interactive-controls-hud {
   position: absolute;
-  top: 98px;
+  top: 56px;
   right: 14px;
   width: 320px;
   z-index: 24;

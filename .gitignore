@@ -28,3 +28,10 @@ scratch/
 # =====================
 .env
 .env.*
+
+# =====================
+# Planning & Scratch
+# =====================
+.planning/
+.agents/.gsd*
+.agents/gsd*
