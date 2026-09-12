@@ -35,8 +35,8 @@ from experiments.ghia_benchmark import (
     GHIA_X, GHIA_V_RE100, GHIA_V_RE400
 )
 
-# Output directory for figures
-ARTIFACTS_DIR = r"C:\Users\ROSHNI\.gemini\antigravity-ide\brain\f1a151dd-f4e0-4edc-bb86-5ec12a165fd9"
+# Output directory for figures (relative to this file, portable across machines)
+ARTIFACTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "artifacts")
 FIG_DIR = os.path.join(ARTIFACTS_DIR, "figures")
 os.makedirs(FIG_DIR, exist_ok=True)
 RESULTS_FILE = os.path.join(ARTIFACTS_DIR, "simulation_results.json")
