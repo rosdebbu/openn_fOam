@@ -573,8 +573,6 @@ onUnmounted(() => {
   transform: translateY(12px);
   opacity: 0;
 }
-</style>
-
 
 /* Floating Sidebar Toggle Tab */
 .sidebar-toggle-tab {
@@ -623,3 +621,4 @@ onUnmounted(() => {
 .toggle-icon {
   font-size: 11px;
 }
+</style>
