@@ -2,6 +2,22 @@
   <header class="header-navbar">
     <!-- Left: Brand Logo and Title -->
     <div class="brand">
+      <!-- ChatGPT-Style Sidebar Toggle Button -->
+      <button
+        class="sidebar-toggle-btn"
+        :class="{ active: isSidebarOpen }"
+        @click="$emit('toggleSidebar')"
+        :title="isSidebarOpen ? 'Collapse Sidebar (Ctrl + \\)' : 'Expand Sidebar (Ctrl + \\)'"
+        aria-label="Toggle Sidebar"
+      >
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="2"/>
+          <path d="M9 3v18"/>
+          <path d="m14 9-3 3 3 3" v-if="isSidebarOpen"/>
+          <path d="m12 9 3 3-3 3" v-else/>
+        </svg>
+      </button>
+
       <div class="logo-cube" title="OpenZess 3D Studio">
         <div class="cube-inner">
           <span class="cube-face front"></span>
@@ -233,6 +249,7 @@ const props = defineProps<{
   isPlaying: boolean;
   isConnected: boolean;
   isConnecting?: boolean;
+  isSidebarOpen?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -245,6 +262,7 @@ const emit = defineEmits<{
   (e: 'reset'): void;
   (e: 'snapshot'): void;
   (e: 'exportCase', type: 'zip' | 'vtk' | 'png'): void;
+  (e: 'toggleSidebar'): void;
 }>();
 
 const showArchetypeMenu = ref(false);
@@ -340,7 +358,40 @@ onUnmounted(() => {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+.sidebar-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-toggle-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  transform: scale(1.04);
+}
+
+.sidebar-toggle-btn.active {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.sidebar-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s ease;
 }
 
 .logo-cube {

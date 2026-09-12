@@ -3,8 +3,22 @@
     <!-- Hub Header -->
     <div class="hub-header">
       <div class="hub-title-row">
-        <h2 class="hub-title">OpenFOAM Physics & Case Hub</h2>
-        <span class="version-tag">v2406 FVM</span>
+        <div class="title-with-badge">
+          <h2 class="hub-title">OpenFOAM Physics & Case Hub</h2>
+          <span class="version-tag">v2406 FVM</span>
+        </div>
+        <button
+          class="sidebar-close-btn"
+          @click="$emit('close')"
+          title="Collapse Sidebar (Ctrl + \\)"
+          aria-label="Collapse Sidebar"
+        >
+          <svg class="close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2"/>
+            <path d="M9 3v18"/>
+            <path d="m14 9-3 3 3 3"/>
+          </svg>
+        </button>
       </div>
       <p class="hub-subtitle">Conservation of Mass, Momentum, Energy & Gravity</p>
     </div>
@@ -444,6 +458,7 @@ const emit = defineEmits<{
   (e: 'update:params', params: SimulationParams): void;
   (e: 'fileUploaded', file: File): void;
   (e: 'autoRunSimulation'): void;
+  (e: 'close'): void;
 }>();
 
 const activeTab = ref<'physics' | 'repair'>('physics');
@@ -833,7 +848,41 @@ function applyAiSnippet(code: string) {
 .hub-title-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+}
+
+.title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.sidebar-close-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  transform: scale(1.05);
+}
+
+.close-svg {
+  width: 16px;
+  height: 16px;
 }
 
 .hub-title {

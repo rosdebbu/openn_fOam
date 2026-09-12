@@ -6,6 +6,8 @@
       :aiConfig="aiConfig"
       :isPlaying="isPlaying"
       :isConnected="isConnected"
+      :isSidebarOpen="isSidebarOpen"
+      @toggleSidebar="toggleSidebar"
       @update:archetype="setArchetype"
       @openSettings="isSettingsOpen = true"
       @togglePlay="togglePlay"
@@ -19,27 +21,19 @@
 
     <!-- Main Studio Body -->
     <div class="studio-body">
-      <!-- Left OpenFOAM Case Hub -->
-      <SidebarControls
-        v-show="isSidebarOpen"
-        :params="params"
-        :aiConfig="aiConfig"
-        :isComputing="status === 'computing'"
-        @update:params="updateParams"
-        @fileUploaded="handleFileUploaded"
-        @autoRunSimulation="startLiveSimulation"
-      />
-
-      <!-- Floating Sidebar Toggle Tab -->
-      <button
-        class="sidebar-toggle-tab"
-        :class="{ 'sidebar-collapsed': !isSidebarOpen }"
-        @click="isSidebarOpen = !isSidebarOpen"
-        :title="isSidebarOpen ? 'Collapse Physics & AI Panel' : 'Expand Physics & AI Panel'"
-      >
-        <span class="toggle-icon">{{ isSidebarOpen ? '◀' : '▶' }}</span>
-        <span class="toggle-text" v-if="!isSidebarOpen">PHYSICS & CASE HUB</span>
-      </button>
+      <!-- Left OpenFOAM Case Hub with ChatGPT-style smooth slide -->
+      <transition name="sidebar-slide">
+        <SidebarControls
+          v-show="isSidebarOpen"
+          :params="params"
+          :aiConfig="aiConfig"
+          :isComputing="status === 'computing'"
+          @update:params="updateParams"
+          @fileUploaded="handleFileUploaded"
+          @autoRunSimulation="startLiveSimulation"
+          @close="toggleSidebar"
+        />
+      </transition>
 
       <!-- Right Main 3D CFD Viewport -->
       <main class="viewport-area">
@@ -371,12 +365,28 @@ function handleExportCase(type: 'zip' | 'vtk' | 'png') {
   }
 }
 
+function toggleSidebar() {
+  isSidebarOpen.value = !isSidebarOpen.value;
+  setTimeout(() => {
+    window.dispatchEvent(new Event('resize'));
+  }, 290);
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+    e.preventDefault();
+    toggleSidebar();
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', handleKeydown);
   // Start real live simulation stream
   startLiveSimulation();
 });
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
   if (socket) {
     socket.close();
     socket = null;
@@ -574,51 +584,16 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-/* Floating Sidebar Toggle Tab */
-.sidebar-toggle-tab {
-  position: absolute;
-  left: 360px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 45;
-  background: rgba(18, 12, 24, 0.94);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  border-left: none;
-  border-radius: 0 8px 8px 0;
-  color: #38bdf8;
-  padding: 10px 4px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.5);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+/* Smooth ChatGPT-Style Sidebar Slide Transition */
+.sidebar-slide-enter-active,
+.sidebar-slide-leave-active {
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.sidebar-toggle-tab.sidebar-collapsed {
-  left: 0;
-  border-left: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: 0 8px 8px 0;
-  padding: 12px 6px;
-}
-
-.sidebar-toggle-tab:hover {
-  background: rgba(56, 189, 248, 0.2);
-  color: #fff;
-  border-color: #38bdf8;
-}
-
-.toggle-text {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: #38bdf8;
-}
-
-.toggle-icon {
-  font-size: 11px;
+.sidebar-slide-enter-from,
+.sidebar-slide-leave-to {
+  margin-left: -360px;
+  opacity: 0;
+  transform: translateX(-20px);
 }
 </style>
