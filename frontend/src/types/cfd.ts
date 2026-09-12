@@ -93,6 +93,15 @@ export interface SimulationStepData {
   speed: number[][];
   mode: SolverMode;
   error?: string;
+  uMax?: number;
+  uAvg?: number;
+  pMin?: number;
+  pMax?: number;
+  cd?: number;
+  cl?: number;
+  courantMax?: number;
+  continuityError?: number;
+  obstacleMask?: boolean[][];
 }
 
 export interface OpenFoamDictFile {

@@ -182,6 +182,7 @@ const iterations = ref<number[]>([0]);
 const residuals = ref<number[]>([1.0]);
 
 let socket: WebSocket | null = null;
+let cachedObstacleMask: boolean[][] | null = null;
 
 const latestResidual = computed(() => {
   if (residuals.value.length === 0) return null;
@@ -227,20 +228,46 @@ function startLiveSimulation() {
       socket?.send(JSON.stringify(payload));
     };
 
+    cachedObstacleMask = null;
     socket.onmessage = (event: MessageEvent) => {
       try {
-        const sanitizedText = event.data.replace(/:\s*NaN/g, ': 0.0').replace(/:\s*Infinity/g, ': 999.0').replace(/:\s*-Infinity/g, ': -999.0');
-        const data = JSON.parse(sanitizedText);
+        let data: any;
+        if (typeof event.data === 'string') {
+          // Fast path: clean numeric JSON directly from optimized Python backend
+          try {
+            data = JSON.parse(event.data);
+          } catch {
+            const sanitizedText = event.data
+              .replace(/:\s*NaN/g, ': 0.0')
+              .replace(/:\s*Infinity/g, ': 999.0')
+              .replace(/:\s*-Infinity/g, ': -999.0');
+            data = JSON.parse(sanitizedText);
+          }
+        } else {
+          data = event.data;
+        }
+
         if (data.error) {
           console.error('Simulation error from backend:', data.error);
           status.value = 'error';
           return;
         }
 
+        // Cache obstacleMask (sent only on frame 1 to reduce WebSocket payload size)
+        if (data.obstacleMask) {
+          cachedObstacleMask = data.obstacleMask;
+        } else if (cachedObstacleMask) {
+          data.obstacleMask = cachedObstacleMask;
+        }
+
         simulationData.value = data;
 
         // Real computed telemetry from Python Navier-Stokes solver
         if (data.iteration !== undefined && data.residual !== undefined) {
+          if (iterations.value.length > 500) {
+            iterations.value.shift();
+            residuals.value.shift();
+          }
           iterations.value.push(data.iteration);
           residuals.value.push(data.residual);
         }

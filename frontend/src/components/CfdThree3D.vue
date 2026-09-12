@@ -384,7 +384,19 @@ const slicePos = ref(0.0);
 const sliceOpacity = ref(0.88);
 
 const sliceStats = computed(() => {
-  if (!props.data || !props.data.speed) {
+  if (!props.data) {
+    return { uMax: 0, pMin: 0, pMax: 0, uAvg: 0 };
+  }
+  // High-performance O(1) path directly from backend solver telemetry
+  if (props.data.uMax !== undefined) {
+    return {
+      uMax: props.data.uMax,
+      pMin: props.data.pMin ?? 0,
+      pMax: props.data.pMax ?? 0,
+      uAvg: props.data.uAvg ?? 0
+    };
+  }
+  if (!props.data.speed) {
     return { uMax: 0, pMin: 0, pMax: 0, uAvg: 0 };
   }
   const speeds = Array.isArray(props.data.speed) ? props.data.speed.flat() : [];
@@ -1402,11 +1414,32 @@ function updateEngineeringTriad() {
   triadRenderer.render(triadScene, triadCamera);
 }
 
-// Real-Time Step Watcher
-function onSimulationStepReceived(_stepData: SimulationStepData) {
+// Real-Time Step Watcher with requestAnimationFrame frame coalescing (prevents micro-stutters)
+let pendingStepData: SimulationStepData | null = null;
+let renderFrameScheduled = false;
+
+function applySimulationFrame(_stepData: SimulationStepData) {
   updateSliceDataTexture();
-  updateObstacleSurfaceColors();
-  updateRibbonStreamlinesGeometry();
+  if (showGeometry.value) {
+    updateObstacleSurfaceColors();
+  }
+  if (showStreamlines.value) {
+    updateRibbonStreamlinesGeometry();
+  }
+}
+
+function onSimulationStepReceived(stepData: SimulationStepData) {
+  pendingStepData = stepData;
+  if (!renderFrameScheduled) {
+    renderFrameScheduled = true;
+    requestAnimationFrame(() => {
+      renderFrameScheduled = false;
+      if (pendingStepData) {
+        applySimulationFrame(pendingStepData);
+        pendingStepData = null;
+      }
+    });
+  }
 }
 
 watch(() => props.data, (newData) => {

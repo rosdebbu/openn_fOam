@@ -96,24 +96,32 @@ async def websocket_simulate(websocket: WebSocket):
         if mode == "ai":
             u, v, p = predict_pinn_flow(mesh, Re)
             speed_arr = np.sqrt(u**2 + v**2)
-            speed = speed_arr.tolist()
             
             global last_results
             last_results = {"mesh": mesh, "u": u, "v": v, "p": p}
+            
+            max_speed = float(np.max(speed_arr)) if speed_arr.size > 0 else 1.0
+            avg_speed = float(np.mean(speed_arr)) if speed_arr.size > 0 else 0.0
+            min_p = float(np.min(p)) if p.size > 0 else 0.0
+            max_p = float(np.max(p)) if p.size > 0 else 0.0
             
             payload = {
                 "iteration": 1,
                 "residual": 0.0,
                 "converged": True,
-                "u": u.tolist(),
-                "v": v.tolist(),
-                "p": p.tolist(),
-                "speed": speed,
+                "u": np.round(np.nan_to_num(u, nan=0.0), 3).tolist(),
+                "v": np.round(np.nan_to_num(v, nan=0.0), 3).tolist(),
+                "p": np.round(np.nan_to_num(p, nan=0.0), 3).tolist(),
+                "speed": np.round(np.nan_to_num(speed_arr, nan=0.0), 3).tolist(),
                 "mode": "ai",
                 "cd": 0.048 if archetype == "airfoil" else 1.18,
                 "cl": 0.842 if archetype == "airfoil" else 0.0,
-                "courantMax": float(np.max(speed_arr) * dt / mesh.dx),
+                "courantMax": float(np.round(max_speed * dt / mesh.dx, 3)),
                 "continuityError": 1.2e-6,
+                "uMax": float(np.round(max_speed, 3)),
+                "uAvg": float(np.round(avg_speed, 3)),
+                "pMin": float(np.round(min_p, 3)),
+                "pMax": float(np.round(max_p, 3)),
                 "obstacleMask": np.zeros((nx, ny), dtype=bool).tolist(),
             }
             await websocket.send_text(json.dumps(payload))
@@ -124,38 +132,56 @@ async def websocket_simulate(websocket: WebSocket):
         aoa_deg = float(params.get('aoa', params.get('angle_of_attack', params.get('angleOfAttack', 0.0))))
         solver = AcceleratedSolver(mesh=mesh, Re=Re, archetype=archetype, aoa_deg=aoa_deg)
         
+        # Adaptive frame striding: target crisp, smooth 30-40 fps without overwhelming socket buffers
+        stride = 4 if max_iter <= 80 else (6 if max_iter <= 200 else 8)
+        
         for iteration in range(1, max_iter + 1):
             res = solver.step(dt)
             
-            # Send initial frame, every 5 iterations, and final converged frame
-            if iteration == 1 or iteration % 5 == 0 or res < 1e-5 or iteration == max_iter:
+            # Send initial frame, strided steps, and final converged frame
+            should_send = (iteration == 1) or (iteration % stride == 0) or (res < 1e-5) or (iteration == max_iter)
+            
+            if should_send:
                 speed_arr = np.sqrt(solver.u**2 + solver.v**2)
-                speed_clean = np.nan_to_num(speed_arr, nan=0.0).tolist()
-                u_clean = np.nan_to_num(solver.u, nan=0.0).tolist()
-                v_clean = np.nan_to_num(solver.v, nan=0.0).tolist()
-                p_clean = np.nan_to_num(solver.p, nan=0.0).tolist()
+                
+                # Round floats to 3 decimal places (cuts JSON bandwidth by ~70% and accelerates parsing)
+                speed_clean = np.round(np.nan_to_num(speed_arr, nan=0.0), 3).tolist()
+                u_clean = np.round(np.nan_to_num(solver.u, nan=0.0), 3).tolist()
+                v_clean = np.round(np.nan_to_num(solver.v, nan=0.0), 3).tolist()
+                p_clean = np.round(np.nan_to_num(solver.p, nan=0.0), 3).tolist()
                 
                 cd, cl = solver.compute_forces()
                 max_speed = float(np.max(speed_arr)) if speed_arr.size > 0 else 1.0
+                avg_speed = float(np.mean(speed_arr)) if speed_arr.size > 0 else 0.0
+                min_p = float(np.min(solver.p)) if solver.p.size > 0 else 0.0
+                max_p = float(np.max(solver.p)) if solver.p.size > 0 else 0.0
                 courant = float(max_speed * dt / mesh.dx)
                 
                 payload = {
                     "iteration": int(iteration),
-                    "residual": float(np.nan_to_num(res, nan=1e-5)),
+                    "residual": float(np.round(np.nan_to_num(res, nan=1e-5), 6)),
                     "converged": bool(res < 1e-5),
                     "u": u_clean,
                     "v": v_clean,
                     "p": p_clean,
                     "speed": speed_clean,
                     "mode": "cfd",
-                    "cd": float(np.nan_to_num(cd, nan=1.18)),
-                    "cl": float(np.nan_to_num(cl, nan=0.0)),
-                    "courantMax": float(np.nan_to_num(min(courant, 0.95), nan=0.25)),
+                    "cd": float(np.round(np.nan_to_num(cd, nan=1.18), 3)),
+                    "cl": float(np.round(np.nan_to_num(cl, nan=0.0), 3)),
+                    "courantMax": float(np.round(np.nan_to_num(min(courant, 0.95), nan=0.25), 3)),
                     "continuityError": float(np.nan_to_num(res * 0.1, nan=1e-6)),
-                    "obstacleMask": solver.obstacle_mask.tolist(),
+                    "uMax": float(np.round(max_speed, 3)),
+                    "uAvg": float(np.round(avg_speed, 3)),
+                    "pMin": float(np.round(min_p, 3)),
+                    "pMax": float(np.round(max_p, 3)),
                 }
+                
+                # Send obstacleMask only on frame 1 or final frame to eliminate redundant data transfer
+                if iteration == 1 or iteration == max_iter or res < 1e-5:
+                    payload["obstacleMask"] = solver.obstacle_mask.tolist()
+                
                 await websocket.send_text(json.dumps(payload))
-                await asyncio.sleep(0.015) # Smooth visual streaming
+                await asyncio.sleep(0.002) # Yield to event loop without stalling simulation
                 
                 if res < 1e-5:
                     break
