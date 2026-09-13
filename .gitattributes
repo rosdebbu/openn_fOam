@@ -1,0 +1,14 @@
+# GitHub Linguist Overrides
+# Tells GitHub to ignore generated HTML documentation and build outputs
+# so the Language Bar accurately reflects the Python, TypeScript, and Vue tech stack.
+
+*.html linguist-detectable=false
+*.html linguist-documentation
+graphify-out/** linguist-vendored
+docs/** linguist-documentation
+frontend/dist/** linguist-vendored
+scratch/** linguist-vendored
+experiments/** linguist-detectable=true
+backend/** linguist-detectable=true
+frontend/src/** linguist-detectable=true
+rust-sidecar/** linguist-detectable=true
