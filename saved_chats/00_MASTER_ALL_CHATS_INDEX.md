@@ -7,6 +7,7 @@
 
 ## 📚 Session Index
 
+- [[2026-09-14_hybrid_model_rust_python_chat.md]] — **2026-09-14 02:38:52** (`5c77b94b`): *"Hybrid Model: Rust Bare-Metal Engine, Axum Sidecar, Python-Rust Bridge with Auto-Fallback, 3-Way Engine Selector, Localhost Verification"* (Complete Hybrid Migration)
 - [[Session_2026-08-27_fb59d5da.md]] — **2026-08-27 03:44:55** (`fb59d5da`): *"are you to read the save chats..."* (24 turns)
 - [[Session_2026-08-27_e6b5f044.md]] — **2026-08-27 01:51:45** (`e6b5f044`): *"can you give me the things to get more achivemnet how to unlock that..."* (81 turns)
 - [[Session_2026-08-26_ccd75d72.md]] — **2026-08-26 17:59:23** (`ccd75d72`): *"i donot know what happneded the system my laptop screen i sblack not opening at ..."* (2 turns)
