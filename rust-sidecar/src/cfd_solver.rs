@@ -129,10 +129,10 @@ impl NavierStokesSolver {
 
             for i in 1..self.nx - 1 {
                 for j in 1..self.ny - 1 {
-                    pn[i][j] = (((self.p[i + 1][j] + self.p[i - 1][j]) * dy2
+                    pn[i][j] = ((self.p[i + 1][j] + self.p[i - 1][j]) * dy2
                         + (self.p[i][j + 1] + self.p[i][j - 1]) * dx2
                         - self.b[i][j] * dx2 * dy2)
-                        / factor);
+                        / factor;
                 }
             }
 
@@ -271,7 +271,7 @@ pub fn run_simulation(config: CfdConfig) -> CfdStepResult {
     let mut last_res = 1.0;
     let mut converged = false;
 
-    for step in 1..=config.steps {
+    for _step in 1..=config.steps {
         last_res = solver.step();
         if last_res < 1e-5 {
             converged = true;

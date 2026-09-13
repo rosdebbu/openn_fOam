@@ -30,8 +30,8 @@ scratch/
 .env.*
 
 # =====================
-# Planning & Scratch
+# Rust
 # =====================
-.planning/
-.agents/.gsd*
-.agents/gsd*
+target/
+rust-sidecar/target/
+**/*.rs.bk

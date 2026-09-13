@@ -10,8 +10,8 @@ mod imaging;
 mod vector;
 
 use axum::{
-    extract::{DefaultBodyLimit, HeaderMap},
-    http::StatusCode,
+    extract::DefaultBodyLimit,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
