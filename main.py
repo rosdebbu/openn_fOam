@@ -13,6 +13,9 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Expose app for ASGI servers (e.g., uvicorn main:app)
+from backend.app import app
+
 
 def open_browser():
     """Wait for server to start, then open browser."""
