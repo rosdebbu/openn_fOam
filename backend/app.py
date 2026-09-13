@@ -33,7 +33,15 @@ last_results = {}
 # Serve Frontend static files (built Vue 3 dist or raw frontend)
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
 dist_path = os.path.join(frontend_path, "dist")
-static_dir = dist_path if os.path.exists(dist_path) else frontend_path
+gitwork_dist = r"C:\gitwork\openn_fOam\frontend\dist"
+
+if os.path.exists(dist_path) and os.path.exists(os.path.join(dist_path, "index.html")):
+    static_dir = dist_path
+elif os.path.exists(gitwork_dist) and os.path.exists(os.path.join(gitwork_dist, "index.html")):
+    static_dir = gitwork_dist
+else:
+    static_dir = frontend_path
+
 if os.path.exists(static_dir):
     app.mount("/studio", StaticFiles(directory=static_dir, html=True), name="frontend")
 
