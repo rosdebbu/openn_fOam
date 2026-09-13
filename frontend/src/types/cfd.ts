@@ -2,7 +2,7 @@ export type CaseType = 'cavity' | 'channel' | 'obstacle' | 'pipe';
 
 export type SimulationArchetype = 'plume' | 'airfoil' | 'cylinder' | 'venturi' | 'cavity' | 'cad' | 'water_dam' | 'weather_plume';
 
-export type SolverMode = 'cfd' | 'ai';
+export type SolverMode = 'cfd' | 'rust' | 'ai';
 
 export type FieldVariable = 'U' | 'p' | 'T' | 'omega' | 'q_crit';
 

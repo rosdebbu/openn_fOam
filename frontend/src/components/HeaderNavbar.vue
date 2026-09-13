@@ -61,6 +61,43 @@
           </div>
         </transition>
       </div>
+
+      <!-- Engine Selector Dropdown (Rust Bare-Metal / PINN AI / Python SciPy) -->
+      <div class="engine-dropdown-wrapper" ref="engineDropdownRef">
+        <button
+          class="engine-pill-btn"
+          :class="solverMode || 'cfd'"
+          @click="showEngineMenu = !showEngineMenu"
+          title="Select CFD Physics Engine (Rust SIMD, PINN AI, or Python SciPy)"
+        >
+          <span class="engine-icon">{{ currentEngineInfo.icon }}</span>
+          <span class="engine-label">{{ currentEngineInfo.name }}</span>
+          <span class="engine-badge" :class="currentEngineInfo.id">{{ currentEngineInfo.badge }}</span>
+          <span class="dropdown-arrow">▾</span>
+        </button>
+
+        <transition name="fade-drop">
+          <div v-if="showEngineMenu" class="engine-menu">
+            <div class="menu-heading">CFD Physics Engines</div>
+            <button
+              v-for="eng in engines"
+              :key="eng.id"
+              class="engine-menu-item"
+              :class="{ selected: (solverMode || 'cfd') === eng.id }"
+              @click="selectEngine(eng.id)"
+            >
+              <span class="menu-item-icon">{{ eng.icon }}</span>
+              <div class="menu-item-text">
+                <div class="menu-item-title-row">
+                  <strong>{{ eng.name }}</strong>
+                  <span class="speed-tag" :class="eng.speedClass">{{ eng.speed }}</span>
+                </div>
+                <small>{{ eng.tech }} · {{ eng.desc }}</small>
+              </div>
+            </button>
+          </div>
+        </transition>
+      </div>
     </div>
 
     <!-- Right: AI Copilot Key Status, Colab Runtime Widget, Transport Controls, Export -->
@@ -241,10 +278,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import type { SimulationArchetype, AiProviderConfig } from '../types/cfd';
+import type { SimulationArchetype, AiProviderConfig, SolverMode } from '../types/cfd';
 
 const props = defineProps<{
   currentArchetype: SimulationArchetype;
+  solverMode?: SolverMode;
   aiConfig: AiProviderConfig;
   isPlaying: boolean;
   isConnected: boolean;
@@ -254,6 +292,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:archetype', arch: SimulationArchetype): void;
+  (e: 'update:solverMode', mode: SolverMode): void;
   (e: 'openSettings'): void;
   (e: 'togglePlay'): void;
   (e: 'stepBack'): void;
@@ -266,12 +305,30 @@ const emit = defineEmits<{
 }>();
 
 const showArchetypeMenu = ref(false);
+const showEngineMenu = ref(false);
 const showColabMenu = ref(false);
 const showExportMenu = ref(false);
 
 const archetypeDropdownRef = ref<HTMLDivElement | null>(null);
+const engineDropdownRef = ref<HTMLDivElement | null>(null);
 const colabWidgetRef = ref<HTMLDivElement | null>(null);
 const exportDropdownRef = ref<HTMLDivElement | null>(null);
+
+const engines: { id: SolverMode; name: string; icon: string; badge: string; tech: string; desc: string; speed: string; speedClass: string }[] = [
+  { id: 'rust', name: 'Rust Bare-Metal', icon: '🦀', badge: 'SIMD', tech: 'Axum + Rayon', desc: 'Multi-threaded Navier-Stokes & Poisson solver', speed: 'Fastest ⚡', speedClass: 'fastest' },
+  { id: 'ai', name: 'PINN AI Surrogate', icon: '⚡', badge: '<50ms', tech: 'Neural Network', desc: 'Instant physics-informed neural operator flow prediction', speed: 'Instant 🚀', speedClass: 'instant' },
+  { id: 'cfd', name: 'Python SciPy', icon: '🔬', badge: 'Sparse', tech: 'SciPy + NumPy', desc: 'High-precision sparse fractional-step CPU solver', speed: 'High-Res 🎯', speedClass: 'precise' }
+];
+
+const currentEngineInfo = computed(() => {
+  const current = props.solverMode || 'cfd';
+  return engines.find(e => e.id === current) || engines[2];
+});
+
+function selectEngine(id: SolverMode) {
+  showEngineMenu.value = false;
+  emit('update:solverMode', id);
+}
 
 const ramUsage = ref(38);
 const diskUsage = ref(24);
@@ -323,6 +380,9 @@ function handleClickOutside(e: MouseEvent) {
   if (archetypeDropdownRef.value && !archetypeDropdownRef.value.contains(target)) {
     showArchetypeMenu.value = false;
   }
+  if (engineDropdownRef.value && !engineDropdownRef.value.contains(target)) {
+    showEngineMenu.value = false;
+  }
   if (colabWidgetRef.value && !colabWidgetRef.value.contains(target)) {
     showColabMenu.value = false;
   }
@@ -354,7 +414,6 @@ onUnmounted(() => {
   user-select: none;
 }
 
-/* Brand styling */
 .brand {
   display: flex;
   align-items: center;
@@ -508,6 +567,141 @@ onUnmounted(() => {
   background: var(--btn-surface);
   border-color: var(--accent-border);
   color: #ffffff;
+}
+
+/* Engine Dropdown Styles */
+.engine-dropdown-wrapper {
+  position: relative;
+  margin-left: 6px;
+}
+
+.engine-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 4px 10px;
+  color: #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.engine-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-border);
+}
+
+.engine-pill-btn.rust {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(249, 115, 22, 0.12);
+  color: #fdba74;
+}
+
+.engine-pill-btn.ai {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+}
+
+.engine-pill-btn.cfd {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(52, 211, 153, 0.12);
+  color: #6ee7b7;
+}
+
+.engine-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.engine-badge.rust {
+  background: #ea580c;
+  color: #ffffff;
+}
+
+.engine-badge.ai {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.engine-badge.cfd {
+  background: #059669;
+  color: #ffffff;
+}
+
+.engine-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 340px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-active);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
+  z-index: 250;
+}
+
+.engine-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #cbd5e1;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.engine-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.engine-menu-item.selected {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
+}
+
+.menu-item-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.speed-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.speed-tag.fastest {
+  background: rgba(249, 115, 22, 0.2);
+  color: #fb923c;
+}
+
+.speed-tag.instant {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+.speed-tag.precise {
+  background: rgba(52, 211, 153, 0.2);
+  color: #34d399;
 }
 
 .menu-item-icon {

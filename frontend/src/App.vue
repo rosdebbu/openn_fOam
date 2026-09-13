@@ -3,10 +3,12 @@
     <!-- Top Navigation Header -->
     <HeaderNavbar
       :currentArchetype="params.archetype"
+      :solverMode="params.solverMode"
       :aiConfig="aiConfig"
       :isPlaying="isPlaying"
       :isConnected="isConnected"
       @update:archetype="setArchetype"
+      @update:solverMode="val => params.solverMode = val"
       @openSettings="isSettingsOpen = true"
       @togglePlay="togglePlay"
       @stepBack="stepBack"
@@ -113,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import type { SimulationParams, SimulationStepData, SimulationArchetype, AiProviderConfig, AerodynamicTelemetry } from './types/cfd';
 import { getStoredAiConfig } from './utils/aiCopilot';
 
@@ -236,12 +238,103 @@ function handleFileUploaded(file: File) {
   console.log('Geometry uploaded:', file.name);
 }
 
+function triggerLiveSimulation() {
+  if (!isPlaying.value) return;
+  
+  const loc = window.location;
+  const envApi = (import.meta as any).env?.VITE_API_URL;
+  const rawHost = envApi ? envApi.replace(/^https?:\/\//, '') : (loc.host.includes('5173') ? '127.0.0.1:8000' : loc.host);
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${proto}//${rawHost}/ws/simulate`;
+
+  if (socket) {
+    try { socket.close(); } catch (_) {}
+  }
+
+  status.value = 'computing';
+  try {
+    socket = new WebSocket(wsUrl);
+    
+    socket.onopen = () => {
+      isConnected.value = true;
+      socket.send(JSON.stringify({
+        gridResolution: params.gridResolution,
+        reynoldsNumber: params.reynoldsNumber,
+        solverMode: params.solverMode,
+        archetype: params.archetype,
+        maxIterations: params.maxIterations,
+        dt: params.dt
+      }));
+    };
+
+    socket.onmessage = (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.error) {
+          console.warn('Simulation backend warning:', payload.error);
+          return;
+        }
+
+        if (payload.iteration !== undefined) {
+          iterations.value.push(payload.iteration);
+          residuals.value.push(payload.residual);
+        }
+
+        if (payload.cd !== undefined) telemetry.cd = payload.cd;
+        if (payload.cl !== undefined) telemetry.cl = payload.cl;
+        if (payload.courantMax !== undefined) telemetry.courantMax = payload.courantMax;
+        if (payload.continuityError !== undefined) telemetry.continuityError = payload.continuityError;
+
+        if (payload.u && payload.v && payload.speed) {
+          simulationData.value = {
+            iteration: payload.iteration || 1,
+            residual: payload.residual || 0.0,
+            converged: !!payload.converged,
+            u: payload.u,
+            v: payload.v,
+            p: payload.p,
+            speed: payload.speed,
+            mode: (payload.mode as SolverMode) || params.solverMode || 'cfd'
+          };
+        }
+
+        if (payload.converged) {
+          status.value = 'converged';
+        }
+      } catch (err) {
+        console.error('WebSocket parse error:', err);
+      }
+    };
+
+    socket.onerror = () => {
+      isConnected.value = false;
+    };
+
+    socket.onclose = () => {
+      if (status.value === 'computing') {
+        status.value = 'ready';
+      }
+    };
+  } catch (err) {
+    console.warn('WebSocket connection error; client ticker active:', err);
+  }
+}
+
+watch(() => [params.solverMode, params.archetype], () => {
+  resetSimulation();
+  triggerLiveSimulation();
+});
+
 function togglePlay() {
   isPlaying.value = !isPlaying.value;
   if (isPlaying.value) {
     status.value = 'computing';
+    triggerLiveSimulation();
   } else {
     status.value = 'ready';
+    if (socket) {
+      try { socket.close(); } catch (_) {}
+    }
   }
 }
 
