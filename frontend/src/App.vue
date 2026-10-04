@@ -2,11 +2,16 @@
   <div class="app-layout">
     <!-- Top Navigation Header -->
     <HeaderNavbar
+      :caseName="params.caseName"
       :currentArchetype="params.archetype"
+      :solverMode="params.solverMode"
       :aiConfig="aiConfig"
       :isPlaying="isPlaying"
       :isConnected="isConnected"
+      :isSidebarOpen="isSidebarOpen"
+      @update:caseName="val => params.caseName = val"
       @update:archetype="setArchetype"
+      @update:solverMode="val => params.solverMode = val"
       @openSettings="isSettingsOpen = true"
       @togglePlay="togglePlay"
       @stepBack="stepBack"
@@ -15,21 +20,38 @@
       @reset="resetSimulation"
       @snapshot="takeSnapshot"
       @exportCase="handleExportCase"
+      @toggleSidebar="toggleSidebar"
     />
 
     <!-- Main Studio Body -->
     <div class="studio-body">
-      <!-- Left OpenFOAM Case Hub -->
-      <SidebarControls
-        :params="params"
-        :aiConfig="aiConfig"
-        :isComputing="status === 'computing'"
-        @update:params="updateParams"
-        @fileUploaded="handleFileUploaded"
-      />
+      <!-- Left OpenFOAM Case Hub (Collapsible Slide Bar) -->
+      <transition name="slide-sidebar">
+        <SidebarControls
+          v-show="isSidebarOpen"
+          :params="params"
+          :aiConfig="aiConfig"
+          :isComputing="status === 'computing'"
+          @update:params="updateParams"
+          @fileUploaded="handleFileUploaded"
+          @closeSidebar="isSidebarOpen = false"
+        />
+      </transition>
 
       <!-- Right Main 3D CFD Viewport -->
       <main class="viewport-area">
+        <!-- Floating Expand Pill when Sidebar is Collapsed -->
+        <button
+          v-if="!isSidebarOpen"
+          class="sidebar-floating-toggle-btn"
+          @click="toggleSidebar"
+          title="Open Case Hub (Ctrl + \)"
+        >
+          <span class="pill-icon">📁</span>
+          <span class="pill-text">OpenFOAM Hub</span>
+          <span class="pill-arrow">▶</span>
+        </button>
+
         <CfdThree3D
           :data="simulationData"
           :params="params"
@@ -113,8 +135,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import type { SimulationParams, SimulationStepData, SimulationArchetype, AiProviderConfig, AerodynamicTelemetry } from './types/cfd';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
+import type { SimulationParams, SimulationStepData, SimulationArchetype, SolverMode, AiProviderConfig, AerodynamicTelemetry } from './types/cfd';
 import { getStoredAiConfig } from './utils/aiCopilot';
 
 import HeaderNavbar from './components/HeaderNavbar.vue';
@@ -126,6 +148,7 @@ import SettingsModal from './components/SettingsModal.vue';
 
 // Studio Simulation Parameters matching Mockup
 const params = reactive<SimulationParams>({
+  caseName: 'NACA0012_Airfoil_Run',
   archetype: 'airfoil',
   activeField: 'U',
   substance: 'air',
@@ -153,7 +176,22 @@ const params = reactive<SimulationParams>({
 const aiConfig = reactive<AiProviderConfig>(getStoredAiConfig());
 const isSettingsOpen = ref(false);
 const isBottomDockOpen = ref(false);
+const isSidebarOpen = ref(true);
 const activeDockTab = ref<'residuals' | 'terminal'>('terminal');
+
+function toggleSidebar() {
+  isSidebarOpen.value = !isSidebarOpen.value;
+  setTimeout(() => {
+    window.dispatchEvent(new Event('resize'));
+  }, 260);
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && (e.key === '\\' || e.key === 'b')) {
+    e.preventDefault();
+    toggleSidebar();
+  }
+}
 
 const isPlaying = ref(true);
 const isConnected = ref(true);
@@ -188,6 +226,21 @@ const latestResidualFormatted = computed(() => {
 
 function setArchetype(arch: SimulationArchetype) {
   params.archetype = arch;
+  const defaultNames: Record<string, string> = {
+    airfoil: 'NACA0012_Airfoil_Run',
+    cylinder: 'Cylinder_Vortex_Street',
+    venturi: 'Venturi_Tube_Choked_Flow',
+    f1: 'Formula1_GroundEffect_Downforce',
+    drone: 'Drone_Quadrotor_Hover',
+    submarine: 'Submarine_Cavitation_Hull',
+    plume: 'Thermal_Buoyant_Plume',
+    cavity: 'Lid_Driven_Cavity_Re100',
+    water_dam: 'Dam_Break_VOF_Water',
+    weather_plume: 'Atmospheric_Weather_Plume'
+  };
+  if (defaultNames[arch]) {
+    params.caseName = defaultNames[arch];
+  }
   if (arch === 'airfoil') {
     params.studioParams.irisPurple = 0.45;
     params.studioParams.vorticityAngle = 0.209;
@@ -212,6 +265,33 @@ function setArchetype(arch: SimulationArchetype) {
     telemetry.cd = 0.21;
     telemetry.cl = 0.0;
     telemetry.l_d = 0.0;
+  } else if (arch === 'f1') {
+    params.studioParams.irisPurple = 0.85;
+    params.studioParams.vorticityAngle = -0.12;
+    params.studioParams.vorticityCore = 75;
+    params.studioParams.butterscotchCore = 110;
+    telemetry.cd = 0.92;
+    telemetry.cl = -2.85;
+    telemetry.l_d = 3.10;
+    telemetry.downforce = 2450;
+  } else if (arch === 'drone') {
+    params.studioParams.irisPurple = 0.40;
+    params.studioParams.vorticityAngle = -0.45;
+    params.studioParams.vorticityCore = 80;
+    params.studioParams.butterscotchCore = 70;
+    telemetry.cd = 0.32;
+    telemetry.cl = 1.20;
+    telemetry.l_d = 3.75;
+    telemetry.thrust = 17.65;
+  } else if (arch === 'submarine') {
+    params.studioParams.irisPurple = 0.38;
+    params.studioParams.vorticityAngle = 0.05;
+    params.studioParams.vorticityCore = 35;
+    params.studioParams.butterscotchCore = 40;
+    telemetry.cd = 0.082;
+    telemetry.cl = 0.015;
+    telemetry.l_d = 0.18;
+    telemetry.cavitationIndex = 11.8;
   } else {
     params.studioParams.irisPurple = 0.182;
     params.studioParams.vorticityAngle = 0.152;
@@ -236,12 +316,107 @@ function handleFileUploaded(file: File) {
   console.log('Geometry uploaded:', file.name);
 }
 
+function triggerLiveSimulation() {
+  if (!isPlaying.value) return;
+  
+  const loc = window.location;
+  const envApi = (import.meta as any).env?.VITE_API_URL;
+  const rawHost = envApi ? envApi.replace(/^https?:\/\//, '') : (loc.host.includes('5173') ? '127.0.0.1:8000' : loc.host);
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${proto}//${rawHost}/ws/simulate`;
+
+  if (socket) {
+    try { socket.close(); } catch (_) {}
+  }
+
+  status.value = 'computing';
+  try {
+    socket = new WebSocket(wsUrl);
+    
+    socket.onopen = () => {
+      isConnected.value = true;
+      socket.send(JSON.stringify({
+        gridResolution: params.gridResolution,
+        reynoldsNumber: params.reynoldsNumber,
+        solverMode: params.solverMode,
+        archetype: params.archetype,
+        aoa_deg: params.studioParams.vorticityAngle * (180 / Math.PI),
+        maxIterations: params.maxIterations,
+        dt: params.dt
+      }));
+    };
+
+    socket.onmessage = (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.error) {
+          console.warn('Simulation backend warning:', payload.error);
+          return;
+        }
+
+        if (payload.iteration !== undefined) {
+          iterations.value.push(payload.iteration);
+          residuals.value.push(payload.residual);
+        }
+
+        if (payload.cd !== undefined) telemetry.cd = payload.cd;
+        if (payload.cl !== undefined) telemetry.cl = payload.cl;
+        if (payload.downforce !== undefined) telemetry.downforce = payload.downforce;
+        if (payload.thrust !== undefined) telemetry.thrust = payload.thrust;
+        if (payload.cavitationIndex !== undefined) telemetry.cavitationIndex = payload.cavitationIndex;
+        if (payload.courantMax !== undefined) telemetry.courantMax = payload.courantMax;
+        if (payload.continuityError !== undefined) telemetry.continuityError = payload.continuityError;
+
+        if (payload.u && payload.v && payload.speed) {
+          simulationData.value = {
+            iteration: payload.iteration || 1,
+            residual: payload.residual || 0.0,
+            converged: !!payload.converged,
+            u: payload.u,
+            v: payload.v,
+            p: payload.p,
+            speed: payload.speed,
+            mode: (payload.mode as SolverMode) || params.solverMode || 'cfd'
+          };
+        }
+
+        if (payload.converged) {
+          status.value = 'converged';
+        }
+      } catch (err) {
+        console.error('WebSocket parse error:', err);
+      }
+    };
+
+    socket.onerror = () => {
+      isConnected.value = false;
+    };
+
+    socket.onclose = () => {
+      if (status.value === 'computing') {
+        status.value = 'ready';
+      }
+    };
+  } catch (err) {
+    console.warn('WebSocket connection error; client ticker active:', err);
+  }
+}
+
+watch(() => [params.solverMode, params.archetype], () => {
+  resetSimulation();
+  triggerLiveSimulation();
+});
+
 function togglePlay() {
   isPlaying.value = !isPlaying.value;
   if (isPlaying.value) {
     status.value = 'computing';
+    triggerLiveSimulation();
   } else {
     status.value = 'ready';
+    if (socket) {
+      try { socket.close(); } catch (_) {}
+    }
   }
 }
 
@@ -271,13 +446,15 @@ function takeSnapshot() {
 
 function handleExportCase(type: 'zip' | 'vtk' | 'png') {
   const loc = window.location;
-  const apiHost = loc.host.includes('5173') ? 'http://127.0.0.1:8000' : '';
+  const envApi = (import.meta as any).env?.VITE_API_URL;
+  const apiHost = envApi || (loc.host.includes('5173') ? 'http://127.0.0.1:8000' : '');
+  const safeCaseName = encodeURIComponent(params.caseName || 'openzess_simulation');
   if (type === 'vtk') {
-    window.open(`${apiHost}/api/export/vtk`, '_blank');
+    window.open(`${apiHost}/api/export/vtk?name=${safeCaseName}`, '_blank');
   } else if (type === 'zip') {
-    window.open(`${apiHost}/api/export/openfoam`, '_blank');
+    window.open(`${apiHost}/api/export/openfoam?name=${safeCaseName}`, '_blank');
   } else {
-    alert('Viewport snapshot captured successfully!');
+    alert(`Viewport snapshot captured successfully for case [${params.caseName || 'openzess_simulation'}]!`);
   }
 }
 
@@ -300,11 +477,14 @@ onMounted(() => {
       }
     }
   }, 1000);
+
+  window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
   if (socket) socket.close();
   if (simInterval) clearInterval(simInterval);
+  window.removeEventListener('keydown', handleKeydown);
 });
 </script>
 
@@ -325,15 +505,73 @@ onUnmounted(() => {
   flex: 1;
   overflow: hidden;
   height: calc(100vh - 56px);
+  position: relative;
+}
+
+/* Sidebar Smooth Slide Transition */
+.slide-sidebar-enter-active,
+.slide-sidebar-leave-active {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-sidebar-enter-from,
+.slide-sidebar-leave-to {
+  margin-left: -450px;
+  opacity: 0;
 }
 
 .viewport-area {
   flex: 1;
+  min-width: 0;
   position: relative;
   background: var(--bg-canvas);
   padding: 10px;
   overflow: hidden;
   display: flex;
+}
+
+/* Floating Expand Pill when Sidebar is Collapsed */
+.sidebar-floating-toggle-btn {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(19, 15, 22, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: #f1f5f9;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.sidebar-floating-toggle-btn:hover {
+  background: var(--bg-card);
+  border-color: #38bdf8;
+  transform: translateX(2px);
+}
+
+.sidebar-floating-toggle-btn .pill-icon {
+  font-size: 13px;
+}
+
+.sidebar-floating-toggle-btn .pill-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sidebar-floating-toggle-btn .pill-arrow {
+  font-size: 10px;
+  color: #38bdf8;
 }
 
 /* Bottom Telemetry Slide Drawer */

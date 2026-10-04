@@ -7,11 +7,15 @@
         <div class="status-left">
           <span class="viewport-title">Three.js CFD Viewport</span>
           <span class="archetype-badge">{{ archetypeBadgeTitle }}</span>
+          <span v-if="params.caseName" class="case-tag-badge" :title="'Active Case: ' + params.caseName">📁 {{ params.caseName }}</span>
         </div>
         <div class="status-right">
           <span class="telemetry-pill">Co_max: {{ telemetry.courantMax.toFixed(2) }}</span>
           <span class="telemetry-pill forces">Cd: {{ telemetry.cd.toFixed(3) }}</span>
           <span class="telemetry-pill forces">Cl: {{ telemetry.cl.toFixed(3) }}</span>
+          <span v-if="telemetry.downforce !== undefined && params.archetype === 'f1'" class="telemetry-pill forces special">Downforce: {{ telemetry.downforce.toFixed(0) }} N</span>
+          <span v-if="telemetry.thrust !== undefined && params.archetype === 'drone'" class="telemetry-pill forces special">Thrust: {{ telemetry.thrust.toFixed(1) }} N</span>
+          <span v-if="telemetry.cavitationIndex !== undefined && params.archetype === 'submarine'" class="telemetry-pill forces special">σ: {{ telemetry.cavitationIndex.toFixed(2) }}</span>
         </div>
       </div>
 
@@ -233,6 +237,9 @@ let mouse = new THREE.Vector2();
 const archetypeBadgeTitle = computed(() => {
   switch (props.params.archetype) {
     case 'airfoil': return '✈️ NACA 0012 Wing Aerodynamics';
+    case 'f1': return '🏎️ F1 Front Wing & Ground Effect';
+    case 'drone': return '🚁 Quadcopter Rotor Downwash';
+    case 'submarine': return '🌊 Submarine Hydrodynamic Hull';
     case 'cylinder': return '🔴 Von Kármán Vortex Shedding';
     case 'venturi': return '🚿 Venturi Nozzle Compressible Flow';
     case 'cavity': return '🌀 3D Lid-Driven Cavity Shear';
@@ -437,6 +444,122 @@ function buildActiveArchetype() {
     lidMesh.position.set(0, 1.2, 0);
     lidMesh.rotation.x = Math.PI / 2;
     geometryGroup.add(lidMesh);
+
+  } else if (arch === 'f1') {
+    // 🏎️ F1 Front Wing & Ground Effect Cascade
+    const f1Group = new THREE.Group();
+    const mainShape = new THREE.Shape();
+    mainShape.moveTo(-1.0, 0.1);
+    mainShape.quadraticCurveTo(-0.3, -0.25, 0.8, -0.05);
+    mainShape.quadraticCurveTo(0.2, 0.15, -1.0, 0.1);
+    const mainGeom = new THREE.ExtrudeGeometry(mainShape, { depth: 2.6, bevelEnabled: true, bevelSize: 0.02, steps: 1 });
+    mainGeom.center();
+    const carbonMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.9, roughness: 0.2 });
+    const mainWing = new THREE.Mesh(mainGeom, carbonMat);
+    mainWing.position.set(0, -0.35, 0);
+    f1Group.add(mainWing);
+
+    const flapShape = new THREE.Shape();
+    flapShape.moveTo(-0.4, 0.2);
+    flapShape.quadraticCurveTo(0.1, -0.05, 0.9, 0.18);
+    flapShape.quadraticCurveTo(0.3, 0.32, -0.4, 0.2);
+    const flapGeom = new THREE.ExtrudeGeometry(flapShape, { depth: 2.4, bevelEnabled: true, bevelSize: 0.02, steps: 1 });
+    flapGeom.center();
+    const flapMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.7, roughness: 0.3 });
+    const flapMesh = new THREE.Mesh(flapGeom, flapMat);
+    flapMesh.position.set(0.15, -0.15, 0);
+    f1Group.add(flapMesh);
+
+    const epGeom = new THREE.BoxGeometry(2.0, 0.7, 0.04);
+    const epLeft = new THREE.Mesh(epGeom, carbonMat);
+    epLeft.position.set(0, -0.2, -1.3);
+    const epRight = new THREE.Mesh(epGeom, carbonMat);
+    epRight.position.set(0, -0.2, 1.3);
+    f1Group.add(epLeft);
+    f1Group.add(epRight);
+
+    const groundGeom = new THREE.PlaneGeometry(3.5, 3.0);
+    const groundMat = new THREE.MeshBasicMaterial({ color: 0x3f3f46, wireframe: true, transparent: true, opacity: 0.25 });
+    const groundMesh = new THREE.Mesh(groundGeom, groundMat);
+    groundMesh.position.set(0, -0.7, 0);
+    groundMesh.rotation.x = Math.PI / 2;
+    f1Group.add(groundMesh);
+
+    geometryGroup.add(f1Group);
+
+  } else if (arch === 'drone') {
+    // 🚁 Quadcopter Drone Airframe with 4 Rotor Disks
+    const droneGroup = new THREE.Group();
+    const bodyGeom = new THREE.SphereGeometry(0.35, 16, 16);
+    bodyGeom.scale(1.2, 0.5, 0.9);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, metalness: 0.8, roughness: 0.2 });
+    const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
+    droneGroup.add(bodyMesh);
+
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.4 });
+    const armAngles = [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4];
+    armAngles.forEach(ang => {
+      const armGeom = new THREE.CylinderGeometry(0.04, 0.04, 1.3, 8);
+      const armMesh = new THREE.Mesh(armGeom, armMat);
+      armMesh.rotation.z = Math.PI / 2;
+      armMesh.rotation.y = ang;
+      droneGroup.add(armMesh);
+
+      const motorGeom = new THREE.CylinderGeometry(0.09, 0.09, 0.16, 16);
+      const motorMesh = new THREE.Mesh(motorGeom, bodyMat);
+      const rx = Math.cos(ang) * 0.95;
+      const rz = Math.sin(ang) * 0.95;
+      motorMesh.position.set(rx, 0.06, rz);
+      droneGroup.add(motorMesh);
+
+      const rotorGeom = new THREE.TorusGeometry(0.42, 0.02, 8, 32);
+      const rotorMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7 });
+      const rotorMesh = new THREE.Mesh(rotorGeom, rotorMat);
+      rotorMesh.rotation.x = Math.PI / 2;
+      rotorMesh.position.set(rx, 0.15, rz);
+      droneGroup.add(rotorMesh);
+    });
+    geometryGroup.add(droneGroup);
+
+  } else if (arch === 'submarine') {
+    // 🌊 Submarine Hydrodynamic Teardrop Hull
+    const subGroup = new THREE.Group();
+    const hullPoints: THREE.Vector2[] = [];
+    for (let i = 0; i <= 30; i++) {
+      const u = i / 30;
+      const x = -1.6 + u * 3.4;
+      const r = u < 0.4 
+        ? 0.42 * Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.4) / 0.4, 2)))
+        : 0.42 * (1 - Math.pow((u - 0.4) / 0.6, 1.4));
+      hullPoints.push(new THREE.Vector2(Math.max(r, 0.01), x));
+    }
+    const hullGeom = new THREE.LatheGeometry(hullPoints, 32);
+    const subMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.92, roughness: 0.15 });
+    const hullMesh = new THREE.Mesh(hullGeom, subMat);
+    hullMesh.rotation.z = Math.PI / 2;
+    subGroup.add(hullMesh);
+
+    const sailGeom = new THREE.BoxGeometry(0.65, 0.55, 0.18);
+    const sailMesh = new THREE.Mesh(sailGeom, subMat);
+    sailMesh.position.set(-0.25, 0.42, 0);
+    subGroup.add(sailMesh);
+
+    const bowPlaneGeom = new THREE.BoxGeometry(0.2, 0.04, 0.85);
+    const bowPlaneMesh = new THREE.Mesh(bowPlaneGeom, subMat);
+    bowPlaneMesh.position.set(-0.25, 0.48, 0);
+    subGroup.add(bowPlaneMesh);
+
+    const finVGeom = new THREE.BoxGeometry(0.35, 0.75, 0.04);
+    const finVMesh = new THREE.Mesh(finVGeom, subMat);
+    finVMesh.position.set(1.5, 0, 0);
+    subGroup.add(finVMesh);
+
+    const finHGeom = new THREE.BoxGeometry(0.35, 0.04, 0.75);
+    const finHMesh = new THREE.Mesh(finHGeom, subMat);
+    finHMesh.position.set(1.5, 0, 0);
+    subGroup.add(finHMesh);
+
+    geometryGroup.add(subGroup);
   }
 }
 
@@ -456,6 +579,29 @@ function evaluateVelocityField(x: number, y: number, z: number): [number, number
       const circulation = vorticityAngle * 3.2;
       vy = -(x / (dist * dist + 0.12)) * circulation * 0.45;
       vx = 1.0 + (1.2 - Math.abs(y)) * 0.65;
+    }
+  } else if (arch === 'f1') {
+    // 🏎️ F1 Ground Effect Downforce & Upwash
+    const dist = Math.sqrt(x * x + Math.pow(y + 0.3, 2));
+    if (dist < 1.8) {
+      vy = 0.55 * Math.sin((x + 1.0) * 1.8) * Math.exp(-Math.abs(y + 0.3) * 2.0);
+      vx = (y < -0.3 ? 1.6 : 1.1) + 0.3 * Math.exp(-dist);
+    }
+  } else if (arch === 'drone') {
+    // 🚁 Quadcopter Rotor Downwash Jet
+    const rRotor = Math.sqrt(x * x + z * z);
+    if (rRotor < 1.3 && y < 0.2) {
+      vy = -1.8 * Math.exp(-Math.pow(rRotor / 0.85, 2));
+      vx = -x * 0.4 * Math.exp(-rRotor);
+      vz = -z * 0.4 * Math.exp(-rRotor);
+    }
+  } else if (arch === 'submarine') {
+    // 🌊 Submarine Axisymmetric Streamlines & Wake
+    const rHull = Math.sqrt(y * y + z * z);
+    if (rHull < 1.2 && Math.abs(x) < 2.0) {
+      vx = 1.0 + (x < 1.2 ? (0.45 - rHull) * 0.5 : -0.4 * Math.exp(-rHull * 3.0));
+      vy = (y / (rHull + 0.05)) * (0.35 - rHull) * 0.3;
+      vz = (z / (rHull + 0.05)) * (0.35 - rHull) * 0.3;
     }
   } else if (arch === 'cylinder') {
     const dx = x - (-0.8);
@@ -478,7 +624,7 @@ function evaluateVelocityField(x: number, y: number, z: number): [number, number
     const dist = Math.sqrt(y * y + z * z);
     const spread = (0.2 + (x + 2.2) * 0.35) * (0.8 + iris * 1.5);
     vx = 1.2 * Math.exp(-Math.pow(dist / spread, 2));
-    vz = 0.4 * Math.exp(-Math.pow(dist / spread, 2)); // Buoyancy lift
+    vz = 0.4 * Math.exp(-Math.pow(dist / spread, 2));
   }
 
   // Natural Forces Coupling (Gravity & Buoyancy)
@@ -832,6 +978,7 @@ function handleResize() {
   if (!canvasMountRef.value || !renderer || !camera) return;
   const width = canvasMountRef.value.clientWidth;
   const height = canvasMountRef.value.clientHeight;
+  if (!width || !height || width < 20 || height < 20 || !isFinite(width) || !isFinite(height)) return;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
@@ -843,14 +990,26 @@ watch(() => [props.params.archetype, props.params.studioParams, activeColormap.v
   buildVectorGlyphs();
 }, { deep: true });
 
+let resizeObserver: ResizeObserver | null = null;
+
 onMounted(() => {
   initThree();
   window.addEventListener('resize', handleResize);
+  if (canvasMountRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(canvasMountRef.value);
+  }
 });
 
 onUnmounted(() => {
   if (animId) cancelAnimationFrame(animId);
   window.removeEventListener('resize', handleResize);
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
 });
 </script>
 
@@ -919,6 +1078,19 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+.case-tag-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 600;
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
+}
+
 .status-right {
   display: flex;
   align-items: center;
@@ -941,6 +1113,12 @@ onUnmounted(() => {
   color: #f1f5f9;
   background: var(--btn-surface);
   border-color: var(--accent-border);
+}
+
+.telemetry-pill.forces.special {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
 }
 
 .header-tools-line {

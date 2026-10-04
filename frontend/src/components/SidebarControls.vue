@@ -3,227 +3,62 @@
     <!-- Hub Header -->
     <div class="hub-header">
       <div class="hub-title-row">
-        <h2 class="hub-title">OpenFOAM Physics & Case Hub</h2>
-        <span class="version-tag">v2406 FVM</span>
-      </div>
-      <p class="hub-subtitle">Conservation of Mass, Momentum, Energy & Gravity</p>
-    </div>
-
-    <!-- AI Slide Bar Drawer Toggle -->
-    <div class="ai-slide-toggle-bar" @click="isAiDrawerOpen = !isAiDrawerOpen">
-      <div class="toggle-left">
-        <span class="ai-icon">🤖</span>
-        <span class="toggle-label">AI Copilot & Idea Assistant</span>
-        <span class="ai-chip">{{ aiStatusBadge }}</span>
-      </div>
-      <button class="slide-arrow-btn">
-        {{ isAiDrawerOpen ? '▲ Slide Close' : '▼ Slide Open' }}
-      </button>
-    </div>
-
-    <!-- AI Slide Drawer (Collapsible) -->
-    <transition name="slide-down">
-      <div v-show="isAiDrawerOpen" class="ai-slide-drawer">
-        <div class="copilot-chat-history" ref="chatHistoryRef">
-          <div v-for="(msg, i) in chatMessages" :key="i" class="chat-msg" :class="msg.role">
-            <div class="msg-author">{{ msg.role === 'user' ? '👤 Idea Input' : '⚡ AI Assistant' }}</div>
-            <div class="msg-content">{{ msg.text }}</div>
-            <button
-              v-if="msg.dictCode"
-              class="apply-snippet-btn"
-              @click="applyAiSnippet(msg.dictCode)"
-            >
-              📋 Apply & Repair in Case
-            </button>
-          </div>
-          <div v-if="isAiLoading" class="chat-msg ai loading">
-            <div class="msg-author">⚡ AI Assistant</div>
-            <div class="msg-content">🧠 Computing Navier-Stokes equations, boundary conditions & mesh...</div>
-          </div>
+        <div class="hub-title-left">
+          <span class="hub-icon">📁</span>
+          <h2 class="hub-title">OpenFOAM Case Hub</h2>
+          <span class="version-tag">v2406 FVM</span>
         </div>
-
-        <!-- Quick Idea Chips -->
-        <div class="quick-prompt-chips">
-          <button class="chip-btn" @click="sendQuickPrompt('Setup water sloshing under Earth gravity g = [0, 0, -9.81]')">
-            💧 Water Gravity
-          </button>
-          <button class="chip-btn" @click="sendQuickPrompt('Thermal plume rising with Boussinesq buoyancy at 350K')">
-            🔥 Thermal Buoyancy
-          </button>
-          <button class="chip-btn" @click="sendQuickPrompt('High Reynolds aerodynamic flow over car with ground effect')">
-            🏎️ Ground Effect
-          </button>
-        </div>
-
-        <!-- Copilot Input Row -->
-        <div class="copilot-input-row">
-          <input
-            type="text"
-            v-model="userPrompt"
-            placeholder="Type physics idea or describe boundary conditions..."
-            class="copilot-input"
-            @keyup.enter="handleSendAiPrompt"
-          />
-          <button class="copilot-send-btn" :disabled="isAiLoading || !userPrompt.trim()" @click="handleSendAiPrompt">
-            ➤
-          </button>
-        </div>
-      </div>
-    </transition>
-
-    <!-- Hub Mode Tabs: Natural Physics vs Manual Repair -->
-    <div class="hub-tabs-row">
-      <button
-        class="hub-tab-btn"
-        :class="{ active: activeTab === 'physics' }"
-        @click="activeTab = 'physics'"
-      >
-        🌍 Natural Physics & Forces
-      </button>
-      <button
-        class="hub-tab-btn"
-        :class="{ active: activeTab === 'repair' }"
-        @click="activeTab = 'repair'"
-      >
-        🛠️ Manual Repair & OpenFOAM Case
-      </button>
-    </div>
-
-    <!-- TAB 1: Natural Physics & Forces Engine (Gravity, Temperature, Density, Water, Volume) -->
-    <div v-show="activeTab === 'physics'" class="physics-tab-content">
-      <!-- Card: Fluid Substance & Density -->
-      <div class="hub-card substance-card">
-        <div class="card-header">
-          <div class="card-title-row">
-            <span class="card-title">🧪 Fluid Substance & Thermodynamic Density (ρ)</span>
-          </div>
-          <p class="card-desc">Equation of State: Continuity & Momentum properties</p>
-        </div>
-
-        <div class="substance-grid">
-          <button
-            v-for="sub in substances"
-            :key="sub.id"
-            class="substance-btn"
-            :class="{ active: currentSubstance.id === sub.id }"
-            @click="selectSubstance(sub)"
-          >
-            <span class="sub-name">{{ sub.name }}</span>
-            <span class="sub-prop">ρ: {{ sub.density }} kg/m³</span>
-            <span class="sub-prop">ν: {{ sub.kinematicViscosity.toExponential(1) }} m²/s</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Card: Natural Forces — Gravity & Buoyancy -->
-      <div class="hub-card forces-card">
-        <div class="card-header">
-          <div class="card-title-row">
-            <span class="card-title">🌍 Natural Gravity Vector (g) & Temperature (T)</span>
-          </div>
-          <p class="card-desc">Momentum source: ρg + Energy equation: ∇·(k∇T)</p>
-        </div>
-
-        <div class="sliders-list">
-          <!-- Gravity Z Slider -->
-          <div class="slider-group">
-            <div class="slider-labels">
-              <label>Gravity Z (gz) [m/s²]</label>
-              <span class="slider-val-badge">{{ gravityZ.toFixed(2) }} m/s²</span>
-            </div>
-            <input
-              type="range"
-              min="-20.0"
-              max="20.0"
-              step="0.1"
-              v-model.number="gravityZ"
-              @input="emitForcesChange"
-            />
-            <div class="preset-pills">
-              <button class="preset-btn" @click="setGravity(-9.81)">🌍 Earth (-9.81)</button>
-              <button class="preset-btn" @click="setGravity(-1.62)">🌙 Moon (-1.62)</button>
-              <button class="preset-btn" @click="setGravity(0.0)">🛰️ Zero-G (0.0)</button>
-              <button class="preset-btn" @click="setGravity(9.81)">🔄 Inverted (+9.81)</button>
-            </div>
-          </div>
-
-          <!-- Ambient Temperature -->
-          <div class="slider-group">
-            <div class="slider-labels">
-              <label>Core Fluid Temperature (T)</label>
-              <span class="slider-val-badge">{{ coreTemp.toFixed(1) }} K ({{ (coreTemp - 273.15).toFixed(1) }} °C)</span>
-            </div>
-            <input
-              type="range"
-              min="250.0"
-              max="450.0"
-              step="1.0"
-              v-model.number="coreTemp"
-              @input="emitForcesChange"
-            />
-          </div>
-
-          <!-- Thermal Expansion (Buoyancy) -->
-          <div class="slider-group">
-            <div class="slider-labels">
-              <label>Thermal Expansion (β) — Boussinesq</label>
-              <span class="slider-val-badge">{{ thermalBeta.toFixed(4) }} 1/K</span>
-            </div>
-            <input
-              type="range"
-              min="0.0005"
-              max="0.01"
-              step="0.0001"
-              v-model.number="thermalBeta"
-              @input="emitForcesChange"
-            />
-          </div>
-
-          <!-- Water / Multiphase Volume Fraction -->
-          <div class="slider-group" v-if="currentSubstance.id === 'water'">
-            <div class="slider-labels">
-              <label>💧 Water Volume Fraction (α) — VOF</label>
-              <span class="slider-val-badge">{{ (waterAlpha * 100).toFixed(0) }}% Water / {{ ((1 - waterAlpha) * 100).toFixed(0) }}% Air</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="1.0"
-              step="0.05"
-              v-model.number="waterAlpha"
-              @input="emitForcesChange"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 2: Manual Repair & OpenFOAM Case Hub -->
-    <div v-show="activeTab === 'repair'" class="repair-tab-content">
-      <!-- Diagnostics & Repair Action Bar -->
-      <div class="diagnostics-action-card">
-        <div class="diag-left">
-          <span class="diag-icon">🛡️</span>
-          <div>
-            <strong>OpenFOAM Case Consistency Validator</strong>
-            <p>Checks Courant Co &lt; 1.0, mesh skewness, and boundary conditions</p>
-          </div>
-        </div>
-        <button class="run-diag-btn" @click="runCaseDiagnostics">
-          ⚡ Auto-Diagnose & Repair
+        <button
+          class="collapse-sidebar-btn"
+          @click="$emit('closeSidebar')"
+          title="Collapse Case Hub into Slide Bar (Ctrl + \)"
+        >
+          ◀ Hide
         </button>
       </div>
+      <p class="hub-subtitle">Standard OpenFOAM Directory Tree & Physical Controls</p>
+    </div>
 
-      <div v-if="diagReport" class="diag-report-banner" :class="diagReport.type">
-        <span>{{ diagReport.message }}</span>
-      </div>
+    <!-- Mode Switcher Pill (Matching Approved Mockup) -->
+    <div class="mode-toggle-wrapper">
+      <button
+        class="mode-btn"
+        :class="{ active: activeMode === 'manual' }"
+        @click="setMode('manual')"
+      >
+        <span>⚙️ Manual OpenFOAM</span>
+      </button>
+      <button
+        class="mode-btn"
+        :class="{ active: activeMode === 'ai' }"
+        @click="setMode('ai')"
+      >
+        <span>🤖 AI Copilot</span>
+        <span class="ai-chip">{{ aiStatusBadge }}</span>
+      </button>
+    </div>
 
-      <!-- Hub Grid: File Tree on Left, Boundary Editor & Dropzone on Right -->
+    <!-- MODE 1: Manual OpenFOAM (Default Approved Layout) -->
+    <div v-show="activeMode === 'manual'" class="manual-mode-content">
       <div class="hub-grid">
-        <!-- Card 1: OpenFOAM Case File Tree -->
+        <!-- Column 1: OpenFOAM Case File Tree -->
         <div class="hub-card tree-card">
           <div class="card-header">
-            <span class="card-title">Case File Tree</span>
+            <div class="card-title-row">
+              <span class="card-title">OpenFOAM case</span>
+              <span class="token-tag">system/ constant/ 0/</span>
+            </div>
+            <button
+              class="auto-diag-btn"
+              @click="runCaseDiagnostics"
+              title="Run OpenFOAM numerical stability & Courant check"
+            >
+              ⚡ Check & Repair
+            </button>
+          </div>
+
+          <div v-if="diagReport" class="diag-report-banner" :class="diagReport.type">
+            <span>{{ diagReport.message }}</span>
           </div>
 
           <div class="file-tree-container">
@@ -292,55 +127,152 @@
           </div>
         </div>
 
-        <!-- Right Column: Boundary Repair & Photo Dropzone -->
+        <!-- Column 2: Parameters, Natural Physics Drawer, Geometry Dropzone -->
         <div class="right-controls-column">
-          <!-- Boundary Condition Inspector & Repair -->
-          <div class="hub-card bc-repair-card">
+          <!-- Parameters Card -->
+          <div class="hub-card params-card">
             <div class="card-header">
-              <span class="card-title">Boundary Repair</span>
-            </div>
-
-            <div class="bc-list">
-              <div class="bc-item">
-                <div class="bc-meta">
-                  <span class="bc-name">inlet</span>
-                  <span class="bc-type">fixedValue</span>
-                </div>
-                <div class="bc-input-row">
-                  <span class="unit-lbl">U:</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    v-model.number="studioParams.irisPurple"
-                    class="bc-num-input"
-                    @input="emitParamsChange"
-                  />
-                  <span class="unit-lbl">m/s</span>
-                </div>
-              </div>
-
-              <div class="bc-item">
-                <div class="bc-meta">
-                  <span class="bc-name">outlet</span>
-                  <span class="bc-type">zeroGradient / p=0</span>
-                </div>
-                <span class="bc-desc">Free atmospheric outflow</span>
-              </div>
-
-              <div class="bc-item">
-                <div class="bc-meta">
-                  <span class="bc-name">walls / ground</span>
-                  <span class="bc-type">noSlip (Wall Function)</span>
-                </div>
-                <span class="bc-desc">Viscous boundary layer adherence</span>
+              <div class="card-title-row">
+                <span class="card-title">Parameters</span>
+                <span class="token-tag">Aerodynamics & Flow</span>
               </div>
             </div>
+
+            <div class="sliders-list">
+              <!-- Flow Velocity -->
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Flow Speed (U)</label>
+                  <span class="slider-val-badge">{{ studioParams.irisPurple.toFixed(2) }} m/s</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.05"
+                  max="5.0"
+                  step="0.05"
+                  v-model.number="studioParams.irisPurple"
+                  @input="emitParamsChange"
+                />
+              </div>
+
+              <!-- Vorticity Angle / AoA -->
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Vorticity Angle</label>
+                  <span class="slider-val-badge">{{ (studioParams.vorticityAngle * 57.2958).toFixed(1) }}°</span>
+                </div>
+                <input
+                  type="range"
+                  min="-0.35"
+                  max="0.35"
+                  step="0.01"
+                  v-model.number="studioParams.vorticityAngle"
+                  @input="emitParamsChange"
+                />
+              </div>
+
+              <!-- Vorticity Core Shear -->
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Vorticity Core</label>
+                  <span class="slider-val-badge">{{ studioParams.vorticityCore.toFixed(0) }}</span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  step="5"
+                  v-model.number="studioParams.vorticityCore"
+                  @input="emitParamsChange"
+                />
+              </div>
+
+              <!-- Thermal Core -->
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Thermal Core</label>
+                  <span class="slider-val-badge">{{ studioParams.butterscotchCore.toFixed(1) }} °C</span>
+                </div>
+                <input
+                  type="range"
+                  min="20"
+                  max="120"
+                  step="1"
+                  v-model.number="studioParams.butterscotchCore"
+                  @input="emitParamsChange"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Compact Collapsible Natural Forces & Fluid Properties Drawer -->
+          <div class="hub-card natural-drawer-card">
+            <div class="drawer-header" @click="isForcesDrawerOpen = !isForcesDrawerOpen">
+              <div class="drawer-header-left">
+                <span class="drawer-icon">🌍</span>
+                <span class="drawer-title">Fluid Medium & Gravity</span>
+                <span class="substance-chip">{{ currentSubstance.name }}</span>
+              </div>
+              <span class="drawer-arrow">{{ isForcesDrawerOpen ? '▲' : '▼' }}</span>
+            </div>
+
+            <transition name="drawer-slide">
+              <div v-show="isForcesDrawerOpen" class="drawer-body">
+                <!-- Substance Selection Pills -->
+                <div class="substance-pills-row">
+                  <button
+                    v-for="sub in substances"
+                    :key="sub.id"
+                    class="sub-pill-btn"
+                    :class="{ active: currentSubstance.id === sub.id }"
+                    @click="selectSubstance(sub)"
+                  >
+                    {{ sub.name }}
+                  </button>
+                </div>
+
+                <!-- Gravity Presets -->
+                <div class="gravity-presets-row">
+                  <button
+                    class="preset-pill"
+                    :class="{ active: Math.abs(gravityZ - (-9.81)) < 0.1 }"
+                    @click="setGravity(-9.81)"
+                  >
+                    Earth
+                  </button>
+                  <button
+                    class="preset-pill"
+                    :class="{ active: Math.abs(gravityZ - (-1.62)) < 0.1 }"
+                    @click="setGravity(-1.62)"
+                  >
+                    Moon
+                  </button>
+                  <button
+                    class="preset-pill"
+                    :class="{ active: Math.abs(gravityZ) < 0.1 }"
+                    @click="setGravity(0.0)"
+                  >
+                    Zero-G
+                  </button>
+                  <button
+                    class="preset-pill"
+                    :class="{ active: Math.abs(gravityZ - 9.81) < 0.1 }"
+                    @click="setGravity(9.81)"
+                  >
+                    Inverted
+                  </button>
+                </div>
+              </div>
+            </transition>
           </div>
 
           <!-- Geometry input / Photo dropzone Card -->
           <div class="hub-card geometry-card">
             <div class="card-header">
-              <span class="card-title">Geometry input</span>
+              <div class="card-title-row">
+                <span class="card-title">Geometry input</span>
+                <span class="token-tag">CAD / Mesh / Photo</span>
+              </div>
             </div>
 
             <div
@@ -367,13 +299,91 @@
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                   </svg>
                 </div>
-                <span class="dropzone-title">Photo / CAD Dropzone</span>
-                <span class="dropzone-sub">Drag & drop .stl / .obj / .step / photo</span>
+                <span class="dropzone-title">Photo dropzone</span>
+                <span class="dropzone-sub">Drag & drop .stl / .obj / .step or photo</span>
                 <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
               </div>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- MODE 2: AI Copilot Mode -->
+    <div v-show="activeMode === 'ai'" class="ai-mode-content">
+      <div class="copilot-chat-history" ref="chatHistoryRef">
+        <div v-for="(msg, i) in chatMessages" :key="i" class="chat-msg" :class="msg.role">
+          <div class="msg-author">{{ msg.role === 'user' ? '👤 Idea Input' : '⚡ AI Assistant' }}</div>
+          <div class="msg-content">{{ msg.text }}</div>
+
+          <!-- Autonomous Action Card -->
+          <div v-if="msg.detectedAction" class="ai-action-card">
+            <div class="action-card-header">
+              <span class="action-pulse-dot"></span>
+              <span class="action-badge">Autonomous Action</span>
+              <span class="action-label">{{ msg.detectedAction.label }}</span>
+            </div>
+            <div class="action-card-buttons">
+              <button
+                class="apply-and-run-btn"
+                @click="executeAiAction(msg.detectedAction)"
+              >
+                ▶ 1-Click Apply to 3D Studio & Run
+              </button>
+              <button
+                v-if="msg.dictCode"
+                class="apply-snippet-btn"
+                @click="applyAiSnippet(msg.dictCode)"
+              >
+                📋 View Case Dict
+              </button>
+            </div>
+          </div>
+          <button
+            v-else-if="msg.dictCode"
+            class="apply-snippet-btn"
+            @click="applyAiSnippet(msg.dictCode)"
+          >
+            📋 Apply & Repair in Case
+          </button>
+        </div>
+        <div v-if="isAiLoading" class="chat-msg ai loading">
+          <div class="msg-author">⚡ AI Assistant</div>
+          <div class="msg-content">🧠 Computing Navier-Stokes equations, boundary conditions & mesh...</div>
+        </div>
+      </div>
+
+      <!-- Quick Idea Chips -->
+      <div class="quick-prompt-chips">
+        <button class="chip-btn" @click="sendQuickPrompt('Configure Formula 1 front wing in ground effect at 80 m/s with inverted multi-element downforce')">
+          🏎️ F1 Downforce
+        </button>
+        <button class="chip-btn" @click="sendQuickPrompt('Analyze NACA 0012 swept wing at 14 degrees angle of attack with boundary layer separation')">
+          ✈️ Wing Stall
+        </button>
+        <button class="chip-btn" @click="sendQuickPrompt('Simulate quadcopter multi-rotor propeller downwash and slipstream contraction in air')">
+          🚁 Drone Downwash
+        </button>
+        <button class="chip-btn" @click="sendQuickPrompt('Simulate submarine hydrodynamic teardrop hull in seawater at 20 knots with boundary layer wake')">
+          🌊 Submarine Hull
+        </button>
+        <button class="chip-btn" @click="sendQuickPrompt('Thermal plume rising with Boussinesq buoyancy at 350K')">
+          🔥 Thermal Plume
+        </button>
+      </div>
+
+      <!-- Copilot Input Row -->
+      <div class="copilot-input-row">
+        <input
+          type="text"
+          v-model="userPrompt"
+          placeholder="Type physics idea or describe boundary conditions..."
+          class="copilot-input"
+          @keyup.enter="handleSendAiPrompt"
+        />
+        <button class="copilot-send-btn" :disabled="isAiLoading || !userPrompt.trim()" @click="handleSendAiPrompt">
+          ➤
+        </button>
       </div>
     </div>
 
@@ -405,9 +415,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, nextTick } from 'vue';
+import { ref, reactive, computed, watch, nextTick } from 'vue';
 import type {
   SimulationParams,
+  SimulationArchetype,
   StudioParameters,
   OpenFoamDictFile,
   AiProviderConfig,
@@ -424,10 +435,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:params', params: SimulationParams): void;
   (e: 'fileUploaded', file: File): void;
+  (e: 'startSimulation'): void;
+  (e: 'closeSidebar'): void;
 }>();
 
-const activeTab = ref<'physics' | 'repair'>('physics');
-const isAiDrawerOpen = ref(false);
+const activeMode = ref<'manual' | 'ai'>('manual');
+const isForcesDrawerOpen = ref(false);
 const isDraggingOver = ref(false);
 const uploadedFileName = ref<string | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -436,7 +449,6 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const gravityZ = ref(props.params.naturalForces?.gravity?.[1] ?? -9.81);
 const coreTemp = ref(props.params.naturalForces?.ambientTemp ?? 310.0);
 const thermalBeta = ref(0.0034);
-const waterAlpha = ref(0.65);
 
 // Substances
 const substances: FluidProperties[] = [
@@ -455,10 +467,23 @@ const currentSubstance = ref<FluidProperties>(
 const userPrompt = ref('');
 const isAiLoading = ref(false);
 const chatHistoryRef = ref<HTMLDivElement | null>(null);
-const chatMessages = ref<{ role: 'user' | 'ai'; text: string; dictCode?: string }[]>([
+
+interface ChatMessageItem {
+  role: 'user' | 'ai';
+  text: string;
+  dictCode?: string;
+  detectedAction?: {
+    archetype?: SimulationArchetype;
+    substance?: string;
+    re?: number;
+    label: string;
+  } | null;
+}
+
+const chatMessages = ref<ChatMessageItem[]>([
   {
     role: 'ai',
-    text: '⚡ OpenFOAM Physics Assistant: Give me an idea or sketch, and I will set up the governing equations (mass, momentum, gravity, temperature, and multiphase).'
+    text: '⚡ OpenFOAM Physics Assistant: Give me an idea or scenario, and I will calculate the Navier-Stokes equations and auto-configure your 3D simulation.'
   }
 ]);
 
@@ -483,6 +508,14 @@ const aiStatusBadge = computed(() => {
   if (!props.aiConfig.apiKey) return '🔑 Key Needed';
   return props.aiConfig.model;
 });
+
+function setMode(mode: 'manual' | 'ai') {
+  activeMode.value = mode;
+  emit('update:params', {
+    ...props.params,
+    solverMode: mode === 'ai' ? 'ai' : 'cfd'
+  });
+}
 
 function selectSubstance(sub: FluidProperties) {
   currentSubstance.value = sub;
@@ -520,7 +553,7 @@ function runCaseDiagnostics() {
   if (courant > 1.0) {
     diagReport.value = {
       type: 'warn',
-      message: `⚠️ Courant number Co = ${courant.toFixed(2)} > 1.0! Auto-reduced dt to ${(0.8 * (1.0 / props.params.gridResolution) / studioParams.irisPurple).toFixed(4)}s to prevent numerical divergence.`
+      message: `⚠️ Courant number Co = ${courant.toFixed(2)} > 1.0! Auto-reduced dt to prevent numerical divergence.`
     };
   } else {
     diagReport.value = {
@@ -560,10 +593,15 @@ startFrom       startTime;
 startTime       0;
 stopAt          endTime;
 endTime         1000;
-deltaT          ${props.params.dt};
+deltaT          ${props.params.dt || 0.005};
 writeControl    timeStep;
-writeInterval   50;
+writeInterval   20;
+purgeWrite      0;
+writeFormat     ascii;
 writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
 runTimeModifiable true;`
     },
     {
@@ -578,9 +616,10 @@ runTimeModifiable true;`
     location    "system";
     object      fvSchemes;
 }
-ddtSchemes { default Euler; }
+ddtSchemes { default steadyState; }
 gradSchemes { default Gauss linear; }
-divSchemes {
+divSchemes
+{
     default none;
     div(phi,U) Gauss linearUpwind grad(U);
     div(phi,T) Gauss limitedLinear 1;
@@ -605,6 +644,35 @@ solvers
     U { solver smoothSolver; smoother symGaussSeidel; tolerance 1e-08; }
     T { solver PBiCGStab; preconditioner DILU; tolerance 1e-08; }
 }`
+    },
+    {
+      name: 'blockMeshDict',
+      path: 'system/blockMeshDict',
+      category: 'system',
+      content: `FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+convertToMeters 1;
+vertices
+(
+    (-2.0 -1.0 -1.0)
+    ( 2.0 -1.0 -1.0)
+    ( 2.0  1.0 -1.0)
+    (-2.0  1.0 -1.0)
+    (-2.0 -1.0  1.0)
+    ( 2.0 -1.0  1.0)
+    ( 2.0  1.0  1.0)
+    (-2.0  1.0  1.0)
+);
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (${props.params.gridResolution} ${props.params.gridResolution} 32) simpleGrading (1 1 1)
+);`
     }
   ];
 });
@@ -689,6 +757,27 @@ boundaryField
     outlet { type fixedValue; value uniform 0; }
     walls { type zeroGradient; }
 }`
+    },
+    {
+      name: 'T',
+      path: '0/T',
+      category: '0',
+      content: `FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      T;
+}
+dimensions      [0 0 0 1 0 0 0];
+internalField   uniform 293.15;
+boundaryField
+{
+    inlet { type fixedValue; value uniform 293.15; }
+    heaterSource { type fixedValue; value uniform ${(studioParams.butterscotchCore + 273.15).toFixed(2)}; }
+    walls { type zeroGradient; }
+}`
     }
   ];
 });
@@ -723,6 +812,66 @@ function handleFileDrop(e: DragEvent) {
   }
 }
 
+function parseActionFromAiResponse(aiText: string, userText: string) {
+  const combined = (aiText + ' ' + userText).toLowerCase();
+  let arch: SimulationArchetype | undefined;
+  if (combined.includes('submarine') || combined.includes('hull')) arch = 'submarine';
+  else if (combined.includes('airfoil') || combined.includes('naca') || combined.includes('wing')) arch = 'airfoil';
+  else if (combined.includes('drone') || combined.includes('rotor') || combined.includes('quadcopter')) arch = 'drone';
+  else if (combined.includes('f1') || combined.includes('formula 1') || combined.includes('downforce')) arch = 'f1';
+  else if (combined.includes('cylinder') || combined.includes('von karman')) arch = 'cylinder';
+  else if (combined.includes('venturi') || combined.includes('converging')) arch = 'venturi';
+
+  let substance: string | undefined;
+  if (combined.includes('seawater') || combined.includes('water')) substance = 'water';
+  else if (combined.includes('air')) substance = 'air';
+  else if (combined.includes('oil')) substance = 'oil';
+
+  let re: number | undefined;
+  const reMatch = combined.match(/re\s*[=:\s]+([0-9]+)/i);
+  if (reMatch) {
+    re = parseInt(reMatch[1], 10);
+  }
+
+  if (arch || substance || re) {
+    const parts = [];
+    if (arch) parts.push(`Archetype: ${arch.toUpperCase()}`);
+    if (substance) parts.push(`Medium: ${substance.toUpperCase()}`);
+    if (re) parts.push(`Re = ${re.toLocaleString()}`);
+    return {
+      archetype: arch,
+      substance,
+      re,
+      label: parts.join(' • ')
+    };
+  }
+  return null;
+}
+
+function executeAiAction(action: any) {
+  const updated = { ...props.params };
+  if (action.archetype) {
+    updated.archetype = action.archetype;
+  }
+  if (action.substance) {
+    updated.substance = action.substance;
+    const found = substances.find(s => s.id === action.substance);
+    if (found) currentSubstance.value = found;
+  }
+  if (action.re) {
+    updated.reynoldsNumber = action.re;
+  }
+  emit('update:params', updated);
+  emit('startSimulation');
+  chatMessages.value.push({
+    role: 'ai',
+    text: `⚡ Autonomous Action Executed: Successfully configured ${action.label} and launched live 3D simulation in viewport!`
+  });
+  nextTick(() => {
+    if (chatHistoryRef.value) chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight;
+  });
+}
+
 async function handleSendAiPrompt() {
   if (!userPrompt.value.trim() || isAiLoading.value) return;
 
@@ -738,14 +887,23 @@ async function handleSendAiPrompt() {
   const res = await queryAiCopilot(promptText, context);
 
   isAiLoading.value = false;
+  const detectedAction = parseActionFromAiResponse(res.analysis, promptText);
+  const dictCode = res.openfoamDictSnippet || extractDictCode(res.analysis);
+
   chatMessages.value.push({
     role: 'ai',
     text: res.analysis,
-    dictCode: res.openfoamDictSnippet
+    dictCode,
+    detectedAction
   });
 
   await nextTick();
   if (chatHistoryRef.value) chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight;
+}
+
+function extractDictCode(text: string): string | undefined {
+  const codeBlockMatch = text.match(/```(?:openfoam|cpp|text)?\s*([\s\S]*?)```/);
+  return codeBlockMatch ? codeBlockMatch[1].trim() : undefined;
 }
 
 function sendQuickPrompt(text: string) {
@@ -761,21 +919,29 @@ function applyAiSnippet(code: string) {
     content: code
   };
 }
+
+watch(() => props.params.studioParams, (newParams) => {
+  if (newParams) {
+    Object.assign(studioParams, newParams);
+  }
+}, { deep: true });
 </script>
 
 <style scoped>
 .case-hub-panel {
-  width: 480px;
-  min-width: 440px;
+  width: 440px;
+  min-width: 400px;
+  flex-shrink: 0;
   height: 100%;
   background: var(--bg-canvas);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  padding: 12px 16px;
+  padding: 12px 14px;
   gap: 10px;
   overflow-y: auto;
   user-select: none;
+  transition: width 0.25s ease, opacity 0.2s ease;
 }
 
 .hub-header {
@@ -787,7 +953,17 @@ function applyAiSnippet(code: string) {
 .hub-title-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.hub-title-left {
+  display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.hub-icon {
+  font-size: 15px;
 }
 
 .hub-title {
@@ -806,193 +982,42 @@ function applyAiSnippet(code: string) {
   border-radius: 4px;
 }
 
+.collapse-sidebar-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.collapse-sidebar-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-border);
+}
+
 .hub-subtitle {
   font-size: 10.5px;
   color: var(--text-secondary);
 }
 
-/* AI Slide Toggle Bar */
-.ai-slide-toggle-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--btn-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 7px;
-  padding: 6px 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.ai-slide-toggle-bar:hover {
-  background: var(--bg-card);
-  border-color: var(--accent-border);
-}
-
-.toggle-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ai-icon {
-  font-size: 13px;
-}
-
-.toggle-label {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #f1f5f9;
-}
-
-.ai-chip {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 1px 5px;
-  border-radius: 4px;
-}
-
-.slide-arrow-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* AI Slide Drawer Content */
-.ai-slide-drawer {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.copilot-chat-history {
-  max-height: 90px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.chat-msg {
-  padding: 5px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-}
-
-.chat-msg.user {
-  background: rgba(0, 0, 0, 0.3);
-  border-left: 2px solid var(--accent-border);
-}
-
-.chat-msg.ai {
-  background: rgba(0, 0, 0, 0.2);
-  border-left: 2px solid var(--text-secondary);
-}
-
-.msg-author {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  margin-bottom: 2px;
-}
-
-.msg-content {
-  color: #e2e8f0;
-  white-space: pre-wrap;
-}
-
-.apply-snippet-btn {
-  margin-top: 4px;
-  padding: 3px 8px;
-  background: var(--btn-surface);
-  border: 1px solid var(--accent-border);
-  color: #ffffff;
-  border-radius: 4px;
-  font-size: 9.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.quick-prompt-chips {
-  display: flex;
-  gap: 5px;
-  overflow-x: auto;
-}
-
-.chip-btn {
-  background: var(--btn-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 9.5px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chip-btn:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--accent-border);
-  color: #ffffff;
-}
-
-.copilot-input-row {
-  display: flex;
-  gap: 6px;
-}
-
-.copilot-input {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--border-subtle);
-  border-radius: 5px;
-  padding: 5px 8px;
-  color: #f1f5f9;
-  font-size: 11px;
-  outline: none;
-}
-
-.copilot-input:focus {
-  border-color: var(--accent-border);
-}
-
-.copilot-send-btn {
-  background: var(--btn-surface);
-  border: 1px solid var(--accent-border);
-  border-radius: 5px;
-  color: white;
-  padding: 0 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.copilot-send-btn:hover {
-  background: var(--bg-card-hover);
-}
-
-/* Tabs: Natural Physics vs Manual Repair */
-.hub-tabs-row {
+/* Mode Switcher Pill */
+.mode-toggle-wrapper {
   display: flex;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   padding: 3px;
-  gap: 3px;
+  gap: 4px;
 }
 
-.hub-tab-btn {
+.mode-btn {
   flex: 1;
-  padding: 7px 10px;
+  padding: 6px 10px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -1000,167 +1025,49 @@ function applyAiSnippet(code: string) {
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  text-align: center;
-  transition: all 0.15s ease;
-}
-
-.hub-tab-btn.active {
-  background: var(--btn-surface);
-  border-color: var(--accent-border);
-  color: #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Physics Tab */
-.physics-tab-content {
+  transition: all 0.2s ease;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.substance-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
-.substance-btn {
-  display: flex;
-  flex-direction: column;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 6px 8px;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.15s ease;
-}
-
-.substance-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--accent-border);
-}
-
-.substance-btn.active {
+.mode-btn.active {
   background: var(--btn-surface);
   border-color: var(--accent-border);
-  box-shadow: 0 0 0 1px var(--accent-border);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.sub-name {
-  font-size: 11.5px;
-  font-weight: 700;
+.mode-btn:hover:not(.active) {
   color: #ffffff;
 }
 
-.sub-prop {
-  font-family: 'JetBrains Mono', monospace;
+.ai-chip {
   font-size: 9px;
-  color: var(--text-secondary);
-}
-
-.preset-pills {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-  flex-wrap: wrap;
-}
-
-.preset-btn {
-  background: var(--btn-surface);
-  border: 1px solid var(--border-subtle);
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  padding: 1px 5px;
   border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 9.5px;
-  color: var(--text-secondary);
-  cursor: pointer;
 }
 
-.preset-btn:hover {
-  background: var(--bg-card-hover);
-  color: #ffffff;
-}
-
-/* Repair Tab Content */
-.repair-tab-content {
+/* Manual Mode Content */
+.manual-mode-content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  flex: 1;
+  overflow: hidden;
 }
 
-.diagnostics-action-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 8px 10px;
-  gap: 8px;
-}
-
-.diag-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.diag-icon {
-  font-size: 18px;
-}
-
-.diag-left strong {
-  font-size: 11.5px;
-  color: #f1f5f9;
-}
-
-.diag-left p {
-  font-size: 9.5px;
-  color: var(--text-secondary);
-}
-
-.run-diag-btn {
-  background: var(--btn-surface);
-  border: 1px solid var(--accent-border);
-  color: white;
-  border-radius: 5px;
-  padding: 6px 10px;
-  font-size: 10.5px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.run-diag-btn:hover {
-  background: var(--bg-card-hover);
-  border-color: #ffffff;
-}
-
-.diag-report-banner {
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 10.5px;
-}
-
-.diag-report-banner.success {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.diag-report-banner.warn {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-/* Hub Grid Layout */
 .hub-grid {
   display: grid;
   grid-template-columns: 1.15fr 1fr;
   gap: 10px;
+  flex: 1;
+  overflow-y: auto;
 }
 
+/* Hub Cards */
 .hub-card {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
@@ -1170,21 +1077,17 @@ function applyAiSnippet(code: string) {
   flex-direction: column;
 }
 
-.geometry-card {
-  background: var(--bg-card-alt);
-  border-color: var(--accent-border);
-}
-
 .card-header {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
 }
 
 .card-title-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .card-title {
@@ -1193,22 +1096,54 @@ function applyAiSnippet(code: string) {
   color: #ffffff;
 }
 
-.card-desc {
-  font-size: 9.5px;
-  color: #94a3b8;
-}
-
 .token-tag {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 8.5px;
+  font-size: 9px;
   color: var(--text-secondary);
   opacity: 0.8;
+}
+
+.auto-diag-btn {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auto-diag-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  color: #ffffff;
+}
+
+.diag-report-banner {
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.diag-report-banner.success {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #86efac;
+}
+
+.diag-report-banner.warn {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fde047;
 }
 
 /* File Tree */
 .tree-card {
   overflow-y: auto;
-  max-height: 280px;
+  max-height: calc(100vh - 170px);
 }
 
 .file-tree-container {
@@ -1219,6 +1154,11 @@ function applyAiSnippet(code: string) {
   font-size: 11px;
 }
 
+.tree-folder {
+  display: flex;
+  flex-direction: column;
+}
+
 .folder-header {
   display: flex;
   align-items: center;
@@ -1227,6 +1167,7 @@ function applyAiSnippet(code: string) {
   border-radius: 4px;
   cursor: pointer;
   color: #e2e8f0;
+  transition: background 0.15s ease;
 }
 
 .folder-header:hover {
@@ -1239,13 +1180,17 @@ function applyAiSnippet(code: string) {
   width: 10px;
 }
 
+.folder-icon {
+  font-size: 11px;
+}
+
 .folder-name {
   font-weight: 600;
   color: #38bdf8;
 }
 
 .folder-children {
-  margin-left: 16px;
+  margin-left: 14px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1256,11 +1201,12 @@ function applyAiSnippet(code: string) {
 .tree-file {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 6px;
+  gap: 5px;
+  padding: 3px 5px;
   border-radius: 4px;
   cursor: pointer;
   color: #cbd5e1;
+  transition: all 0.15s ease;
 }
 
 .tree-file:hover {
@@ -1273,6 +1219,14 @@ function applyAiSnippet(code: string) {
   color: #e9d5ff;
 }
 
+.file-icon {
+  font-size: 10px;
+}
+
+.file-name {
+  font-size: 10.5px;
+}
+
 /* Right Column */
 .right-controls-column {
   display: flex;
@@ -1280,71 +1234,14 @@ function applyAiSnippet(code: string) {
   gap: 10px;
 }
 
-.bc-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.params-card {
+  flex: 1;
 }
 
-.bc-item {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
-  padding: 5px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.bc-meta {
-  display: flex;
-  justify-content: space-between;
-}
-
-.bc-name {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #38bdf8;
-}
-
-.bc-type {
-  font-size: 9px;
-  color: #a855f7;
-}
-
-.bc-input-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.bc-num-input {
-  width: 55px;
-  background: #0f1016;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  color: white;
-  padding: 2px 4px;
-  font-size: 10.5px;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.unit-lbl {
-  font-size: 10px;
-  color: #94a3b8;
-}
-
-.bc-desc {
-  font-size: 9px;
-  color: #94a3b8;
-}
-
-/* Sliders */
 .sliders-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .slider-group {
@@ -1360,38 +1257,145 @@ function applyAiSnippet(code: string) {
 }
 
 .slider-labels label {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: #cbd5e1;
 }
 
 .slider-val-badge {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
   padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Natural Forces Collapsible Drawer */
+.natural-drawer-card {
+  padding: 8px 10px;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.drawer-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawer-icon {
+  font-size: 12px;
+}
+
+.drawer-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.substance-chip {
+  font-size: 9px;
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  padding: 1px 5px;
   border-radius: 4px;
 }
 
-/* Photo Dropzone */
+.drawer-arrow {
+  font-size: 9px;
+  color: #94a3b8;
+}
+
+.drawer-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.substance-pills-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sub-pill-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sub-pill-btn:hover {
+  color: #ffffff;
+  border-color: var(--accent-border);
+}
+
+.sub-pill-btn.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.gravity-presets-row {
+  display: flex;
+  gap: 3px;
+}
+
+.preset-pill {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 9px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.preset-pill.active {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
+}
+
+/* Geometry Card & Dropzone */
+.geometry-card {
+  min-height: 100px;
+}
+
 .photo-dropzone {
   border: 1px dashed rgba(255, 255, 255, 0.2);
   border-radius: 6px;
-  padding: 10px;
+  padding: 10px 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   cursor: pointer;
   background: rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
 }
 
 .photo-dropzone:hover,
 .photo-dropzone.dragging {
-  border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.08);
+  border-color: var(--accent-border);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .dropzone-content {
@@ -1423,10 +1427,118 @@ function applyAiSnippet(code: string) {
   color: #10b981;
   background: rgba(16, 185, 129, 0.15);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
-/* Modal View & Editor */
+/* AI Mode Panel */
+.ai-mode-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.copilot-chat-history {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-height: calc(100vh - 280px);
+}
+
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.chat-msg.user {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  align-self: flex-end;
+  max-width: 90%;
+}
+
+.chat-msg.ai {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  align-self: flex-start;
+  max-width: 95%;
+}
+
+.msg-author {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.msg-content {
+  color: #e2e8f0;
+}
+
+.quick-prompt-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.chip-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.copilot-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.copilot-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.copilot-input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.copilot-send-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  color: #38bdf8;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+/* Modal View */
 .dict-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1440,12 +1552,12 @@ function applyAiSnippet(code: string) {
 }
 
 .dict-modal {
-  width: 680px;
+  width: 600px;
   max-width: 90vw;
   max-height: 80vh;
   background: #141b24;
   border: 1px solid var(--border-active);
-  border-radius: 10px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1476,56 +1588,50 @@ function applyAiSnippet(code: string) {
 }
 
 .save-file-btn {
-  background: #10b981;
-  color: white;
+  background: #0284c7;
+  color: #ffffff;
   border: none;
   border-radius: 4px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-}
-
-.save-file-btn:hover {
-  background: #059669;
 }
 
 .close-btn {
   background: transparent;
   border: none;
   color: #94a3b8;
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
 }
 
 .modal-body {
   padding: 12px;
+  overflow-y: auto;
   background: #0d1219;
-  flex: 1;
-  display: flex;
 }
 
 .dict-editor-textarea {
   width: 100%;
   height: 380px;
   background: transparent;
+  border: none;
   color: #38bdf8;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11.5px;
-  border: none;
-  outline: none;
+  line-height: 1.5;
   resize: none;
-  line-height: 1.4;
+  outline: none;
 }
 
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.2s ease-out;
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
 }
 
-.slide-down-enter-from,
-.slide-down-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
 }
 </style>

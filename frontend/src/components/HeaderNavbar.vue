@@ -2,6 +2,22 @@
   <header class="header-navbar">
     <!-- Left: Brand Logo and Title -->
     <div class="brand">
+      <!-- ChatGPT-Style Sidebar Toggle Button -->
+      <button
+        class="sidebar-toggle-btn"
+        :class="{ active: isSidebarOpen }"
+        @click="$emit('toggleSidebar')"
+        :title="isSidebarOpen ? 'Collapse Sidebar (Ctrl + \\)' : 'Expand Sidebar (Ctrl + \\)'"
+        aria-label="Toggle Sidebar"
+      >
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="2"/>
+          <path d="M9 3v18"/>
+          <path d="m14 9-3 3 3 3" v-if="isSidebarOpen"/>
+          <path d="m12 9 3 3-3 3" v-else/>
+        </svg>
+      </button>
+
       <div class="logo-cube" title="OpenZess 3D Studio">
         <div class="cube-inner">
           <span class="cube-face front"></span>
@@ -13,6 +29,21 @@
         </div>
       </div>
       <h1 class="brand-title">OpenZess 3D Studio</h1>
+
+      <!-- Editable Simulation / Case Name Pill -->
+      <div class="case-name-wrapper" title="Click to rename this simulation case">
+        <span class="case-icon">📁</span>
+        <input
+          type="text"
+          :value="caseName || 'OpenZess_Case'"
+          @input="$emit('update:caseName', ($event.target as HTMLInputElement).value)"
+          @change="$emit('update:caseName', ($event.target as HTMLInputElement).value)"
+          class="case-name-input"
+          placeholder="Name simulation..."
+          aria-label="Simulation Case Name"
+        />
+        <span class="edit-hint-icon" title="Rename Case">✏️</span>
+      </div>
 
       <!-- Archetype Switcher Dropdown -->
       <div class="archetype-dropdown-wrapper" ref="archetypeDropdownRef">
@@ -40,6 +71,43 @@
               <div class="menu-item-text">
                 <strong>{{ arch.name }}</strong>
                 <small>{{ arch.solver }} · {{ arch.desc }}</small>
+              </div>
+            </button>
+          </div>
+        </transition>
+      </div>
+
+      <!-- Engine Selector Dropdown (Rust Bare-Metal / PINN AI / Python SciPy) -->
+      <div class="engine-dropdown-wrapper" ref="engineDropdownRef">
+        <button
+          class="engine-pill-btn"
+          :class="solverMode || 'cfd'"
+          @click="showEngineMenu = !showEngineMenu"
+          title="Select CFD Physics Engine (Rust SIMD, PINN AI, or Python SciPy)"
+        >
+          <span class="engine-icon">{{ currentEngineInfo.icon }}</span>
+          <span class="engine-label">{{ currentEngineInfo.name }}</span>
+          <span class="engine-badge" :class="currentEngineInfo.id">{{ currentEngineInfo.badge }}</span>
+          <span class="dropdown-arrow">▾</span>
+        </button>
+
+        <transition name="fade-drop">
+          <div v-if="showEngineMenu" class="engine-menu">
+            <div class="menu-heading">CFD Physics Engines</div>
+            <button
+              v-for="eng in engines"
+              :key="eng.id"
+              class="engine-menu-item"
+              :class="{ selected: (solverMode || 'cfd') === eng.id }"
+              @click="selectEngine(eng.id)"
+            >
+              <span class="menu-item-icon">{{ eng.icon }}</span>
+              <div class="menu-item-text">
+                <div class="menu-item-title-row">
+                  <strong>{{ eng.name }}</strong>
+                  <span class="speed-tag" :class="eng.speedClass">{{ eng.speed }}</span>
+                </div>
+                <small>{{ eng.tech }} · {{ eng.desc }}</small>
               </div>
             </button>
           </div>
@@ -225,18 +293,23 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import type { SimulationArchetype, AiProviderConfig } from '../types/cfd';
+import type { SimulationArchetype, AiProviderConfig, SolverMode } from '../types/cfd';
 
 const props = defineProps<{
+  caseName?: string;
   currentArchetype: SimulationArchetype;
+  solverMode?: SolverMode;
   aiConfig: AiProviderConfig;
   isPlaying: boolean;
   isConnected: boolean;
   isConnecting?: boolean;
+  isSidebarOpen?: boolean;
 }>();
 
 const emit = defineEmits<{
+  (e: 'update:caseName', name: string): void;
   (e: 'update:archetype', arch: SimulationArchetype): void;
+  (e: 'update:solverMode', mode: SolverMode): void;
   (e: 'openSettings'): void;
   (e: 'togglePlay'): void;
   (e: 'stepBack'): void;
@@ -245,22 +318,44 @@ const emit = defineEmits<{
   (e: 'reset'): void;
   (e: 'snapshot'): void;
   (e: 'exportCase', type: 'zip' | 'vtk' | 'png'): void;
+  (e: 'toggleSidebar'): void;
 }>();
 
 const showArchetypeMenu = ref(false);
+const showEngineMenu = ref(false);
 const showColabMenu = ref(false);
 const showExportMenu = ref(false);
 
 const archetypeDropdownRef = ref<HTMLDivElement | null>(null);
+const engineDropdownRef = ref<HTMLDivElement | null>(null);
 const colabWidgetRef = ref<HTMLDivElement | null>(null);
 const exportDropdownRef = ref<HTMLDivElement | null>(null);
+
+const engines: { id: SolverMode; name: string; icon: string; badge: string; tech: string; desc: string; speed: string; speedClass: string }[] = [
+  { id: 'rust', name: 'Rust Bare-Metal', icon: '🦀', badge: 'SIMD', tech: 'Axum + Rayon', desc: 'Multi-threaded Navier-Stokes & Poisson solver', speed: 'Fastest ⚡', speedClass: 'fastest' },
+  { id: 'ai', name: 'PINN AI Surrogate', icon: '⚡', badge: '<50ms', tech: 'Neural Network', desc: 'Instant physics-informed neural operator flow prediction', speed: 'Instant 🚀', speedClass: 'instant' },
+  { id: 'cfd', name: 'Python SciPy', icon: '🔬', badge: 'Sparse', tech: 'SciPy + NumPy', desc: 'High-precision sparse fractional-step CPU solver', speed: 'High-Res 🎯', speedClass: 'precise' }
+];
+
+const currentEngineInfo = computed(() => {
+  const current = props.solverMode || 'cfd';
+  return engines.find(e => e.id === current) || engines[2];
+});
+
+function selectEngine(id: SolverMode) {
+  showEngineMenu.value = false;
+  emit('update:solverMode', id);
+}
 
 const ramUsage = ref(38);
 const diskUsage = ref(24);
 
 const archetypes: { id: SimulationArchetype; name: string; icon: string; solver: string; desc: string }[] = [
-  { id: 'plume', name: 'Buoyant Thermal Plume', icon: '💨', solver: 'buoyantBoussinesqSimpleFoam', desc: 'Coupled thermal buoyancy jet' },
   { id: 'airfoil', name: 'NACA 0012 Airfoil Flow', icon: '✈️', solver: 'simpleFoam', desc: 'Wing aerodynamics, Lift & Drag' },
+  { id: 'f1', name: 'F1 Front Wing Aerodynamics', icon: '🏎️', solver: 'pimpleFoam', desc: 'Ground-effect downforce & wake' },
+  { id: 'drone', name: 'Quadcopter Drone Rotor', icon: '🚁', solver: 'simpleFoam', desc: 'Multi-rotor downwash & thrust' },
+  { id: 'submarine', name: 'Submarine Hydrodynamic Hull', icon: '🌊', solver: 'interFoam', desc: 'Deep water skin friction & cavitation' },
+  { id: 'plume', name: 'Buoyant Thermal Plume', icon: '💨', solver: 'buoyantBoussinesqSimpleFoam', desc: 'Coupled thermal buoyancy jet' },
   { id: 'cylinder', name: 'Bluff Body & Vortex Street', icon: '🔴', solver: 'pimpleFoam', desc: 'Von Kármán transient wake' },
   { id: 'venturi', name: 'Venturi Nozzle Flow', icon: '🚿', solver: 'rhoSimpleFoam', desc: 'Compressible throat acceleration' },
   { id: 'cavity', name: '3D Lid-Driven Cavity', icon: '🌀', solver: 'icoFoam', desc: 'Shear-driven vortex recirculation' },
@@ -305,6 +400,9 @@ function handleClickOutside(e: MouseEvent) {
   if (archetypeDropdownRef.value && !archetypeDropdownRef.value.contains(target)) {
     showArchetypeMenu.value = false;
   }
+  if (engineDropdownRef.value && !engineDropdownRef.value.contains(target)) {
+    showEngineMenu.value = false;
+  }
   if (colabWidgetRef.value && !colabWidgetRef.value.contains(target)) {
     showColabMenu.value = false;
   }
@@ -336,11 +434,43 @@ onUnmounted(() => {
   user-select: none;
 }
 
-/* Brand styling */
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+.sidebar-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-toggle-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  transform: scale(1.04);
+}
+
+.sidebar-toggle-btn.active {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.sidebar-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s ease;
 }
 
 .logo-cube {
@@ -375,6 +505,64 @@ onUnmounted(() => {
   letter-spacing: -0.2px;
   color: #ffffff;
   margin: 0;
+}
+
+/* Editable Simulation / Case Name Pill */
+.case-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+}
+
+.case-name-wrapper:hover {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.case-name-wrapper:focus-within {
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.case-icon {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.case-name-input {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+  font-weight: 600;
+  outline: none;
+  min-width: 130px;
+  max-width: 200px;
+  letter-spacing: -0.2px;
+}
+
+.case-name-input::placeholder {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.edit-hint-icon {
+  font-size: 10px;
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.case-name-wrapper:hover .edit-hint-icon {
+  opacity: 1;
 }
 
 /* Archetype Dropdown Switcher */
@@ -457,6 +645,141 @@ onUnmounted(() => {
   background: var(--btn-surface);
   border-color: var(--accent-border);
   color: #ffffff;
+}
+
+/* Engine Dropdown Styles */
+.engine-dropdown-wrapper {
+  position: relative;
+  margin-left: 6px;
+}
+
+.engine-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 4px 10px;
+  color: #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.engine-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-border);
+}
+
+.engine-pill-btn.rust {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(249, 115, 22, 0.12);
+  color: #fdba74;
+}
+
+.engine-pill-btn.ai {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+}
+
+.engine-pill-btn.cfd {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(52, 211, 153, 0.12);
+  color: #6ee7b7;
+}
+
+.engine-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.engine-badge.rust {
+  background: #ea580c;
+  color: #ffffff;
+}
+
+.engine-badge.ai {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.engine-badge.cfd {
+  background: #059669;
+  color: #ffffff;
+}
+
+.engine-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 340px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-active);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
+  z-index: 250;
+}
+
+.engine-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #cbd5e1;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.engine-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.engine-menu-item.selected {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
+}
+
+.menu-item-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.speed-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.speed-tag.fastest {
+  background: rgba(249, 115, 22, 0.2);
+  color: #fb923c;
+}
+
+.speed-tag.instant {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+.speed-tag.precise {
+  background: rgba(52, 211, 153, 0.2);
+  color: #34d399;
 }
 
 .menu-item-icon {

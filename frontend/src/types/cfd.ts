@@ -1,8 +1,8 @@
 export type CaseType = 'cavity' | 'channel' | 'obstacle' | 'pipe';
 
-export type SimulationArchetype = 'plume' | 'airfoil' | 'cylinder' | 'venturi' | 'cavity' | 'cad' | 'water_dam' | 'weather_plume';
+export type SimulationArchetype = 'plume' | 'airfoil' | 'cylinder' | 'venturi' | 'cavity' | 'cad' | 'water_dam' | 'weather_plume' | 'f1' | 'drone' | 'submarine';
 
-export type SolverMode = 'cfd' | 'ai';
+export type SolverMode = 'cfd' | 'rust' | 'ai';
 
 export type FieldVariable = 'U' | 'p' | 'T' | 'omega' | 'q_crit';
 
@@ -43,6 +43,9 @@ export interface AerodynamicTelemetry {
   cd: number;           // Drag Coefficient
   cl: number;           // Lift Coefficient
   l_d: number;          // Lift-to-Drag Ratio
+  downforce?: number;   // F1 Downforce [N]
+  thrust?: number;      // Drone Thrust [N]
+  cavitationIndex?: number; // Submarine Cavitation Index sigma
   courantMax: number;   // Maximum Courant number Co = |U| dt / dx
   courantMean: number;  // Mean Courant number
   continuityError: number;
@@ -56,6 +59,7 @@ export interface StudioParameters {
 }
 
 export interface SimulationParams {
+  caseName?: string;
   archetype: SimulationArchetype;
   activeField: FieldVariable;
   substance: FluidSubstanceId;
@@ -93,6 +97,18 @@ export interface SimulationStepData {
   speed: number[][];
   mode: SolverMode;
   error?: string;
+  uMax?: number;
+  uAvg?: number;
+  pMin?: number;
+  pMax?: number;
+  cd?: number;
+  cl?: number;
+  downforce?: number;
+  thrust?: number;
+  cavitationIndex?: number;
+  courantMax?: number;
+  continuityError?: number;
+  obstacleMask?: boolean[][];
 }
 
 export interface OpenFoamDictFile {
