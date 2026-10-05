@@ -1,0 +1,9 @@
+[target.x86_64-pc-windows-gnu]
+linker = "C:\\Users\\ROSHNI\\.rustup\\toolchains\\stable-x86_64-pc-windows-gnu\\lib\\rustlib\\x86_64-pc-windows-gnu\\bin\\self-contained\\x86_64-w64-mingw32-gcc.exe"
+rustflags = [
+    "-C",
+    "dlltool=C:\\Users\\ROSHNI\\OneDrive\\Documents\\GitHub\\openn_fOam\\rust-sidecar\\tools\\dlltool.exe",
+]
+
+[build]
+target-dir = "tools/rustbuild"
