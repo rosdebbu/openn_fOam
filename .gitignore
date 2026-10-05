@@ -28,3 +28,12 @@ scratch/
 # =====================
 .env
 .env.*
+
+# =====================
+# Rust
+# =====================
+target/
+rust-sidecar/target/
+rust-sidecar/tools/rustbuild/
+rust-sidecar/tools/dlltool.exe
+**/*.rs.bk
