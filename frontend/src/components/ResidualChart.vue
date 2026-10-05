@@ -6,11 +6,11 @@
 
     <div class="chart-body">
       <div class="y-axis-labels">
-        <span>10⁻³</span>
+        <span>10⁰</span>
         <span>10⁻¹</span>
-        <span>1e-01</span>
-        <span>0.001</span>
-        <span>1e-13</span>
+        <span>10⁻²</span>
+        <span>10⁻³</span>
+        <span>10⁻⁴</span>
       </div>
 
       <div class="canvas-container">
@@ -78,10 +78,6 @@ function drawChart() {
     ctx.stroke();
   }
 
-  // Draw Sample or Live Residual Curve
-  const count = 200;
-  ctx.beginPath();
-
   // Create neon violet/cyan gradient
   const gradient = ctx.createLinearGradient(0, 0, w, h);
   gradient.addColorStop(0, '#c084fc');
@@ -91,12 +87,51 @@ function drawChart() {
   ctx.strokeStyle = gradient;
   ctx.lineWidth = 2;
 
-  // Render logarithmic curve
+  // Plot the real residual history on a log scale when available;
+  // fall back to the synthetic decay curve when no data exists yet.
+  const reals = props.residuals.filter(r => Number.isFinite(r) && r > 0);
+  if (reals.length >= 2) {
+    const maxLog = Math.log10(Math.max(...reals));
+    const minLog = Math.log10(Math.min(...reals));
+    const span = (maxLog - minLog) || 1;
+    const iterMax = Math.max(...props.iterations, 1);
+
+    // Map each residual to its iteration position so multiple pushes of the
+    // same iteration (from both WS frames and the local ticker) are handled.
+    const points: Array<{ x: number; y: number }> = [];
+    let pointIdx = 0;
+    for (let k = 0; k < props.residuals.length; k++) {
+      const r = props.residuals[k];
+      if (!Number.isFinite(r) || r <= 0) continue;
+      const iter = props.iterations[k] ?? pointIdx;
+      const xNorm = Math.min(1, iter / iterMax);
+      const logNorm = (Math.log10(r) - minLog) / span;
+      const y = Math.min(h - 4, Math.max(4, (1 - logNorm) * (h - 8) + 4));
+      points.push({ x: xNorm * w, y });
+      pointIdx++;
+    }
+
+    ctx.beginPath();
+    points.forEach((pt, idx) => {
+      if (idx === 0) ctx.moveTo(pt.x, pt.y);
+      else ctx.lineTo(pt.x, pt.y);
+    });
+    ctx.stroke();
+
+    ctx.shadowColor = 'rgba(168, 85, 247, 0.5)';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    return;
+  }
+
+  // Render synthetic logarithmic decay curve matching visual mockup
+  const count = 200;
+  ctx.beginPath();
   for (let i = 0; i <= count; i++) {
     const xNorm = i / count;
     const x = xNorm * w;
 
-    // Logarithmic decay formula matching visual mockup
     const noise = Math.sin(i * 0.8) * 0.015 + (Math.random() - 0.5) * 0.01;
     const yNorm = Math.pow(xNorm, 0.65) * 0.92 + noise;
     const y = Math.min(h - 4, Math.max(4, yNorm * h));

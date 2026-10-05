@@ -205,7 +205,7 @@ const probe = ref({
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
-let renderer: THREE.WebGLRenderer;
+let renderer: THREE.WebGLRenderer | undefined;
 let animId: number;
 
 let mainGroup: THREE.Group;
@@ -266,6 +266,23 @@ const colorbarData = computed(() => {
 const probeNormalizedPos = computed(() => {
   const val = probe.value.value;
   return Math.max(0, Math.min(100, (val / 1.82) * 100));
+});
+
+// Min/max of the active scalar field from the live CFD solution, used to
+// normalize colormap values on the cutplanes.
+const fieldRange = computed(() => {
+  const data = props.data;
+  if (!data || !data.speed || !data.p || !data.speed.length) return null;
+  const field = activeField.value === 'p' ? data.p : data.speed;
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  for (const row of field) {
+    for (const val of row) {
+      if (val < minVal) minVal = val;
+      if (val > maxVal) maxVal = val;
+    }
+  }
+  return { min: minVal, max: maxVal };
 });
 
 function onFieldChange(field: FieldVariable) {
@@ -823,6 +840,24 @@ function getScalarFieldValue(x: number, y: number, z: number, vx: number, vy: nu
   const f = activeField.value;
   const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
 
+  // Prefer the live CFD solution received via props.data when a simulation
+  // frame is available; fall back to the analytical approximation otherwise.
+  const data = props.data;
+  const range = fieldRange.value;
+  if (data && data.speed && data.p && data.speed.length && range) {
+    const nx = data.speed.length;
+    const ny = data.speed[0].length;
+    // Map viewport cutplane extents (x: -1.8..1.8, y: -1.1..1.1) to grid indices
+    const fx = (x + 1.8) / 3.6;
+    const fy = (y + 1.1) / 2.2;
+    if (fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1) {
+      const i = Math.min(nx - 1, Math.max(0, Math.round(fx * (nx - 1))));
+      const j = Math.min(ny - 1, Math.max(0, Math.round(fy * (ny - 1))));
+      const value = f === 'p' ? data.p[i][j] : data.speed[i][j];
+      return Math.max(0, Math.min(1, (value - range.min) / ((range.max - range.min) || 1)));
+    }
+  }
+
   if (f === 'p') {
     // Bernoulli pressure relation: p = p0 - 0.5 * rho * |U|^2
     return Math.max(0, Math.min(1, 1.0 - (speed * speed) / 4.0));
@@ -974,6 +1009,28 @@ function resetCamera() {
   camera.lookAt(0, 0, 0);
 }
 
+function capturePng(): boolean {
+  if (!renderer || !scene || !camera) return false;
+  try {
+    // Render one fresh frame so toDataURL does not read a cleared buffer
+    renderer.render(scene, camera);
+    const url = renderer.domElement.toDataURL('image/png');
+    const safeName = (props.params.caseName || 'openzess_snapshot').replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${safeName}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  } catch (err) {
+    console.warn('Viewport snapshot capture failed:', err);
+    return false;
+  }
+}
+
+defineExpose({ capturePng });
+
 function handleResize() {
   if (!canvasMountRef.value || !renderer || !camera) return;
   const width = canvasMountRef.value.clientWidth;
@@ -989,6 +1046,17 @@ watch(() => [props.params.archetype, props.params.studioParams, activeColormap.v
   buildCutplanes();
   buildVectorGlyphs();
 }, { deep: true });
+
+// Rebuild cutplanes when new live simulation frames arrive (throttled so a
+// fast WebSocket frame stream does not thrash geometry allocation).
+let lastCutplaneRebuild = 0;
+watch(() => props.data?.iteration, () => {
+  const now = performance.now();
+  if (now - lastCutplaneRebuild > 100) {
+    lastCutplaneRebuild = now;
+    buildCutplanes();
+  }
+});
 
 let resizeObserver: ResizeObserver | null = null;
 
@@ -1006,9 +1074,14 @@ onMounted(() => {
 onUnmounted(() => {
   if (animId) cancelAnimationFrame(animId);
   window.removeEventListener('resize', handleResize);
+  window.removeEventListener('mouseup', onMouseUp);
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
+  }
+  if (renderer) {
+    renderer.dispose();
+    renderer = undefined;
   }
 });
 </script>

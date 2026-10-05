@@ -33,7 +33,11 @@ export const PROVIDER_MODELS: Record<AiProviderType, { id: string; name: string;
     { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B (Groq)', badge: 'Fast MoE' }
   ],
   ollama: [
-    { id: 'deepseek-r1:latest', name: 'DeepSeek R1 (Local)', badge: '100% Free / Offline' },
+    { id: 'qwen2.5-coder:7b', name: 'Qwen 2.5 Coder 7B (Local)', badge: 'Local Active' },
+    { id: 'deepseek-r1:8b', name: 'DeepSeek R1 8B (Local)', badge: 'Local Active' },
+    { id: 'qwen-16k:latest', name: 'Qwen 16k (Local)', badge: 'Local Active' },
+    { id: 'qwen-64k:latest', name: 'Qwen 64k (Local)', badge: 'Local Active' },
+    { id: 'deepseek-16k:latest', name: 'DeepSeek 16k (Local)', badge: 'Local Active' },
     { id: 'llama3:latest', name: 'Llama 3 (Local)', badge: 'Offline' },
     { id: 'mistral:latest', name: 'Mistral (Local)', badge: 'Offline' }
   ]
@@ -162,7 +166,7 @@ export async function queryAiCopilot(prompt: string, context?: string): Promise<
     let baseUrl = 'https://api.openai.com/v1';
     if (config.provider === 'deepseek') baseUrl = 'https://api.deepseek.com/v1';
     if (config.provider === 'groq') baseUrl = 'https://api.groq.com/openai/v1';
-    if (config.provider === 'ollama') baseUrl = (config.customBaseUrl || 'http://localhost:11434') + '/v1';
+    if (config.provider === 'ollama') baseUrl = (config.customBaseUrl || 'http://localhost:11434').replace(/\/v1\/?$/, '') + '/v1';
     if (config.customBaseUrl && config.provider !== 'ollama') baseUrl = config.customBaseUrl;
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };

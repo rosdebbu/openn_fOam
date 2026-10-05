@@ -116,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import type { AiProviderConfig, AiProviderType } from '../types/cfd';
 import { getStoredAiConfig, saveStoredAiConfig, clearStoredAiConfig, testAiConnection, PROVIDER_MODELS } from '../utils/aiCopilot';
 
@@ -142,8 +142,40 @@ const localConfig = reactive<AiProviderConfig>(getStoredAiConfig());
 const showKey = ref(false);
 const isTesting = ref(false);
 const testResult = ref<{ success: boolean; message: string } | null>(null);
+const dynamicOllamaModels = ref<Array<{ id: string; name: string; badge: string }>>([]);
+
+async function refreshOllamaModels() {
+  try {
+    const url = (localConfig.customBaseUrl || 'http://localhost:11434').replace(/\/v1\/?$/, '') + '/api/tags';
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.models && Array.isArray(data.models)) {
+        dynamicOllamaModels.value = data.models.map((m: any) => ({
+          id: m.name,
+          name: m.name,
+          badge: `${(m.size / (1024 * 1024 * 1024)).toFixed(1)} GB (Installed)`
+        }));
+        if (dynamicOllamaModels.value.length > 0 && !dynamicOllamaModels.value.some(m => m.id === localConfig.model)) {
+          localConfig.model = dynamicOllamaModels.value[0].id;
+        }
+      }
+    }
+  } catch (e) {
+    // Ollama not reachable yet
+  }
+}
+
+onMounted(() => {
+  if (localConfig.provider === 'ollama') {
+    refreshOllamaModels();
+  }
+});
 
 const currentModels = computed(() => {
+  if (localConfig.provider === 'ollama' && dynamicOllamaModels.value.length > 0) {
+    return dynamicOllamaModels.value;
+  }
   return PROVIDER_MODELS[localConfig.provider] || [];
 });
 
@@ -154,7 +186,10 @@ const providerApiKeyUrl = computed(() => {
 
 function selectProvider(prov: AiProviderType) {
   localConfig.provider = prov;
-  const models = PROVIDER_MODELS[prov];
+  if (prov === 'ollama') {
+    refreshOllamaModels();
+  }
+  const models = currentModels.value;
   if (models && models.length > 0) {
     localConfig.model = models[0].id;
   }

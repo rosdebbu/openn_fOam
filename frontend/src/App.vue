@@ -33,7 +33,10 @@
           :aiConfig="aiConfig"
           :isComputing="status === 'computing'"
           @update:params="updateParams"
+          @update:customGeometry="handleCustomGeometry"
+          @applyDict="handleApplyDict"
           @fileUploaded="handleFileUploaded"
+          @startSimulation="runNow"
           @closeSidebar="isSidebarOpen = false"
         />
       </transition>
@@ -53,6 +56,7 @@
         </button>
 
         <CfdThree3D
+          ref="viewportRef"
           :data="simulationData"
           :params="params"
           :telemetry="telemetry"
@@ -208,11 +212,24 @@ const telemetry = reactive<AerodynamicTelemetry>({
 });
 
 const simulationData = ref<SimulationStepData | null>(null);
-const iterations = ref<number[]>([0, 20, 50, 100, 150, 200]);
-const residuals = ref<number[]>([1.0, 0.1, 0.01, 0.001, 1e-5, 1e-13]);
+const iterations = ref<number[]>([0]);
+const residuals = ref<number[]>([1.0]);
+
+// Custom Geometry Builder — user-defined obstacle shape/size/position that is
+// sent to the real solver as `obstacleSpec` (the "build your own simulation" path)
+const customGeometry = ref<{
+  shape: string; cx: number; cy: number; size: number; aoa: number;
+} | null>(null);
+
+// Frame history enabling REAL transport controls: step back / fast forward
+// scrub through actually received solver frames instead of doing nothing.
+const frameHistory = ref<SimulationStepData[]>([]);
+const frameIndex = ref(-1);
+const isScrubbing = ref(false);
 
 let socket: any = null;
 let simInterval: any = null;
+const viewportRef = ref<{ capturePng?: () => boolean } | null>(null);
 
 const latestResidual = computed(() => {
   if (residuals.value.length === 0) return null;
@@ -307,6 +324,25 @@ function updateParams(newParams: SimulationParams) {
   Object.assign(params, newParams);
 }
 
+function handleCustomGeometry(
+  spec: { shape: string; cx: number; cy: number; size: number; aoa: number } | null
+) {
+  customGeometry.value = spec;
+  if (spec) {
+    params.archetype = 'cad';
+  }
+}
+
+// Dictionary overrides extracted from the dict editor's edited content.
+// The backend parses simple `key value;` pairs (deltaT, nu, viscosity...)
+// and applies them to the live solver run.
+const dictOverrides = ref<Record<string, { name: string; content: string }>>({});
+
+function handleApplyDict(file: { name: string; path?: string; category?: string; content: string }) {
+  dictOverrides.value = { ...dictOverrides.value, [file.name]: { name: file.name, content: file.content } };
+  restartSimulation();
+}
+
 function handleAiConfigSaved(newConfig: AiProviderConfig) {
   Object.assign(aiConfig, newConfig);
 }
@@ -335,14 +371,23 @@ function triggerLiveSimulation() {
     
     socket.onopen = () => {
       isConnected.value = true;
+      // Full user physics: everything the user sets in the Case Hub is sent to
+      // the real solver — substance, inlet velocity, gravity, temperatures and
+      // custom geometry (obstacleSpec) all change the actual computation.
       socket.send(JSON.stringify({
         gridResolution: params.gridResolution,
         reynoldsNumber: params.reynoldsNumber,
         solverMode: params.solverMode,
         archetype: params.archetype,
-        aoa_deg: params.studioParams.vorticityAngle * (180 / Math.PI),
+        aoa: params.studioParams.vorticityAngle * (180 / Math.PI),
         maxIterations: params.maxIterations,
-        dt: params.dt
+        dt: params.dt,
+        substance: params.substance,
+        inletVelocity: params.studioParams.irisPurple,
+        hotTemp: params.studioParams.butterscotchCore,
+        naturalForces: params.naturalForces,
+        obstacleSpec: customGeometry.value,
+        dictOverrides: dictOverrides.value
       }));
     };
 
@@ -368,7 +413,7 @@ function triggerLiveSimulation() {
         if (payload.continuityError !== undefined) telemetry.continuityError = payload.continuityError;
 
         if (payload.u && payload.v && payload.speed) {
-          simulationData.value = {
+          const frame: SimulationStepData = {
             iteration: payload.iteration || 1,
             residual: payload.residual || 0.0,
             converged: !!payload.converged,
@@ -376,8 +421,17 @@ function triggerLiveSimulation() {
             v: payload.v,
             p: payload.p,
             speed: payload.speed,
+            obstacleMask: payload.obstacleMask,
             mode: (payload.mode as SolverMode) || params.solverMode || 'cfd'
           };
+          // Record every frame; while scrubbing the display stays frozen on
+          // the frame the user stepped back to.
+          frameHistory.value.push(frame);
+          if (frameHistory.value.length > 240) frameHistory.value.shift();
+          frameIndex.value = frameHistory.value.length - 1;
+          if (!isScrubbing.value) {
+            simulationData.value = frame;
+          }
         }
 
         if (payload.converged) {
@@ -403,13 +457,58 @@ function triggerLiveSimulation() {
 }
 
 watch(() => [params.solverMode, params.archetype], () => {
-  resetSimulation();
-  triggerLiveSimulation();
+  restartSimulation();
 });
+
+// Debounced live re-run: changing any physics slider (Reynolds, grid, dt,
+// substance, gravity, inlet velocity, AoA, hot temp) or editing the Custom
+// Geometry Builder automatically re-runs the REAL simulation — user-made
+// cases respond immediately instead of showing stale/wrong results.
+let reRunTimer: any = null;
+watch(
+  () => [
+    params.reynoldsNumber,
+    params.gridResolution,
+    params.dt,
+    params.substance,
+    ...params.naturalForces.gravity,
+    params.naturalForces.ambientTemp,
+    params.studioParams.irisPurple,
+    params.studioParams.vorticityAngle,
+    params.studioParams.butterscotchCore,
+    customGeometry.value
+  ],
+  () => {
+    if (reRunTimer) clearTimeout(reRunTimer);
+    reRunTimer = setTimeout(() => {
+      restartSimulation();
+    }, 450);
+  }
+);
+
+function restartSimulation() {
+  // Reset convergence history and restart the live stream regardless of the
+  // play/pause state. Calling resetSimulation() here would set isPlaying=false
+  // and stall triggerLiveSimulation(), so the stream would never restart.
+  iterations.value = [0];
+  residuals.value = [1.0];
+  simulationData.value = null;
+  frameHistory.value = [];
+  frameIndex.value = -1;
+  isScrubbing.value = false;
+  isPlaying.value = true;
+  status.value = 'computing';
+  triggerLiveSimulation();
+}
+
+function runNow() {
+  restartSimulation();
+}
 
 function togglePlay() {
   isPlaying.value = !isPlaying.value;
   if (isPlaying.value) {
+    isScrubbing.value = false;
     status.value = 'computing';
     triggerLiveSimulation();
   } else {
@@ -421,16 +520,46 @@ function togglePlay() {
 }
 
 function stepBack() {
-  // Step simulation back
+  // Step back through the REAL received solver frames
+  if (frameHistory.value.length === 0) return;
+  isScrubbing.value = true;
+  if (isPlaying.value) {
+    isPlaying.value = false;
+    if (socket) { try { socket.close(); } catch (_) {} }
+  }
+  frameIndex.value = Math.max(0, frameIndex.value - 1);
+  simulationData.value = frameHistory.value[frameIndex.value];
+  status.value = 'ready';
 }
 
 function stopSimulation() {
   isPlaying.value = false;
+  isScrubbing.value = false;
   status.value = 'ready';
+  if (socket) {
+    try { socket.close(); } catch (_) {}
+  }
 }
 
 function fastForward() {
-  // Accelerate simulation
+  // Step forward through recorded frames, or resume the live stream
+  if (frameHistory.value.length === 0) {
+    if (!isPlaying.value) runNow();
+    return;
+  }
+  if (frameIndex.value < frameHistory.value.length - 1) {
+    frameIndex.value = Math.min(frameHistory.value.length - 1, frameIndex.value + 1);
+    simulationData.value = frameHistory.value[frameIndex.value];
+    status.value = 'ready';
+  } else {
+    // Already at the latest frame -> resume live playback
+    isScrubbing.value = false;
+    if (!isPlaying.value) {
+      isPlaying.value = true;
+      status.value = 'computing';
+      triggerLiveSimulation();
+    }
+  }
 }
 
 function resetSimulation() {
@@ -441,6 +570,10 @@ function resetSimulation() {
 }
 
 function takeSnapshot() {
+  if (viewportRef.value && typeof viewportRef.value.capturePng === 'function') {
+    const downloaded = viewportRef.value.capturePng();
+    if (downloaded) return;
+  }
   handleExportCase('png');
 }
 
@@ -459,9 +592,15 @@ function handleExportCase(type: 'zip' | 'vtk' | 'png') {
 }
 
 onMounted(() => {
-  // Live physics telemetry ticker
+  // Trigger the initial live simulation on page load (isPlaying starts true,
+  // but nothing connected the WebSocket without this call).
+  triggerLiveSimulation();
+
+  // Offline fallback ticker — ONLY active when the backend is unreachable.
+  // When the real solver streams data (isConnected), the backend telemetry
+  // wins and this ticker stays quiet so real results are never overridden.
   simInterval = setInterval(() => {
-    if (isPlaying.value) {
+    if (isPlaying.value && !isConnected.value) {
       const lastIter = iterations.value[iterations.value.length - 1] || 0;
       if (lastIter < 200) {
         iterations.value.push(lastIter + 5);
@@ -469,7 +608,7 @@ onMounted(() => {
         residuals.value.push(Math.max(1e-13, lastRes * 0.85 * (1 + (Math.random() - 0.5) * 0.1)));
       }
 
-      // Dynamic force variations with vortex shedding
+      // Offline demo force variations with vortex shedding
       if (params.archetype === 'cylinder') {
         const t = performance.now() * 0.003;
         telemetry.cl = Math.sin(t * 2.5) * 0.55;

@@ -38,23 +38,355 @@
       </button>
     </div>
 
-    <!-- MODE 1: Manual OpenFOAM (Default Approved Layout) -->
+    <!-- MODE 1: Manual OpenFOAM (Structured Tabbed Layout) -->
     <div v-show="activeMode === 'manual'" class="manual-mode-content">
-      <div class="hub-grid">
-        <!-- Column 1: OpenFOAM Case File Tree -->
-        <div class="hub-card tree-card">
+      <!-- Sub-Tab Navigation Strip -->
+      <div class="sub-tab-strip">
+        <button
+          class="sub-tab-pill"
+          :class="{ active: activeSubTab === 'physics' }"
+          @click="activeSubTab = 'physics'"
+          title="Fluid medium, inflow speed, turbulence, and gravity"
+        >
+          <span>🌊 Physics & Water</span>
+        </button>
+        <button
+          class="sub-tab-pill"
+          :class="{ active: activeSubTab === 'geometry' }"
+          @click="activeSubTab = 'geometry'"
+          title="Vehicle archetype, submarine hull, drone rotors, and CAD dropzone"
+        >
+          <span>🧱 Geometry</span>
+        </button>
+        <button
+          class="sub-tab-pill"
+          :class="{ active: activeSubTab === 'files' }"
+          @click="activeSubTab = 'files'"
+          title="OpenFOAM standard directory tree (system, constant, 0)"
+        >
+          <span>📁 Case Tree</span>
+        </button>
+        <button
+          class="sub-tab-pill"
+          :class="{ active: activeSubTab === 'changelog' }"
+          @click="activeSubTab = 'changelog'"
+          title="Simulation naming, change history, and snapshot saving"
+        >
+          <span>📝 History</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: Physics & Water -->
+      <div v-show="activeSubTab === 'physics'" class="tab-pane physics-pane">
+        <!-- Parameters Card -->
+        <div class="hub-card params-card">
           <div class="card-header">
             <div class="card-title-row">
-              <span class="card-title">OpenFOAM case</span>
+              <span class="card-title">Flow Parameters</span>
+              <span class="token-tag">Aerodynamics & Hydrodynamics</span>
+            </div>
+          </div>
+
+          <div class="sliders-list">
+            <!-- Flow Velocity -->
+            <div class="slider-group">
+              <div class="slider-labels">
+                <label>Flow Speed (U)</label>
+                <span class="slider-val-badge">{{ studioParams.irisPurple.toFixed(2) }} m/s</span>
+              </div>
+              <input
+                type="range"
+                min="0.05"
+                max="5.0"
+                step="0.05"
+                v-model.number="studioParams.irisPurple"
+                @input="emitParamsChange"
+              />
+            </div>
+
+            <!-- Vorticity Angle / AoA -->
+            <div class="slider-group">
+              <div class="slider-labels">
+                <label>Vorticity Angle / AoA</label>
+                <span class="slider-val-badge">{{ (studioParams.vorticityAngle * 57.2958).toFixed(1) }}°</span>
+              </div>
+              <input
+                type="range"
+                min="-0.35"
+                max="0.35"
+                step="0.01"
+                v-model.number="studioParams.vorticityAngle"
+                @input="emitParamsChange"
+              />
+            </div>
+
+            <!-- Vorticity Core Shear -->
+            <div class="slider-group">
+              <div class="slider-labels">
+                <label>Vorticity Core / Re Intensity</label>
+                <span class="slider-val-badge">{{ studioParams.vorticityCore.toFixed(0) }}</span>
+              </div>
+              <input
+                type="range"
+                min="10"
+                max="100"
+                step="5"
+                v-model.number="studioParams.vorticityCore"
+                @input="emitParamsChange"
+              />
+            </div>
+
+            <!-- Thermal Core -->
+            <div class="slider-group">
+              <div class="slider-labels">
+                <label>Thermal Core / Fluid Temp</label>
+                <span class="slider-val-badge">{{ studioParams.butterscotchCore.toFixed(1) }} °C</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="120"
+                step="1"
+                v-model.number="studioParams.butterscotchCore"
+                @input="emitParamsChange"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Fluid Medium & Hydrodynamics Card -->
+        <div class="hub-card natural-drawer-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Fluid Medium & Gravity</span>
+              <span class="substance-chip">{{ currentSubstance.name }}</span>
+            </div>
+          </div>
+
+          <div class="card-body-section">
+            <label class="section-label">Select Substance:</label>
+            <div class="substance-pills-row">
+              <button
+                v-for="sub in substances"
+                :key="sub.id"
+                class="sub-pill-btn"
+                :class="{ active: currentSubstance.id === sub.id }"
+                @click="selectSubstance(sub)"
+              >
+                {{ sub.name }}
+              </button>
+            </div>
+
+            <!-- Substance Physical Properties Info Grid -->
+            <div class="substance-props-grid">
+              <div class="prop-item">
+                <span class="prop-label">Density (ρ):</span>
+                <span class="prop-value">{{ currentSubstance.density }} kg/m³</span>
+              </div>
+              <div class="prop-item">
+                <span class="prop-label">Viscosity (ν):</span>
+                <span class="prop-value">{{ currentSubstance.kinematicViscosity.toExponential(2) }} m²/s</span>
+              </div>
+              <div class="prop-item">
+                <span class="prop-label">Spec. Heat (Cp):</span>
+                <span class="prop-value">{{ currentSubstance.specificHeat }} J/kg·K</span>
+              </div>
+              <div class="prop-item" v-if="currentSubstance.surfaceTension">
+                <span class="prop-label">Surface Tension:</span>
+                <span class="prop-value">{{ currentSubstance.surfaceTension }} N/m</span>
+              </div>
+            </div>
+
+            <label class="section-label" style="margin-top: 10px;">Gravity Presets:</label>
+            <div class="gravity-presets-row">
+              <button
+                class="preset-pill"
+                :class="{ active: Math.abs(gravityZ - (-9.81)) < 0.1 }"
+                @click="setGravity(-9.81)"
+              >
+                🌍 Earth (-9.81)
+              </button>
+              <button
+                class="preset-pill"
+                :class="{ active: Math.abs(gravityZ - (-1.62)) < 0.1 }"
+                @click="setGravity(-1.62)"
+              >
+                🌑 Moon (-1.62)
+              </button>
+              <button
+                class="preset-pill"
+                :class="{ active: Math.abs(gravityZ) < 0.1 }"
+                @click="setGravity(0.0)"
+              >
+                🌌 Zero-G
+              </button>
+              <button
+                class="preset-pill"
+                :class="{ active: Math.abs(gravityZ - 9.81) < 0.1 }"
+                @click="setGravity(9.81)"
+              >
+                🔄 Inverted
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Geometry & Archetype -->
+      <div v-show="activeSubTab === 'geometry'" class="tab-pane geometry-pane">
+        <!-- Archetype Selector Card -->
+        <div class="hub-card archetype-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Simulation Archetype</span>
+              <span class="token-tag">{{ params.archetype.toUpperCase() }}</span>
+            </div>
+          </div>
+
+          <div class="archetype-grid">
+            <button
+              v-for="arch in availableArchetypes"
+              :key="arch.id"
+              class="archetype-pill-btn"
+              :class="{ active: params.archetype === arch.id }"
+              @click="selectArchetype(arch.id)"
+            >
+              <span class="arch-icon">{{ arch.icon }}</span>
+              <span class="arch-name">{{ arch.name }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Geometry Builder — lets users build THEIR OWN simulation -->
+        <div class="hub-card geometry-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Custom Geometry Builder</span>
+              <span class="token-tag">SOLID OBSTACLE</span>
+            </div>
+          </div>
+
+          <p class="builder-hint">
+            Draw your own body: the solver meshes it as a no-slip solid inside
+            the flow tunnel and computes real drag & lift around it.
+          </p>
+
+          <div class="archetype-grid builder-shape-grid">
+            <button
+              v-for="shape in builderShapes"
+              :key="shape.id"
+              class="archetype-pill-btn"
+              :class="{ active: builderShape === shape.id }"
+              @click="setBuilderShape(shape.id)"
+            >
+              <span class="arch-icon">{{ shape.icon }}</span>
+              <span class="arch-name">{{ shape.name }}</span>
+            </button>
+          </div>
+
+          <template v-if="builderShape">
+            <div class="sliders-list builder-sliders">
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Position X</label>
+                  <span class="slider-val-badge">{{ builderCx.toFixed(2) }}</span>
+                </div>
+                <input type="range" min="0.15" max="0.85" step="0.05" v-model.number="builderCx" @input="emitCustomGeometry" />
+              </div>
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Position Y</label>
+                  <span class="slider-val-badge">{{ builderCy.toFixed(2) }}</span>
+                </div>
+                <input type="range" min="0.15" max="0.85" step="0.05" v-model.number="builderCy" @input="emitCustomGeometry" />
+              </div>
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Size</label>
+                  <span class="slider-val-badge">{{ builderSize.toFixed(2) }}</span>
+                </div>
+                <input type="range" min="0.05" max="0.35" step="0.01" v-model.number="builderSize" @input="emitCustomGeometry" />
+              </div>
+              <div class="slider-group" v-if="builderShape === 'airfoil'">
+                <div class="slider-labels">
+                  <label>Angle of Attack</label>
+                  <span class="slider-val-badge">{{ builderAoa.toFixed(0) }}°</span>
+                </div>
+                <input type="range" min="-20" max="20" step="1" v-model.number="builderAoa" @input="emitCustomGeometry" />
+              </div>
+            </div>
+
+            <button class="apply-btn" @click="applyBuilderToSimulation">
+              ▶ Run Simulation with This Geometry
+            </button>
+          </template>
+        </div>
+
+        <!-- Geometry input / Photo dropzone Card -->
+        <div class="hub-card geometry-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">CAD / Mesh Upload</span>
+              <span class="token-tag">STL / OBJ / STEP</span>
+            </div>
+          </div>
+
+          <div
+            class="photo-dropzone"
+            :class="{ dragging: isDraggingOver, 'has-file': !!uploadedFileName }"
+            @dragover.prevent="isDraggingOver = true"
+            @dragleave.prevent="isDraggingOver = false"
+            @drop.prevent="handleFileDrop"
+            @click="triggerFileInput"
+          >
+            <input
+              type="file"
+              ref="fileInputRef"
+              style="display: none"
+              accept=".stl,.obj,.step,.png,.jpg,.jpeg"
+              @change="handleFileChange"
+            />
+
+            <div class="dropzone-content">
+              <div class="upload-icon-wrapper">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <span class="dropzone-title">Upload Custom CAD Solid</span>
+              <span class="dropzone-sub">Drop .stl / .obj or click to browse</span>
+              <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Case Tree -->
+      <div v-show="activeSubTab === 'files'" class="tab-pane files-pane">
+        <div class="hub-card tree-card full-width">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">OpenFOAM Case Directory</span>
               <span class="token-tag">system/ constant/ 0/</span>
             </div>
-            <button
-              class="auto-diag-btn"
-              @click="runCaseDiagnostics"
-              title="Run OpenFOAM numerical stability & Courant check"
-            >
-              ⚡ Check & Repair
-            </button>
+            <div class="tree-header-actions">
+              <button
+                class="auto-diag-btn"
+                @click="runCaseDiagnostics"
+                title="Run OpenFOAM numerical stability & Courant check"
+              >
+                ⚡ Check & Repair
+              </button>
+              <button
+                class="download-case-btn"
+                @click="downloadCasePackage"
+                title="Download full OpenFOAM case directory as .ZIP"
+              >
+                📦 Export ZIP
+              </button>
+            </div>
           </div>
 
           <div v-if="diagReport" class="diag-report-banner" :class="diagReport.type">
@@ -126,183 +458,49 @@
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Column 2: Parameters, Natural Physics Drawer, Geometry Dropzone -->
-        <div class="right-controls-column">
-          <!-- Parameters Card -->
-          <div class="hub-card params-card">
-            <div class="card-header">
-              <div class="card-title-row">
-                <span class="card-title">Parameters</span>
-                <span class="token-tag">Aerodynamics & Flow</span>
-              </div>
-            </div>
-
-            <div class="sliders-list">
-              <!-- Flow Velocity -->
-              <div class="slider-group">
-                <div class="slider-labels">
-                  <label>Flow Speed (U)</label>
-                  <span class="slider-val-badge">{{ studioParams.irisPurple.toFixed(2) }} m/s</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.05"
-                  max="5.0"
-                  step="0.05"
-                  v-model.number="studioParams.irisPurple"
-                  @input="emitParamsChange"
-                />
-              </div>
-
-              <!-- Vorticity Angle / AoA -->
-              <div class="slider-group">
-                <div class="slider-labels">
-                  <label>Vorticity Angle</label>
-                  <span class="slider-val-badge">{{ (studioParams.vorticityAngle * 57.2958).toFixed(1) }}°</span>
-                </div>
-                <input
-                  type="range"
-                  min="-0.35"
-                  max="0.35"
-                  step="0.01"
-                  v-model.number="studioParams.vorticityAngle"
-                  @input="emitParamsChange"
-                />
-              </div>
-
-              <!-- Vorticity Core Shear -->
-              <div class="slider-group">
-                <div class="slider-labels">
-                  <label>Vorticity Core</label>
-                  <span class="slider-val-badge">{{ studioParams.vorticityCore.toFixed(0) }}</span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="100"
-                  step="5"
-                  v-model.number="studioParams.vorticityCore"
-                  @input="emitParamsChange"
-                />
-              </div>
-
-              <!-- Thermal Core -->
-              <div class="slider-group">
-                <div class="slider-labels">
-                  <label>Thermal Core</label>
-                  <span class="slider-val-badge">{{ studioParams.butterscotchCore.toFixed(1) }} °C</span>
-                </div>
-                <input
-                  type="range"
-                  min="20"
-                  max="120"
-                  step="1"
-                  v-model.number="studioParams.butterscotchCore"
-                  @input="emitParamsChange"
-                />
-              </div>
+      <!-- TAB 4: History & Save -->
+      <div v-show="activeSubTab === 'changelog'" class="tab-pane history-pane">
+        <!-- Simulation Identity Card -->
+        <div class="hub-card identity-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Simulation Identity</span>
+              <span class="token-tag">Naming & Snapshots</span>
             </div>
           </div>
-
-          <!-- Compact Collapsible Natural Forces & Fluid Properties Drawer -->
-          <div class="hub-card natural-drawer-card">
-            <div class="drawer-header" @click="isForcesDrawerOpen = !isForcesDrawerOpen">
-              <div class="drawer-header-left">
-                <span class="drawer-icon">🌍</span>
-                <span class="drawer-title">Fluid Medium & Gravity</span>
-                <span class="substance-chip">{{ currentSubstance.name }}</span>
-              </div>
-              <span class="drawer-arrow">{{ isForcesDrawerOpen ? '▲' : '▼' }}</span>
-            </div>
-
-            <transition name="drawer-slide">
-              <div v-show="isForcesDrawerOpen" class="drawer-body">
-                <!-- Substance Selection Pills -->
-                <div class="substance-pills-row">
-                  <button
-                    v-for="sub in substances"
-                    :key="sub.id"
-                    class="sub-pill-btn"
-                    :class="{ active: currentSubstance.id === sub.id }"
-                    @click="selectSubstance(sub)"
-                  >
-                    {{ sub.name }}
-                  </button>
-                </div>
-
-                <!-- Gravity Presets -->
-                <div class="gravity-presets-row">
-                  <button
-                    class="preset-pill"
-                    :class="{ active: Math.abs(gravityZ - (-9.81)) < 0.1 }"
-                    @click="setGravity(-9.81)"
-                  >
-                    Earth
-                  </button>
-                  <button
-                    class="preset-pill"
-                    :class="{ active: Math.abs(gravityZ - (-1.62)) < 0.1 }"
-                    @click="setGravity(-1.62)"
-                  >
-                    Moon
-                  </button>
-                  <button
-                    class="preset-pill"
-                    :class="{ active: Math.abs(gravityZ) < 0.1 }"
-                    @click="setGravity(0.0)"
-                  >
-                    Zero-G
-                  </button>
-                  <button
-                    class="preset-pill"
-                    :class="{ active: Math.abs(gravityZ - 9.81) < 0.1 }"
-                    @click="setGravity(9.81)"
-                  >
-                    Inverted
-                  </button>
-                </div>
-              </div>
-            </transition>
-          </div>
-
-          <!-- Geometry input / Photo dropzone Card -->
-          <div class="hub-card geometry-card">
-            <div class="card-header">
-              <div class="card-title-row">
-                <span class="card-title">Geometry input</span>
-                <span class="token-tag">CAD / Mesh / Photo</span>
-              </div>
-            </div>
-
-            <div
-              class="photo-dropzone"
-              :class="{ dragging: isDraggingOver, 'has-file': !!uploadedFileName }"
-              @dragover.prevent="isDraggingOver = true"
-              @dragleave.prevent="isDraggingOver = false"
-              @drop.prevent="handleFileDrop"
-              @click="triggerFileInput"
-            >
+          <div class="identity-form">
+            <label class="section-label">Case Identifier:</label>
+            <div class="case-name-row">
               <input
-                type="file"
-                ref="fileInputRef"
-                style="display: none"
-                accept=".stl,.obj,.step,.png,.jpg,.jpeg"
-                @change="handleFileChange"
+                type="text"
+                v-model="caseNameInput"
+                class="case-name-input"
+                placeholder="e.g. Submarine_HighSpeed_Recon"
+                @blur="handleSaveCaseName"
+                @keyup.enter="handleSaveCaseName"
               />
+              <button class="save-name-btn" @click="handleSaveCaseName">Save</button>
+            </div>
+          </div>
+        </div>
 
-              <div class="dropzone-content">
-                <div class="upload-icon-wrapper">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                  </svg>
-                </div>
-                <span class="dropzone-title">Photo dropzone</span>
-                <span class="dropzone-sub">Drag & drop .stl / .obj / .step or photo</span>
-                <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
+        <!-- Changelog Timeline Card -->
+        <div class="hub-card history-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Modification History</span>
+              <span class="token-tag">{{ changeLog.length }} records</span>
+            </div>
+          </div>
+          <div class="changelog-list">
+            <div v-for="(entry, idx) in changeLog" :key="idx" class="changelog-entry">
+              <div class="entry-header">
+                <span class="badge-source" :class="entry.source.toLowerCase()">{{ entry.source }}</span>
+                <span class="entry-time">{{ entry.timestamp }}</span>
               </div>
+              <div class="entry-desc">{{ entry.description }}</div>
             </div>
           </div>
         </div>
@@ -437,13 +635,105 @@ const emit = defineEmits<{
   (e: 'fileUploaded', file: File): void;
   (e: 'startSimulation'): void;
   (e: 'closeSidebar'): void;
+  (e: 'update:customGeometry', spec: { shape: string; cx: number; cy: number; size: number; aoa: number } | null): void;
+  (e: 'applyDict', file: OpenFoamDictFile): void;
 }>();
 
 const activeMode = ref<'manual' | 'ai'>('manual');
-const isForcesDrawerOpen = ref(false);
+const activeSubTab = ref<'physics' | 'geometry' | 'files' | 'changelog'>('physics');
 const isDraggingOver = ref(false);
 const uploadedFileName = ref<string | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+// Archetype list with icons
+const availableArchetypes: Array<{ id: SimulationArchetype; name: string; icon: string }> = [
+  { id: 'submarine', name: 'Submarine', icon: '🌊' },
+  { id: 'drone', name: 'Drone Rotors', icon: '🚁' },
+  { id: 'airfoil', name: 'NACA Airfoil', icon: '✈️' },
+  { id: 'f1', name: 'F1 Aero Wing', icon: '🏎️' },
+  { id: 'venturi', name: 'Venturi Nozzle', icon: '⏳' },
+  { id: 'water_dam', name: 'Water Dam Break', icon: '💧' },
+  { id: 'cylinder', name: 'Cylinder Wake', icon: '⚪' },
+  { id: 'plume', name: 'Thermal Plume', icon: '🔥' },
+  { id: 'cavity', name: 'Lid Cavity', icon: '🌀' },
+  { id: 'cad', name: 'Custom Builder', icon: '🧩' }
+];
+
+// Simulation Case Identity & Changelog
+const caseNameInput = ref(props.params.caseName || 'openzess_sim_01');
+const changeLog = ref<Array<{ timestamp: string; source: 'AI' | 'Manual'; description: string }>>([
+  { timestamp: new Date().toLocaleTimeString(), source: 'Manual', description: 'Session initialized with baseline OpenFOAM parameters' }
+]);
+
+function logChange(source: 'AI' | 'Manual', description: string) {
+  changeLog.value.unshift({
+    timestamp: new Date().toLocaleTimeString(),
+    source,
+    description
+  });
+  if (changeLog.value.length > 50) changeLog.value.pop();
+}
+
+function selectArchetype(arch: SimulationArchetype) {
+  const updated = { ...props.params, archetype: arch };
+  emit('update:params', updated);
+  logChange('Manual', `Switched simulation archetype to ${arch.toUpperCase()}`);
+}
+
+// --- Custom Geometry Builder state ---
+const builderShapes = [
+  { id: 'circle', name: 'Cylinder', icon: '⚪' },
+  { id: 'square', name: 'Square', icon: '⬛' },
+  { id: 'rectangle', name: 'Plate', icon: '▬' },
+  { id: 'airfoil', name: 'Airfoil', icon: '✈️' }
+];
+const builderShape = ref<string | null>(null);
+const builderCx = ref(0.4);
+const builderCy = ref(0.5);
+const builderSize = ref(0.15);
+const builderAoa = ref(8);
+
+function setBuilderShape(id: string) {
+  builderShape.value = id;
+  emitCustomGeometry();
+}
+
+function emitCustomGeometry() {
+  emit('update:customGeometry', builderShape.value ? {
+    shape: builderShape.value,
+    cx: builderCx.value,
+    cy: builderCy.value,
+    size: builderSize.value,
+    aoa: builderAoa.value
+  } : null);
+}
+
+function applyBuilderToSimulation() {
+  emitCustomGeometry();
+  if (props.params.archetype !== 'cad') {
+    emit('update:params', {
+      ...props.params,
+      archetype: 'cad',
+      caseName: `Custom_${builderShape.value}_Run`
+    });
+  }
+  logChange('Manual', `Built custom ${builderShape.value} geometry at (x=${builderCx.value.toFixed(2)}, y=${builderCy.value.toFixed(2)}) and launched the solver`);
+  emit('startSimulation');
+}
+
+function handleSaveCaseName() {
+  const safe = (caseNameInput.value || 'openzess_sim_01').trim();
+  caseNameInput.value = safe;
+  const updated = { ...props.params, caseName: safe };
+  emit('update:params', updated);
+  logChange('Manual', `Renamed simulation case to "${safe}"`);
+}
+
+function downloadCasePackage() {
+  const safe = encodeURIComponent(caseNameInput.value || 'openzess_openfoam_case');
+  window.open(`/api/export/openfoam-zip?name=${safe}`, '_blank');
+  logChange('Manual', `Exported full OpenFOAM case package ZIP for "${caseNameInput.value}"`);
+}
 
 // Natural Physics State
 const gravityZ = ref(props.params.naturalForces?.gravity?.[1] ?? -9.81);
@@ -453,7 +743,8 @@ const thermalBeta = ref(0.0034);
 // Substances
 const substances: FluidProperties[] = [
   { id: 'air', name: '💨 Air', density: 1.225, kinematicViscosity: 1.5e-5, specificHeat: 1005, thermalExpansion: 0.0034 },
-  { id: 'water', name: '💧 Water', density: 998.0, kinematicViscosity: 1.0e-6, specificHeat: 4182, thermalExpansion: 0.00021, surfaceTension: 0.0728 },
+  { id: 'water', name: '💧 Fresh Water', density: 998.0, kinematicViscosity: 1.0e-6, specificHeat: 4182, thermalExpansion: 0.00021, surfaceTension: 0.0728 },
+  { id: 'seawater', name: '🌊 Ocean / Seawater', density: 1025.0, kinematicViscosity: 1.05e-6, specificHeat: 3993, thermalExpansion: 0.00024, surfaceTension: 0.0735 },
   { id: 'co2', name: '🫧 CO₂ Gas', density: 1.980, kinematicViscosity: 8.3e-6, specificHeat: 844, thermalExpansion: 0.0037 },
   { id: 'oil', name: '🛢️ Oil', density: 890.0, kinematicViscosity: 4.5e-5, specificHeat: 1900, thermalExpansion: 0.0007 },
   { id: 'ethanol', name: '🍷 Ethanol', density: 789.0, kinematicViscosity: 1.52e-6, specificHeat: 2440, thermalExpansion: 0.0011 }
@@ -564,10 +855,19 @@ function runCaseDiagnostics() {
 }
 
 function saveDictionaryFile() {
-  if (selectedFile.value) {
-    alert(`File ${selectedFile.value.path} successfully recompiled into OpenFOAM case!`);
-    selectedFile.value = null;
-  }
+  if (!selectedFile.value) return;
+  // ACTUALLY apply the edit: send the modified dict to the parent, which
+  // forwards it to the backend so the re-run honors the user's changes.
+  emit('applyDict', {
+    ...selectedFile.value,
+    content: selectedFile.value.content
+  });
+  logChange('Manual', `Applied edited ${selectedFile.value.category}/${selectedFile.value.name} to the live solver run`);
+  diagReport.value = {
+    type: 'success',
+    message: `✅ ${selectedFile.value.name} applied — solver restarted with your dictionary edits.`
+  };
+  selectedFile.value = null;
 }
 
 const currentSystemFiles = computed<OpenFoamDictFile[]>(() => {
@@ -1057,6 +1357,296 @@ watch(() => props.params.studioParams, (newParams) => {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  gap: 8px;
+}
+
+/* Sub-Tab Navigation Bar */
+.sub-tab-strip {
+  display: flex;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 3px;
+  overflow-x: auto;
+}
+
+.sub-tab-pill {
+  flex: 1;
+  padding: 5px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.sub-tab-pill:hover:not(.active) {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sub-tab-pill.active {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #38bdf8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Tab Panes */
+.tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* Substance Physical Properties Grid */
+.substance-props-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.prop-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prop-label {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.prop-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+/* Archetype Grid */
+.archetype-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.archetype-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.archetype-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.archetype-pill-btn.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+/* Custom Geometry Builder */
+.builder-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 6px 0 2px;
+}
+
+.builder-shape-grid {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+
+.builder-shape-grid .archetype-pill-btn {
+  justify-content: center;
+  padding: 7px 4px;
+  gap: 4px;
+  font-size: 10.5px;
+}
+
+.builder-sliders {
+  margin-top: 8px;
+}
+
+.apply-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #04121d;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.apply-btn:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+/* Manual Mode Content */
+
+.arch-icon {
+  font-size: 16px;
+}
+
+/* History & Save Pane */
+.identity-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.case-name-row {
+  display: flex;
+  gap: 6px;
+}
+
+.case-name-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.case-name-input:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+
+.save-name-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--accent-border);
+  color: #38bdf8;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-name-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.changelog-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.badge-source {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.badge-source.ai {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+.badge-source.manual {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+.entry-time {
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+.entry-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.download-case-btn {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.download-case-btn:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #ffffff;
+}
+
+.tree-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .hub-grid {
