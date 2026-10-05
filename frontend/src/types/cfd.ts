@@ -14,7 +14,7 @@ export type ColormapScheme = 'inferno' | 'jet' | 'coolwarm' | 'viridis' | 'turbo
 
 export type AiProviderType = 'gemini' | 'openai' | 'claude' | 'deepseek' | 'groq' | 'ollama';
 
-export type FluidSubstanceId = 'air' | 'water' | 'co2' | 'oil' | 'ethanol';
+export type FluidSubstanceId = 'air' | 'water' | 'seawater' | 'co2' | 'oil' | 'ethanol';
 
 export interface FluidProperties {
   id: FluidSubstanceId;
