@@ -1,2 +1,5 @@
 [toolchain]
-channel = "stable-x86_64-pc-windows-gnu"
+# Plain "stable" resolves to the host's native toolchain on every OS
+# (x86_64-pc-windows-msvc on Windows, *-linux-gnu, *-apple-darwin, ...).
+# Do not pin a host triple here: rustup rejects a foreign triple outright.
+channel = "stable"

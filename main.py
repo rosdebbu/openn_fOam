@@ -28,14 +28,10 @@ def open_browser():
 
 
 def launch_rust_sidecar_if_available():
-    """Check for compiled Rust sidecar binary or launch background daemon."""
-    candidates = [
-        os.path.join(os.path.dirname(__file__), "rust-sidecar", "target", "release", "openzess-rust-sidecar.exe"),
-        os.path.join(os.path.dirname(__file__), "rust-sidecar", "target", "debug", "openzess-rust-sidecar.exe"),
-        # Custom cargo target-dir configured in rust-sidecar/.cargo/config.toml
-        os.path.join(os.path.dirname(__file__), "rust-sidecar", "tools", "rustbuild", "release", "openzess-rust-sidecar.exe"),
-        os.path.join(os.path.dirname(__file__), "rust-sidecar", "tools", "rustbuild", "debug", "openzess-rust-sidecar.exe"),
-    ]
+    """Launch the compiled Rust sidecar (`cargo build --release`) if present."""
+    exe = "openzess-rust-sidecar" + (".exe" if os.name == "nt" else "")
+    target = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rust-sidecar", "target")
+    candidates = [os.path.join(target, profile, exe) for profile in ("release", "debug")]
     sidecar_bin = next((c for c in candidates if os.path.exists(c)), None)
 
     if sidecar_bin:
