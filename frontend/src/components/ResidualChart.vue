@@ -6,11 +6,7 @@
 
     <div class="chart-body">
       <div class="y-axis-labels">
-        <span>10⁻³</span>
-        <span>10⁻¹</span>
-        <span>1e-01</span>
-        <span>0.001</span>
-        <span>1e-13</span>
+        <span v-for="label in yLabels" :key="label">{{ label }}</span>
       </div>
 
       <div class="canvas-container">
@@ -21,11 +17,7 @@
 
     <div class="x-axis-footer">
       <div class="x-ticks">
-        <span>0</span>
-        <span>50</span>
-        <span>100</span>
-        <span>150</span>
-        <span>200</span>
+        <span v-for="tick in xTicks" :key="tick">{{ tick }}</span>
       </div>
       <span class="x-axis-label">Iterative solver</span>
     </div>
@@ -33,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps<{
   iterations: number[];
@@ -42,6 +34,34 @@ const props = defineProps<{
 }>();
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
+
+// Axis extents shared by the canvas plot and the tick labels, so the labels
+// always describe what is drawn. Residuals are plotted on whole decades.
+const finiteResiduals = computed(() => props.residuals.filter(r => Number.isFinite(r) && r > 0));
+// Labels sit on whole decades: the span is padded to a multiple of `step`
+// so the evenly spaced labels coincide with the plotted log scale.
+const decades = computed(() => {
+  const r = finiteResiduals.value;
+  if (r.length < 2) return { top: 0, bottom: -4, step: 1 };
+  const top = Math.ceil(Math.log10(Math.max(...r)));
+  const low = Math.min(Math.floor(Math.log10(Math.min(...r))), top - 1);
+  const step = Math.ceil((top - low) / 5);
+  return { top, bottom: top - Math.ceil((top - low) / step) * step, step };
+});
+const iterMax = computed(() => Math.max(...props.iterations, 1));
+
+const SUPERSCRIPT: Record<string, string> = {
+  '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+};
+const yLabels = computed(() => {
+  const { top, bottom, step } = decades.value;
+  const labels: string[] = [];
+  for (let exp = top; exp >= bottom; exp -= step) {
+    labels.push('10' + String(exp).split('').map(c => SUPERSCRIPT[c]).join(''));
+  }
+  return labels;
+});
+const xTicks = computed(() => [0, 1, 2, 3, 4].map(k => Math.round((k * iterMax.value) / 4)));
 
 function drawChart() {
   const canvas = canvasRef.value;
@@ -78,10 +98,6 @@ function drawChart() {
     ctx.stroke();
   }
 
-  // Draw Sample or Live Residual Curve
-  const count = 200;
-  ctx.beginPath();
-
   // Create neon violet/cyan gradient
   const gradient = ctx.createLinearGradient(0, 0, w, h);
   gradient.addColorStop(0, '#c084fc');
@@ -91,30 +107,39 @@ function drawChart() {
   ctx.strokeStyle = gradient;
   ctx.lineWidth = 2;
 
-  // Render logarithmic curve
-  for (let i = 0; i <= count; i++) {
-    const xNorm = i / count;
-    const x = xNorm * w;
-
-    // Logarithmic decay formula matching visual mockup
-    const noise = Math.sin(i * 0.8) * 0.015 + (Math.random() - 0.5) * 0.01;
-    const yNorm = Math.pow(xNorm, 0.65) * 0.92 + noise;
-    const y = Math.min(h - 4, Math.max(4, yNorm * h));
-
-    if (i === 0) {
-      ctx.moveTo(x, 4);
-    } else {
-      ctx.lineTo(x, y);
-    }
+  // Plot the real residual history only — nothing is drawn until the
+  // solver has reported at least two points.
+  if (finiteResiduals.value.length < 2) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for solver residuals…', w / 2, h / 2);
+    return;
   }
 
+  const { top, bottom } = decades.value;
+  const span = (top - bottom) || 1;
+  const points: Array<{ x: number; y: number }> = [];
+  for (let k = 0; k < props.residuals.length; k++) {
+    const r = props.residuals[k];
+    if (!Number.isFinite(r) || r <= 0) continue;
+    const iter = props.iterations[k] ?? k;
+    const x = Math.min(1, iter / iterMax.value) * w;
+    const y = ((top - Math.log10(r)) / span) * h;
+    points.push({ x, y: Math.min(h - 2, Math.max(2, y)) });
+  }
+
+  ctx.beginPath();
+  points.forEach((pt, idx) => {
+    if (idx === 0) ctx.moveTo(pt.x, pt.y);
+    else ctx.lineTo(pt.x, pt.y);
+  });
   ctx.stroke();
 
-  // Glow shadow effect
   ctx.shadowColor = 'rgba(168, 85, 247, 0.5)';
   ctx.shadowBlur = 8;
   ctx.stroke();
-  ctx.shadowBlur = 0; // reset
+  ctx.shadowBlur = 0;
 }
 
 watch(() => [props.residuals, props.iterations], () => {

@@ -13,7 +13,15 @@ High-performance native computational kernel for OpenZess Studio, providing:
 cargo run --release
 ```
 
-The sidecar will start on `http://127.0.0.1:8081`.
+The sidecar will start on `http://127.0.0.1:8081` (override with the `PORT`
+environment variable). `python main.py` auto-starts the binary from
+`target/release/` (or `target/debug/`) when it exists.
+
+No machine-specific configuration is needed: the toolchain file only pins
+`stable`, which resolves to your host's native toolchain. On Windows use the
+default MSVC toolchain (`rustup default stable-msvc`, with the Visual Studio
+C++ Build Tools installed). The GNU toolchain also works if you have a
+complete MinGW-w64 install.
 
 ## Endpoints
 

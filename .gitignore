@@ -33,5 +33,16 @@ scratch/
 # Rust
 # =====================
 target/
-rust-sidecar/target/
 **/*.rs.bk
+
+# =====================
+# Runtime output
+# =====================
+backend/saved_projects/
+experiments/output/
+*.vtk
+
+# =====================
+# AI tool session files (contain account emails / local paths)
+# =====================
+.antigravity-chats/

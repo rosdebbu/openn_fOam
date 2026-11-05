@@ -1,187 +1,176 @@
-import type { AiProviderConfig, SimulationArchetype, FluidSubstanceId } from '../types/cfd';
+import type Anthropic from '@anthropic-ai/sdk';
+import type { AiProviderConfig, AiProviderType, AiResponse } from '../types/cfd';
 
 const STORAGE_KEY = 'openzess_ai_copilot_config';
 
-export interface AiSimulationConfig {
-  archetype?: SimulationArchetype;
-  substance?: FluidSubstanceId;
-  reynoldsNumber?: number;
-  angleDegrees?: number;
-  autoRun?: boolean;
-  summary: string;
-  physicsExplanation?: string;
-}
+export const DEFAULT_AI_CONFIG: AiProviderConfig = {
+  provider: 'gemini',
+  apiKey: '',
+  model: 'gemini-2.5-flash',
+  customBaseUrl: ''
+};
 
-export interface AiResponse {
-  query: string;
-  analysis: string;
-  dictCode?: string;
-  simConfig?: AiSimulationConfig;
-  suggestedSolver?: string;
-}
-
-export interface AiModelOption {
-  id: string;
-  name: string;
-  badge: string;
-}
-
-export const PROVIDER_MODELS: Record<string, AiModelOption[]> = {
+export const PROVIDER_MODELS: Record<AiProviderType, { id: string; name: string; badge: string }[]> = {
   gemini: [
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', badge: 'Fastest' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', badge: 'Reasoning' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', badge: 'Light' }
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', badge: 'Ultra Fast / Recommended' },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', badge: 'Deep Reasoning' },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', badge: 'Fast Multimodal' }
   ],
   openai: [
-    { id: 'gpt-4o', name: 'GPT-4o (Omni)', badge: 'Flagship' },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', badge: 'Fast' },
-    { id: 'o3-mini', name: 'o3-mini (Reasoning)', badge: 'Math' }
+    { id: 'gpt-4o', name: 'GPT-4o', badge: 'Omni Flagship' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', badge: 'Fast & Affordable' },
+    { id: 'o3-mini', name: 'o3-mini', badge: 'STEM Reasoning' }
   ],
   claude: [
-    { id: 'claude-3-7-sonnet-20250219', name: 'Claude 3.7 Sonnet', badge: 'Hybrid' },
-    { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', badge: 'Speed' }
+    { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', badge: 'Most Capable / Recommended' },
+    { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', badge: 'Fast & Capable' },
+    { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', badge: 'Fastest' }
   ],
   deepseek: [
-    { id: 'deepseek-chat', name: 'DeepSeek V3', badge: 'Optimal' },
-    { id: 'deepseek-reasoner', name: 'DeepSeek R1', badge: 'Chain of Thought' }
+    { id: 'deepseek-chat', name: 'DeepSeek-V3', badge: 'Flagship Chat' },
+    { id: 'deepseek-reasoner', name: 'DeepSeek-R1', badge: 'Deep Mathematical Reasoning' }
   ],
   groq: [
-    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', badge: 'Ultra-Fast' },
-    { id: 'llama3-8b-8192', name: 'Llama 3 8B', badge: 'Instant' },
-    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', badge: 'Mixture of Experts' }
+    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Groq)', badge: '500+ Tokens/sec' },
+    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B (Groq)', badge: 'Fast MoE' }
   ],
   ollama: [
-    { id: 'llama3:latest', name: 'Llama 3 (Local)', badge: 'Local Private' },
-    { id: 'mistral:latest', name: 'Mistral 7B (Local)', badge: 'Local Private' },
-    { id: 'deepseek-r1:latest', name: 'DeepSeek R1 (Local)', badge: 'Local Private' }
+    { id: 'qwen2.5-coder:7b', name: 'Qwen 2.5 Coder 7B (Local)', badge: 'Local Active' },
+    { id: 'deepseek-r1:8b', name: 'DeepSeek R1 8B (Local)', badge: 'Local Active' },
+    { id: 'qwen-16k:latest', name: 'Qwen 16k (Local)', badge: 'Local Active' },
+    { id: 'qwen-64k:latest', name: 'Qwen 64k (Local)', badge: 'Local Active' },
+    { id: 'deepseek-16k:latest', name: 'DeepSeek 16k (Local)', badge: 'Local Active' },
+    { id: 'llama3:latest', name: 'Llama 3 (Local)', badge: 'Offline' },
+    { id: 'mistral:latest', name: 'Mistral (Local)', badge: 'Offline' }
   ]
 };
 
 export function getStoredAiConfig(): AiProviderConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (_) {}
-  return {
-    provider: 'gemini',
-    apiKey: '',
-    model: 'gemini-2.5-flash'
-  };
+    if (raw) {
+      const config: AiProviderConfig = { ...DEFAULT_AI_CONFIG, ...JSON.parse(raw) };
+      // Saved Claude configs may still name retired model IDs (claude-3-5-*)
+      if (config.provider === 'claude' && !PROVIDER_MODELS.claude.some(m => m.id === config.model)) {
+        config.model = PROVIDER_MODELS.claude[0].id;
+      }
+      return config;
+    }
+  } catch (err) {
+    console.error('Error loading AI config from localStorage:', err);
+  }
+  return { ...DEFAULT_AI_CONFIG };
 }
 
-export function saveStoredAiConfig(config: AiProviderConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+export function saveStoredAiConfig(config: AiProviderConfig) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch (err) {
+    console.error('Error saving AI config to localStorage:', err);
+  }
 }
 
-export function clearStoredAiConfig(): void {
+export function clearStoredAiConfig() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-const SYSTEM_PROMPT = `You are OpenZess CFD Autonomous Copilot, an expert computational fluid dynamics engineer.
-Your goal is to understand the user's physics simulation goals and automatically configure and run OpenFOAM CFD simulations.
+const SYSTEM_PROMPT = `You are the OpenZess AI CFD Co-Pilot, an elite aeronautical and fluid dynamics engineer specialized in OpenFOAM, Navier-Stokes numerical methods, and aerothermal physics.
+Your goal is to assist the user in configuring fluid simulations, setting up OpenFOAM dictionaries (system/controlDict, system/fvSchemes, system/fvSolution, 0/U, 0/p, 0/T), checking mesh resolution, explaining aerodynamics (Lift/Drag, vorticity, boundary layers), and suggesting optimal solver parameters.
+Respond clearly with concise scientific explanations and executable OpenFOAM dictionary snippets where applicable.`;
 
-When the user asks to simulate, test, or setup a scenario, analyze the physical intent and return an executable JSON action block enclosed in triple backticks:
-\`\`\`json
-{
-  "action": "CONFIG_SIMULATION",
-  "archetype": "airfoil" | "cylinder" | "cavity" | "venturi",
-  "substance": "air" | "water" | "oil" | "co2" | "ethanol",
-  "reynoldsNumber": 100,
-  "angleDegrees": 0.0,
-  "autoRun": true,
-  "summary": "Brief 1-line configuration title",
-  "physicsExplanation": "Physical explanation of expected boundary layer, separation point, drag, and vortex behavior."
+// --- Anthropic Claude (official SDK) -------------------------------------
+// The key is the user's own, entered in this browser, so direct browser
+// access is intended here. (Previously the Claude option fell through to the
+// OpenAI code path and POSTed the Anthropic key to api.openai.com.)
+// Loaded on first use so users of other providers never download the SDK
+let sdkPromise: Promise<typeof Anthropic> | null = null;
+function loadSdk(): Promise<typeof Anthropic> {
+  sdkPromise ??= import('@anthropic-ai/sdk').then(mod => mod.default);
+  return sdkPromise;
 }
-\`\`\`
 
-Available archetypes:
-- 'cylinder': Circular bluff body with von Kármán vortex shedding.
-- 'airfoil': NACA 0012 aerodynamic wing with lift and stall.
-- 'cavity': Lid-driven shear cavity (Ghia 1982 benchmark).
-- 'venturi': Compressible nozzle throat with Bernoulli acceleration.
+async function claudeClient(config: AiProviderConfig): Promise<Anthropic> {
+  const AnthropicSDK = await loadSdk();
+  return new AnthropicSDK({
+    apiKey: config.apiKey,
+    dangerouslyAllowBrowser: true,
+    ...(config.customBaseUrl ? { baseURL: config.customBaseUrl } : {})
+  });
+}
 
-Available substances:
-- 'air': rho=1.225, nu=1.5e-5
-- 'water': rho=998, nu=1.0e-6
-- 'oil': rho=890, nu=4.5e-5
-- 'co2': rho=1.98, nu=8.3e-6
-- 'ethanol': rho=789, nu=1.5e-6`;
+async function describeClaudeError(err: unknown): Promise<string> {
+  const AnthropicSDK = await loadSdk();
+  if (err instanceof AnthropicSDK.AuthenticationError) return 'Invalid Anthropic API key.';
+  if (err instanceof AnthropicSDK.RateLimitError) return 'Rate limited by the Claude API — retry shortly.';
+  if (err instanceof AnthropicSDK.APIError) return `Claude API error ${err.status ?? ''}: ${err.message}`;
+  return err instanceof Error ? err.message : String(err);
+}
 
-// Fast Local Intent Parser (Works instantly offline without an API key)
-export function parseLocalSimulationIntent(prompt: string): AiSimulationConfig | null {
-  const p = prompt.toLowerCase();
-
-  let archetype: SimulationArchetype | undefined = undefined;
-  if (p.includes('airfoil') || p.includes('wing') || p.includes('naca') || p.includes('aerodynamic')) {
-    archetype = 'airfoil';
-  } else if (p.includes('cylinder') || p.includes('bluff') || p.includes('vortex') || p.includes('karman')) {
-    archetype = 'cylinder';
-  } else if (p.includes('cavity') || p.includes('box') || p.includes('lid') || p.includes('shear')) {
-    archetype = 'cavity';
-  } else if (p.includes('venturi') || p.includes('nozzle') || p.includes('throat')) {
-    archetype = 'venturi';
+async function queryClaude(config: AiProviderConfig, prompt: string, context?: string): Promise<string> {
+  const client = await claudeClient(config);
+  const response = await client.beta.messages.create({
+    model: config.model || 'claude-opus-5-5',
+    max_tokens: 16000,
+    system: SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `${context ? `Current Simulation Context:\n${context}\n\n` : ''}${prompt}`
+    }],
+    output_config: { effort: 'medium' },
+    // Server-side fallback on a policy decline; a no-op on models without it
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default'
+  });
+  if (response.stop_reason === 'refusal') {
+    return '⚠️ Claude declined this request. Try rephrasing the question.';
   }
-
-  let substance: FluidSubstanceId | undefined = undefined;
-  if (p.includes('water') || p.includes('liquid') || p.includes('h2o')) substance = 'water';
-  else if (p.includes('oil') || p.includes('lubricant') || p.includes('viscous')) substance = 'oil';
-  else if (p.includes('co2') || p.includes('carbon dioxide')) substance = 'co2';
-  else if (p.includes('ethanol') || p.includes('alcohol')) substance = 'ethanol';
-  else if (p.includes('air') || p.includes('gas') || p.includes('atmosphere')) substance = 'air';
-
-  // Reynolds number extraction (e.g. "Re=200", "Re 500", "Reynolds 300")
-  let reynoldsNumber: number | undefined = undefined;
-  const reMatch = p.match(/(?:re|reynolds)(?:\s*=|\s+)(\d+(?:\.\d+)?)/i);
-  if (reMatch) {
-    reynoldsNumber = Math.max(10, Math.min(10000, parseFloat(reMatch[1])));
-  }
-
-  // Angle of attack extraction (e.g. "12 deg", "15 degrees", "aoa=10", "aoa 8")
-  let angleDegrees: number | undefined = undefined;
-  const angleMatch = p.match(/(\d+(?:\.\d+)?)\s*(?:deg|degrees|°)/i) || p.match(/aoa(?:\s*=|\s+)(\d+(?:\.\d+)?)/i);
-  if (angleMatch) {
-    angleDegrees = Math.max(-25, Math.min(25, parseFloat(angleMatch[1])));
-  }
-
-  const autoRun = p.includes('run') || p.includes('simulate') || p.includes('start') || p.includes('launch') || p.includes('test') || p.includes('make');
-
-  if (archetype || substance || reynoldsNumber !== undefined || angleDegrees !== undefined) {
-    const archName = archetype ? archetype.toUpperCase() : 'Current Domain';
-    const subName = substance ? substance.toUpperCase() : 'Selected Substance';
-    const reText = reynoldsNumber ? `Re=${reynoldsNumber}` : 'Default Re';
-    const aoaText = angleDegrees !== undefined ? `AoA=${angleDegrees}°` : '';
-
-    return {
-      archetype,
-      substance,
-      reynoldsNumber,
-      angleDegrees,
-      autoRun,
-      summary: `Autonomous Setup: ${archName} | ${subName} | ${reText} ${aoaText}`.trim(),
-      physicsExplanation: archetype === 'airfoil'
-        ? `NACA 0012 wing with ${angleDegrees !== undefined ? angleDegrees : 0}° angle of attack. Flow will produce positive aerodynamic lift with adverse pressure gradient along the suction surface.`
-        : archetype === 'cylinder'
-        ? `Circular bluff body at ${reText}. Flow experiences boundary layer separation on both shoulders, producing alternating von Kármán vortex shedding.`
-        : `Shear-driven recirculating flow with primary core vortex and corner separation eddies.`
-    };
-  }
-
-  return null;
+  const text = response.content
+    .filter((block): block is Anthropic.Beta.BetaTextBlock => block.type === 'text')
+    .map(block => block.text)
+    .join('\n')
+    .trim();
+  return text || 'No response received from Claude.';
 }
 
 export async function testAiConnection(config: AiProviderConfig): Promise<{ success: boolean; latencyMs: number; message: string }> {
   const start = performance.now();
   try {
-    if (!config.apiKey && config.provider !== 'ollama') {
+    if (config.provider === 'ollama') {
+      const url = (config.customBaseUrl || 'http://localhost:11434').replace(/\/v1\/?$/, '') + '/api/tags';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Ollama server returned status ${res.status}`);
+      const latency = Math.round(performance.now() - start);
+      return { success: true, latencyMs: latency, message: `Connected to Local Ollama (${latency}ms)` };
+    }
+
+    if (!config.apiKey) {
       return { success: false, latencyMs: 0, message: 'Please enter an API Key first.' };
     }
 
+    if (config.provider === 'claude') {
+      try {
+        const client = await claudeClient(config);
+        await client.messages.create({
+          model: config.model || 'claude-opus-5-5',
+          max_tokens: 16,
+          messages: [{ role: 'user', content: 'Ping: reply with OK.' }]
+        });
+      } catch (err) {
+        throw new Error(await describeClaudeError(err));
+      }
+      const latency = Math.round(performance.now() - start);
+      return { success: true, latencyMs: latency, message: `Claude API verified (${latency}ms)` };
+    }
+
     if (config.provider === 'gemini') {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
+      // Key in a header, not the URL (URLs end up in logs and history)
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: 'Ping: reply with "OK".' }] }] })
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Ping: reply with "OK".' }] }]
+        })
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -191,18 +180,18 @@ export async function testAiConnection(config: AiProviderConfig): Promise<{ succ
       return { success: true, latencyMs: latency, message: `Gemini API Verified (${latency}ms)` };
     }
 
+    // OpenAI, DeepSeek, Groq (OpenAI-compatible format)
     let baseUrl = 'https://api.openai.com/v1';
     if (config.provider === 'deepseek') baseUrl = 'https://api.deepseek.com/v1';
     if (config.provider === 'groq') baseUrl = 'https://api.groq.com/openai/v1';
-    if (config.provider === 'ollama') baseUrl = (config.customBaseUrl || 'http://localhost:11434') + '/v1';
-    if (config.customBaseUrl && config.provider !== 'ollama') baseUrl = config.customBaseUrl;
-
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
+    if (config.customBaseUrl) baseUrl = config.customBaseUrl;
 
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
       body: JSON.stringify({
         model: config.model,
         messages: [{ role: 'user', content: 'Ping: reply with OK.' }],
@@ -224,114 +213,71 @@ export async function testAiConnection(config: AiProviderConfig): Promise<{ succ
 
 export async function queryAiCopilot(prompt: string, context?: string): Promise<AiResponse> {
   const config = getStoredAiConfig();
-
-  // 1. Check local physics intent first (works instantly offline)
-  const localConfig = parseLocalSimulationIntent(prompt);
-
-  // If no API key is provided, use the built-in Autonomous Physics Agent
   if (!config.apiKey && config.provider !== 'ollama') {
-    if (localConfig) {
-      return {
-        query: prompt,
-        analysis: `⚡ **Autonomous CFD Agent Action**: Detected physics request for **${localConfig.summary}**.
-
-${localConfig.physicsExplanation || ''}`,
-        simConfig: localConfig
-      };
-    }
     return {
       query: prompt,
-      analysis: '🤖 **OpenZess CFD Agent**: Describe what simulation you want to make (e.g. *"Simulate water past a NACA airfoil at 12 deg AoA"* or *"Test cylinder vortex shedding with CO2"*). You can also configure an LLM key via **[ 🔑 Set AI Key ]** for advanced reasoning.',
-      suggestedSolver: 'icoFoam'
+      analysis: '⚠️ No LLM API Key is configured yet. Click **[ 🔑 Set AI Key ]** in the top navbar to configure Google Gemini, OpenAI, Claude, DeepSeek, Groq, or Local Ollama.',
+      suggestedSolver: 'buoyantBoussinesqSimpleFoam'
     };
   }
 
-  // 2. Query LLM with full context
-  const fullPrompt = `${SYSTEM_PROMPT}\n\n${context ? `Current Simulation Context:\n${context}\n\n` : ''}User Request: ${prompt}`;
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n${context ? `Current Simulation Context:\n${context}\n\n` : ''}User Query: ${prompt}`;
+
+  if (config.provider === 'claude') {
+    try {
+      return { query: prompt, analysis: await queryClaude(config, prompt, context) };
+    } catch (err) {
+      return { query: prompt, analysis: `⚠️ AI Copilot error (claude): ${await describeClaudeError(err)}` };
+    }
+  }
 
   try {
-    let rawText = '';
-
     if (config.provider === 'gemini') {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.apiKey },
         body: JSON.stringify({
           contents: [{ parts: [{ text: fullPrompt }] }],
           generationConfig: { maxOutputTokens: 800, temperature: 0.2 }
         })
       });
       const data = await res.json();
-      rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } else {
-      let baseUrl = 'https://api.openai.com/v1';
-      if (config.provider === 'deepseek') baseUrl = 'https://api.deepseek.com/v1';
-      if (config.provider === 'groq') baseUrl = 'https://api.groq.com/openai/v1';
-      if (config.provider === 'ollama') baseUrl = (config.customBaseUrl || 'http://localhost:11434') + '/v1';
-      if (config.customBaseUrl && config.provider !== 'ollama') baseUrl = config.customBaseUrl;
-
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
-
-      const res = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          model: config.model,
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `${context ? `Context: ${context}\n\n` : ''}${prompt}` }
-          ],
-          max_tokens: 800,
-          temperature: 0.2
-        })
-      });
-      const data = await res.json();
-      rawText = data.choices?.[0]?.message?.content || '';
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received from Gemini.';
+      return { query: prompt, analysis: text };
     }
 
-    // Try to extract JSON simulation action block from LLM response
-    let extractedConfig = localConfig;
-    const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[1]);
-        if (parsed.action === 'CONFIG_SIMULATION' || parsed.archetype || parsed.substance) {
-          extractedConfig = {
-            archetype: parsed.archetype,
-            substance: parsed.substance,
-            reynoldsNumber: parsed.reynoldsNumber ? Number(parsed.reynoldsNumber) : undefined,
-            angleDegrees: parsed.angleDegrees ? Number(parsed.angleDegrees) : undefined,
-            autoRun: parsed.autoRun !== false,
-            summary: parsed.summary || `${parsed.archetype || 'Custom'} Simulation`,
-            physicsExplanation: parsed.physicsExplanation
-          };
-        }
-      } catch (_) {}
-    }
+    // OpenAI-compatible providers: OpenAI, DeepSeek, Groq, Ollama
+    let baseUrl = 'https://api.openai.com/v1';
+    if (config.provider === 'deepseek') baseUrl = 'https://api.deepseek.com/v1';
+    if (config.provider === 'groq') baseUrl = 'https://api.groq.com/openai/v1';
+    if (config.provider === 'ollama') baseUrl = (config.customBaseUrl || 'http://localhost:11434').replace(/\/v1\/?$/, '') + '/v1';
+    if (config.customBaseUrl && config.provider !== 'ollama') baseUrl = config.customBaseUrl;
 
-    const cleanAnalysis = rawText.replace(/```(?:json)?[\s\S]*?```/g, '').trim() || rawText;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
 
-    return {
-      query: prompt,
-      analysis: cleanAnalysis || `Autonomous CFD Agent configured: ${extractedConfig?.summary || 'Custom case'}`,
-      simConfig: extractedConfig || undefined
-    };
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `${context ? `Context: ${context}\n\n` : ''}${prompt}` }
+        ],
+        max_tokens: 800,
+        temperature: 0.2
+      })
+    });
+
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || 'No response received.';
+    return { query: prompt, analysis: text };
   } catch (err: any) {
-    // Fallback to local intent parser on network error
-    if (localConfig) {
-      return {
-        query: prompt,
-        analysis: `⚡ **Autonomous CFD Agent Action (Offline)**: Configured **${localConfig.summary}**.
-
-${localConfig.physicsExplanation || ''}`,
-        simConfig: localConfig
-      };
-    }
     return {
       query: prompt,
-      analysis: `⚠️ AI Copilot error (${config.provider}): ${err.message || 'Request failed'}. Verify your connection.`
+      analysis: `⚠️ AI Copilot error (${config.provider}): ${err.message || 'Request failed'}. Verify your API key and connection.`
     };
   }
 }

@@ -2,11 +2,11 @@
 
 # ⚡ OpenZess Studio
 
-### Indigenous AI-Native Computational Fluid Dynamics Platform
+### A 2-D CFD Studio in the Browser
 
-**Real-time aerothermal simulation · PINN surrogate physics · Three.js WebGL visualization · One-click OpenFOAM & ParaView export**
+**Live Navier–Stokes solver · Instant potential-flow preview · Three.js visualization · OpenFOAM & ParaView export**
 
-[![Rust](https://img.shields.io/badge/Rust-1.75+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-stable-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Vue 3](https://img.shields.io/badge/Vue.js-3.5-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
@@ -14,12 +14,15 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-
 </div>
 
 ---
 
-OpenZess Studio is an **AI-native CFD platform inspired by [OpenFOAM](https://www.openfoam.com/)**. It combines a SciPy sparse-accelerated Navier–Stokes solver engine, an instant **PINN surrogate physics layer**, and a **Vue 3 + Three.js Web Studio UI** for real-time aerothermal simulation, scientific visualization, and one-click export of production-ready OpenFOAM cases and ParaView datasets — all running locally in your browser.
+OpenZess Studio is a **2-D incompressible CFD studio inspired by [OpenFOAM](https://www.openfoam.com/)**.
+A Python projection solver (SciPy sparse LU) streams live flow fields over a WebSocket to a
+**Vue 3 + Three.js** studio, alongside an optional multi-threaded Rust kernel and an instant
+potential-flow preview. Cases can be exported as ParaView `.vtk` files and edited through
+OpenFOAM-style dictionaries. Everything runs locally.
 
 <div align="center">
   <img src="docs/assets/openzess_studio_ui.jpg" alt="OpenZess Studio UI" width="800"/>
@@ -27,20 +30,24 @@ OpenZess Studio is an **AI-native CFD platform inspired by [OpenFOAM](https://ww
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-|     | Feature                 | Description                                                                                                                |
-| --- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| 🌊  | **Live CFD Solver**     | Fractional-step incompressible Navier–Stokes with pressure-Poisson correction, accelerated via SciPy sparse linear algebra |
-| ⚡  | **PINN Surrogate Mode** | Physics-Informed surrogate delivers instant steady-state flow fields (< 50 ms) for rapid design exploration                |
-| 🔥  | **Thermal Buoyancy**    | Boussinesq formulation couples temperature transport with gravity-driven buoyant updrafts                                  |
-| 🌌  | **Dual Viewports**      | 2D HTML5 Canvas renderer + immersive Three.js WebGL 3D scene with cross-section slicing                                    |
-| 📈  | **Residual Monitor**    | Logarithmic convergence chart (Chart.js) streaming live from the solver                                                    |
-| 🤖  | **AI Co-Pilot**         | Conversational assistant for natural-language simulation control                                                           |
-| 👁️  | **AI Vision**           | Photo-to-3D voxelization: upload an image, extract silhouette, detect archetype, auto-generate geometry                    |
-| 📦  | **OpenFOAM Export**     | Generates complete `buoyantBoussinesqSimpleFoam` case dictionaries (`0/`, `constant/`, `system/`) as a ZIP                 |
-| 🧊  | **ParaView Export**     | Legacy structured-points `.vtk` download of any finished run                                                               |
-| 🎛️  | **Dict Editor**         | In-browser OpenFOAM dictionary editor with live templates                                                                  |
+|     | Feature                | Description                                                                                                         |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 🌊  | **Live CFD solver**    | Fractional-step incompressible Navier–Stokes, pressure Poisson by sparse LU, frames streamed live                   |
+| ⚡  | **Instant preview**    | One sparse solve: inviscid potential flow around the body, or the Stokes solution for the cavity. *Not* an ML model |
+| 🦀  | **Rust kernel**        | Optional sidecar; explicit solver with Rayon-parallel Jacobi pressure sweeps on large grids                         |
+| 🔥  | **Thermal buoyancy**   | Boussinesq plume driven by the temperature slider; heavy-fluid gravity current for the dam case                    |
+| 🧩  | **Custom geometry**    | Circle / square / rectangle / NACA airfoil placed with position, size and angle of attack                           |
+| 🌌  | **3-D viewport**       | The 2-D solution on its section plane, the simulated body extruded along the span, particles, glyphs, live probe    |
+| 📈  | **Residual monitor**   | Log-scale convergence plot and a solver log of real per-frame values (residual, Courant, continuity, Cd, Cl)       |
+| 🎛️  | **Dictionary editor**  | Edit `deltaT`, `nu` and inlet velocity in OpenFOAM-style dictionaries and re-run                                    |
+| 💾  | **Snapshots**          | Save / load the full case (physics, geometry, dictionary edits) on the server, with a browser fallback              |
+| 🧊  | **ParaView export**    | Legacy `.vtk` (cell-centred velocity and pressure) of the last run                                                 |
+| 📦  | **OpenFOAM export**    | Runnable `icoFoam` lid-driven-cavity case (`blockMesh` + `icoFoam`) with your Re, dt and grid*                      |
+| 🤖  | **AI co-pilot chat**   | Ask an LLM (Gemini, OpenAI, Claude, DeepSeek, Groq, Ollama) using your own API key                                  |
+
+\* Other geometries are not exported to OpenFOAM yet.
 
 ---
 
@@ -49,59 +56,77 @@ OpenZess Studio is an **AI-native CFD platform inspired by [OpenFOAM](https://ww
 ### Prerequisites
 
 - **Python 3.10+**
-- **Node.js 18+** (only needed for frontend development)
+- **Node.js 18+**: the launcher builds the frontend on first run
+- **Rust (stable)**: optional, only for the Rust engine
 
-### Option A — One Command Launch (Recommended)
+### Run
 
 ```bash
-# 1. Install backend dependencies
 pip install -r requirements.txt
-
-# 2. Launch the studio (starts API server + opens browser automatically)
 python main.py
 ```
 
-The FastAPI server starts at [`http://localhost:8000`](http://localhost:8000) and auto-opens the Web Studio UI in your default browser.
+`main.py` builds `frontend/dist` if it is missing or older than the sources, starts the Rust
+sidecar if you have compiled it, then serves the studio at
+[`http://localhost:8000/studio/index.html`](http://localhost:8000/studio/index.html) and
+opens your browser. Options: `--port`, `--no-browser`, `--reload` (development),
+`--skip-build`. On Windows you can double-click `LAUNCH_STUDIO.bat`.
 
-> 💡 If you have built the frontend (`npm run build`), the server serves the optimized bundle from `frontend/dist`. Otherwise it serves the raw frontend sources.
-
-### Option B — Frontend Development Mode (with HMR)
+Optional Rust engine:
 
 ```bash
-# Terminal 1 — backend
-pip install -r requirements.txt
-python main.py
-
-# Terminal 2 — frontend dev server
-cd frontend
-npm install
-npm run dev      # Vite dev server with hot-reload
+cd rust-sidecar && cargo build --release
 ```
+
+### Frontend development (hot reload)
+
+```bash
+python main.py --no-browser      # terminal 1: backend on :8000
+cd frontend && npm ci && npm run dev   # terminal 2: Vite on :5173
+```
+
+### Tests
+
+```bash
+pip install -r requirements-dev.txt && python -m pytest
+cd rust-sidecar && cargo test
+cd frontend && npm ci && npm run build   # vue-tsc type check + bundle
+```
+
+CI runs all three on every push (`.github/workflows/ci.yml`).
 
 ---
 
-## 🖥️ Usage Walkthrough
+## 🖥️ Usage
 
-1. **Pick a preset** — Submarine, Car, Radiator, Server Rack, Table, Chair, or configure a custom case.
-2. **Choose a mode** — `CFD` for full numerical solving, or `AI` for instant PINN surrogate results.
-3. **Hit simulate** — watch velocity/pressure fields render in real time while residuals converge on the log chart.
-4. **Inspect in 3D** — switch to the Three.js viewport for volumetric exploration.
-5. **Export** — download a ParaView `.vtk` file or a complete OpenFOAM case `.zip` for high-fidelity continuation.
+1. **Pick a case**: airfoil, cylinder, F1 wing, drone, submarine, venturi, plume, dam
+   break, lid-driven cavity, or build your own shape.
+2. **Pick an engine**: Python (live frames), Rust (single result, needs the sidecar), or the
+   instant preview.
+3. **Adjust physics**: inlet speed, angle of attack, Reynolds number, fluid, gravity,
+   heater temperature. Changes re-run automatically.
+4. **Inspect**: hover the viewport for probe values; switch the field between |U|, p, T,
+   vorticity and Q-criterion; watch residuals and the solver log.
+5. **Export**: `.vtk` for ParaView, or the OpenFOAM case ZIP.
 
 ---
 
 ## 🔌 API Reference
 
-| Endpoint                   | Method    | Purpose                                                |
-| -------------------------- | --------- | ------------------------------------------------------ |
-| `/ws/simulate`             | WebSocket | Real-time frame/residual streaming during simulation   |
-| `/ws/simulate_3d`          | WebSocket | 3D simulation frames, residuals & cross-section slices |
-| `/api/health`              | GET       | Engine health & feature probe                          |
-| `/api/presets`             | GET       | Pre-configured 3D case catalog                         |
-| `/api/export/vtk`          | GET       | Download last run as ParaView `.vtk`                   |
-| `/api/export/openfoam-zip` | GET       | Download complete OpenFOAM case as `.zip`              |
-| `/api/ai/chat`             | POST      | Natural-language AI Co-Pilot                           |
-| `/api/ai/vision-analyze`   | POST      | Image silhouette → 3D bounding-box analysis            |
+| Endpoint                        | Method       | Purpose                                                   |
+| ------------------------------- | ------------ | --------------------------------------------------------- |
+| `/ws/simulate`                  | WebSocket    | Run a case; streams frames (fields, residual, forces)    |
+| `/api/health`                   | GET          | Server status                                             |
+| `/api/engine/status`            | GET          | Available engines, whether the Rust sidecar is online     |
+| `/api/engine/benchmark`         | GET          | Rust kernel throughput (if the sidecar is running)        |
+| `/api/system`                   | GET          | Host CPU count, memory and disk (for the header widget)   |
+| `/api/projects`                 | GET / DELETE | List / delete saved snapshots                             |
+| `/api/projects/save`            | POST         | Save a snapshot `{name, state}`                           |
+| `/api/projects/load?name=`      | GET          | Load a snapshot                                           |
+| `/api/export/vtk?name=`         | GET          | Last run as legacy ParaView `.vtk`                        |
+| `/api/export/openfoam-zip?name=`| GET          | OpenFOAM case ZIP (alias: `/api/export/openfoam`)         |
+
+The API accepts cross-origin requests only from `localhost` / `127.0.0.1` pages.
 
 ---
 
@@ -109,55 +134,85 @@ npm run dev      # Vite dev server with hot-reload
 
 ```mermaid
 flowchart LR
-    subgraph Browser ["🌐 Web Studio (Vue 3 + TypeScript)"]
-        UI["Sidebar Controls<br/>Header Navbar"]
-        R2D["2D Canvas Renderer"]
-        R3D["Three.js WebGL Viewport"]
-        RC["Residual Chart"]
-        AI["AI Co-Pilot Panel"]
+    subgraph Browser ["🌐 Studio (Vue 3 + TypeScript)"]
+        UI["Sidebar & Header"]
+        R3D["Three.js Viewport"]
+        RC["Residual Chart & Solver Log"]
+        AI["AI Chat"]
     end
 
-    subgraph Server ["⚙️ FastAPI Backend"]
-        WS["WebSocket Streams"]
-        REST["REST Endpoints"]
+    subgraph Server ["⚙️ FastAPI"]
+        WS["/ws/simulate"]
+        REST["REST endpoints"]
     end
 
-    subgraph Engine ["🧠 Physics Engine (Python)"]
-        MESH["Mesh2D Generator"]
-        SOLVER["Accelerated Solver<br/>Navier-Stokes + Poisson"]
-        PINN["PINN Surrogate"]
-        THERM["Boussinesq Thermal"]
+    subgraph Engines ["🧠 Solvers (2-D)"]
+        SOLVER["Python projection solver<br/>SciPy sparse LU"]
+        RUST["Rust sidecar<br/>Rayon Jacobi"]
+        PREVIEW["Instant preview<br/>potential flow / Stokes"]
     end
 
     subgraph Export ["📦 Exporters"]
-        VTK["VTK Writer"]
-        OF["OpenFOAM Case Builder"]
+        VTK["VTK writer"]
+        OF["OpenFOAM case builder"]
     end
 
-    UI --> WS --> SOLVER
-    UI --> REST
-    SOLVER --> MESH
-    SOLVER --> THERM
-    PINN --> MESH
-    SOLVER --> WS --> R2D & R3D & RC
-    REST --> VTK & OF
-    AI --> REST
+    LLM["LLM providers<br/>(your API key)"]
+
+    UI --> WS
+    WS --> SOLVER & PREVIEW
+    WS -->|HTTP| RUST
+    WS -->|frames| R3D & RC
+    UI --> REST --> VTK & OF
+    AI --> LLM
 ```
 
-**Physics core:** the solver advances each time step through a predictor (upwind advection + central-difference diffusion), solves the pressure Poisson equation with Dirichlet outlet / Neumann wall conditions, then corrects velocities to satisfy continuity — the same fractional-step philosophy used by industrial CFD codes.
+**Numerics:** explicit predictor (first-order upwind advection, central diffusion), pressure
+Poisson with Neumann walls and a Dirichlet outlet (sealed boxes use a compatible Neumann
+problem), then velocity correction. Bodies are staircase immersed boundaries. Details in
+[`docs/PHYSICS_AND_SOLVER.md`](docs/PHYSICS_AND_SOLVER.md).
 
-📖 Full mathematical derivation: [`docs/PHYSICS_AND_SOLVER.md`](docs/PHYSICS_AND_SOLVER.md)
+---
+
+## ✅ Validation
+
+Lid-driven cavity at Re = 100, steady state, centreline RMSE against Ghia, Ghia & Shin (1982):
+
+| Grid    | RMSE u(y) | RMSE v(x) |
+| ------- | --------- | --------- |
+| 21 × 21 | 0.0785    | 0.0467    |
+| 41 × 41 | 0.0385    | 0.0251    |
+| 61 × 61 | 0.0261    | 0.0168    |
+
+The observed order of accuracy is ≈ 0.98, as expected for first-order upwinding. The Python
+and Rust engines, which use different schemes, agree on C_D, C_L and venturi pressure drop
+to within ~1–3 %. The potential-flow preview reproduces the textbook 2U peak speed and
+C_p,min = −3 on a cylinder. Reproduce with `python experiments/run_milestone_simulations.py`;
+the regression tests in `tests/` pin these results.
+
+## ⚠️ Limitations
+
+- **2-D, laminar, incompressible.** There is no turbulence model. The 3-D view is the 2-D
+  solution extruded along the span.
+- **First-order accurate.** At high Reynolds numbers on these grids, numerical diffusion
+  dominates, so the effective Re is far below the slider value.
+- **Staircase bodies.** Surfaces are resolved to one grid cell.
+- **Illustrative SI readouts.** Downforce, thrust and cavitation number scale the
+  coefficients to an assumed full-scale operating point.
+- **Not implemented yet.** OpenFOAM export of non-cavity geometry, and CAD/STL import.
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer                | Technologies                                                                           |
-| -------------------- | -------------------------------------------------------------------------------------- |
-| **Backend**          | Python · FastAPI · Uvicorn · NumPy · SciPy (sparse solvers) · WebSockets · Matplotlib  |
-| **Frontend**         | Vue 3 · TypeScript · Vite · Three.js · Chart.js · Lucide Icons                         |
-| **Physics**          | Incompressible Navier–Stokes · Pressure Poisson · Boussinesq buoyancy · PINN surrogate |
-| **Interoperability** | OpenFOAM v2312 dictionary generation · ParaView legacy VTK                             |
+| Layer           | Technologies                                                                 |
+| --------------- | ---------------------------------------------------------------------------- |
+| **Backend**     | Python · FastAPI · Uvicorn · NumPy · SciPy · WebSockets                      |
+| **Rust kernel** | Rust · Axum · Tokio · Rayon · Serde                                          |
+| **Frontend**    | Vue 3 · TypeScript · Vite · Three.js · Anthropic SDK (Claude chat, lazy-loaded) |
+| **Physics**     | Incompressible Navier–Stokes · Pressure Poisson · Boussinesq buoyancy · Potential flow · Stokes flow |
+| **Interop**     | OpenFOAM dictionary generation · ParaView legacy VTK                         |
+| **Experiments** | Matplotlib (validation figures)                                              |
 
 ---
 
@@ -165,89 +220,79 @@ flowchart LR
 
 ```
 openn_fOam/
-├── main.py                  # 🚀 Launcher: starts FastAPI + opens Studio UI
-├── requirements.txt         # 📦 Python backend dependencies
+├── main.py                  # Launcher: build frontend if stale, start sidecar + server
+├── sync_and_launch.py       # Launcher variant used by LAUNCH_STUDIO.bat
+├── requirements*.txt        # Python runtime / test dependencies
 │
-├── backend/                 # 🧠 Aerothermal & AI physics engine
-│   ├── app.py               # FastAPI routes & WebSocket simulation streaming
-│   ├── mesh.py              # Structured Cartesian grid generator + obstacle masks
-│   ├── solver.py            # Navier–Stokes, pressure Poisson & thermal solver
-│   ├── ai_predictor.py      # ⚡ Instant PINN surrogate prediction
-│   └── vtk_writer.py        # ParaView legacy .vtk exporter
+├── backend/
+│   ├── app.py               # FastAPI routes + /ws/simulate stream
+│   ├── solver.py            # 2-D projection solver, BCs, forces, geometry masks
+│   ├── ai_predictor.py      # Instant preview: potential flow / Stokes cavity
+│   ├── mesh.py              # Uniform cell-centred grid
+│   ├── rust_bridge.py       # HTTP client for the Rust sidecar
+│   ├── frontend_build.py    # Rebuilds frontend/dist when stale
+│   ├── projects.py          # Snapshot persistence (backend/saved_projects/)
+│   ├── openfoam_export.py   # OpenFOAM case ZIP
+│   └── vtk_writer.py        # ParaView .vtk
 │
-├── frontend/                # 🌐 Vue 3 + TypeScript + Three.js Web Studio
-│   └── src/
-│       ├── App.vue          # Master split-screen studio coordinator
-│       ├── components/      # Canvas2D / Three3D viewports, charts, AI panel,
-│       │                    # sidebar controls, OpenFOAM dict editor
-│       ├── utils/           # Scientific colormaps & OpenFOAM dict templates
-│       └── types/cfd.ts     # TypeScript interfaces for CFD cases
-│
-├── docs/                    # 📚 Architecture, physics & design documentation
-├── saved_chats/             # 💾 Session archives & design mockups
-└── graphify-out/            # 🕸️ Codebase dependency-graph reports
+├── rust-sidecar/            # Axum service: CFD kernel + small utilities
+├── frontend/src/            # Vue 3 studio (App.vue, components/, utils/, types/)
+├── experiments/             # Ghia validation & grid-convergence study
+├── tests/                   # pytest suite (physics, API, launcher)
+├── docs/                    # Design docs, research notes, progress reports
+├── saved_chats/             # Design-session archives & mockups
+└── graphify-out/            # Codebase dependency graph (generated; may be stale)
 ```
 
 ---
 
 ## 📚 Documentation
 
-Complete guides live in the [`docs/`](docs/) directory:
-
-| Document                                                              | Contents                                                       |
-| --------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [Project Structure](docs/PROJECT_STRUCTURE.md)                        | Complete architectural map, layer-by-layer breakdown           |
-| [Physics & Solver](docs/PHYSICS_AND_SOLVER.md)                        | Governing equations, fractional-step method, PINN mode         |
-| [OpenFOAM & VTK Export](docs/OPENFOAM_AND_VTK_EXPORT.md)              | Dictionary generation, ZIP packaging, ParaView format          |
-| [AI Vision & Copilot](docs/AI_VISION_AND_COPILOT.md)                  | Photo-to-3D voxelization, NL command reference                 |
-| [UI/UX Design System](docs/UI_UX_DESIGN_SYSTEM.md)                    | OKLCH color tokens, layout specification, 60–120 FPS rendering |
-| [Tech Stack](docs/TECH_STACK.md)                                      | Full technology breakdown                                      |
-| [Local Hardware Runtime](docs/LOCAL_HARDWARE_RUNTIME_ARCHITECTURE.md) | Colab-style local CPU/GPU/NVMe bridge                          |
-| [Hybrid Rust Research](docs/RESEARCH_AND_HYBRID_RUST_PYTHON.md)       | PyO3 dual-engine research roadmap                              |
-| [Rust 2024 Benefits](docs/RUST_2024_BACKEND_BENEFITS.md)              | SIMD, Rayon parallelism, latency benchmarks                    |
-| [Things Taken from OpenFOAM](docs/THINGS_TAKEN_FROM_OPENFOAM.md)      | SI dimensional analysis, patch BCs, schemes, coefficients      |
+| Document                                                              | Contents                                                      |
+| --------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [Physics & Solver](docs/PHYSICS_AND_SOLVER.md)                        | Equations, discretization, BCs, forces, validation, limits    |
+| [OpenFOAM & VTK Export](docs/OPENFOAM_AND_VTK_EXPORT.md)              | What the exports contain and how to run them                  |
+| [Project Structure](docs/PROJECT_STRUCTURE.md)                        | Layer-by-layer architecture notes                             |
+| [UI/UX Design System](docs/UI_UX_DESIGN_SYSTEM.md)                    | OKLCH colour tokens, layout specification                     |
+| [Tech Stack](docs/TECH_STACK.md)                                      | Technology breakdown                                          |
+| [Things Taken from OpenFOAM](docs/THINGS_TAKEN_FROM_OPENFOAM.md)      | Dimensional analysis, patch BCs, schemes, coefficients        |
+| [AI Vision & Copilot](docs/AI_VISION_AND_COPILOT.md)                  | Chat co-pilot (vision part: design only, not implemented)     |
+| [Hybrid Rust Research](docs/RESEARCH_AND_HYBRID_RUST_PYTHON.md)       | Research roadmap (PyO3 / surrogate training: not implemented) |
+| [Rust 2024 Blueprint](docs/RUST_2024_BACKEND_BENEFITS.md)             | Design blueprint; its benchmark tables are projections        |
+| [Local Hardware Runtime](docs/LOCAL_HARDWARE_RUNTIME_ARCHITECTURE.md) | Design document (no GPU code exists)                          |
 
 ---
 
 ## 🗺️ Roadmap
 
-- [ ] Rust 2024 (PyO3) compute kernel for sub-millisecond solver steps
-- [ ] GPU acceleration (CUDA) for large 3D domains
-- [ ] Turbulence modeling (k-ε / k-ω SST)
-- [ ] Unstructured mesh support & adaptive refinement
-- [ ] Transient animation recording & video export
-- [ ] Live aerodynamic coefficient overlays ($C_D$, $C_L$) in the viewport
+- [ ] OpenFOAM export for every geometry (snappyHexMesh or blockMesh with holes)
+- [ ] Second-order advection (TVD / QUICK) and a staggered or Rhie–Chow-corrected grid
+- [ ] Cut-cell immersed boundaries for curved bodies
+- [ ] Turbulence modeling (k-ω SST) and a 3-D solver
+- [ ] CAD/STL import (section at mid-span → solid mask)
+- [ ] Transient validation (cylinder vortex-shedding Strouhal number)
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! This project was built iteratively with AI pair-programming ([session archives](saved_chats/) document the full design history).
+1. Fork the repository and create a feature branch.
+2. Make your change, and add or adjust tests in `tests/` (or `cargo test` for Rust).
+3. Run the test commands above, then open a pull request.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+The [session archives](saved_chats/) document the AI-assisted design history.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- [OpenFOAM®](https://www.openfoam.com/) — the industry-standard open-source CFD toolbox that inspired this project's dictionary structure, boundary-condition model, and numerics
-- [12 Steps to Navier–Stokes](https://www.youtube.com/playlist?list=PL30F4C5AB15562EEB) (Lorena Barba) — foundational numerical methods
+- [OpenFOAM®](https://www.openfoam.com/), which inspired the dictionary structure and boundary-condition model
+- U. Ghia, K. N. Ghia & C. T. Shin (1982), *J. Comput. Phys.* 48, 387–411: cavity benchmark data
+- [12 Steps to Navier–Stokes](https://www.youtube.com/playlist?list=PL30F4C5AB15562EEB) (Lorena Barba): the scheme used by the Rust kernel
 - The Vue, Three.js, FastAPI & SciPy communities
 
 ---
 
 ## 📄 License
- 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
-<div align="center">
-
-**Built with ⚡ by the OpenZess project**
-
-⭐ Star this repo if you find it useful!
-
-</div>
+This project is licensed under the **MIT License**; see [LICENSE](LICENSE).

@@ -1,0 +1,41 @@
+================================================================================
+OpenZess Studio (Project UR2627GEN317) — Autonomous Loop Progress & Coordination Log
+================================================================================
+
+[ARCHITECTURAL AUDIT & NIGHT UPDATE — October 5, 2026]
+- Fixed Localhost Stale Caching:
+  * Modified backend/app.py to prioritize local workspace frontend/dist over foreign C:\gitwork paths.
+  * Injected strict HTTP headers (Cache-Control: no-cache, no-store, must-revalidate, max-age=0, X-OpenZess-Build-Time) across all studio pages, static scripts, and styles.
+  * Updated sync_and_launch.py to synchronize compiled bundles directly into the workspace dist directory.
+
+- Established Rust vs. Python Architectural Division of Work:
+  * Rust Sidecar (rust-sidecar/): High-speed numerical inner loops, Rayon SIMD Navier-Stokes solver, 3D Poisson equation, sub-grid eddy viscosity (k-epsilon), and particle streamline tracing.
+  * Python FastAPI Core: High-level orchestration, OpenFOAM case file synthesis (system/controlDict, fvSchemes, fvSolution, 0/U, 0/p, snappyHexMeshDict), and AI Copilot reasoning.
+  * Web Frontend: Three.js WebGL visualization, shader colormaps, cutting planes, and responsive HUD.
+
+- OpenFOAM Physical Parity Directives:
+  * Calibrate incompressible physics to OpenFOAM simpleFoam and buoyantBoussinesqSimpleFoam standards.
+  * Submarine archetype: Hydrostatic pressure gradient, water density (1025 kg/m^3 for ocean seawater), and cavitation index computation.
+  * Drone archetype: Aerodynamic downwash, rotor disc boundary conditions, and crosswind turbulence intensity.
+
+- Left Sidebar Layout Restructuring (Completed):
+  * Replaced cramped 2-column sidebar layout with 4 full-width dedicated tabs:
+    1. 🌊 Physics & Water: Flow speed (U), AoA, Vorticity core, Fluid temperature core, and fluid medium properties.
+    2. 🧱 Geometry & Archetype: 1-click archetype selector (Submarine, Drone, Airfoil, F1, Venturi, Dam, Cylinder) + CAD STL upload dropzone.
+    3. 📁 Case Tree: Full-height OpenFOAM directory tree (system, constant, 0), Check & Repair diagnostics, and 1-Click ZIP Export.
+    4. 📝 History & Save: Custom simulation case naming and chronological log of AI vs. Manual modifications.
+
+- Ocean Seawater & Hydrodynamic Realism (Completed):
+  * Added Seawater medium (rho = 1025 kg/m^3, nu = 1.05e-6 m^2/s) to FLUID_DATABASE in backend/solver.py and frontend types/SidebarControls.
+  * Verified build pipeline: frontend compiled cleanly with 0 TypeScript errors.
+
+- Custom Geometry Builder & Project Persistence (Completed - Task 2.4):
+  * Added Custom Solid Obstacle builder in SidebarControls.vue (Cylinder, Square, Plate, Airfoil) with position, scale, and AoA controls.
+  * Added parse_dict_overrides() in backend/solver.py to parse OpenFOAM dimensioned scalars (deltaT, nu, inlet_velocity) from user edits into the live solver.
+  * Implemented project snapshot persistence in backend/projects.py and frontend/src/utils/projectStore.ts with named saves and offline localStorage mirror.
+  * Upgraded PINN AI mode in backend/app.py with real dynamic aerodynamic force integration and obstacle masking.
+
+- Inter-Agent Protocol (Antigravity & Ralph Loop):
+  * Completed Epics: Phase 1 (100%), Task 2.3 (100%), Task 2.4 (100%).
+  * Next priority: Task 2.1 (Sub-Grid Turbulence Modeling with eddy viscosity nu_t) and Task 2.2 (STL voxel mask ingestion).
+================================================================================

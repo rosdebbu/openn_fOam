@@ -30,6 +30,21 @@
       </div>
       <h1 class="brand-title">OpenZess 3D Studio</h1>
 
+      <!-- Editable Simulation / Case Name Pill -->
+      <div class="case-name-wrapper" title="Click to rename this simulation case">
+        <span class="case-icon">📁</span>
+        <input
+          type="text"
+          :value="caseName || 'OpenZess_Case'"
+          @input="$emit('update:caseName', ($event.target as HTMLInputElement).value)"
+          @change="$emit('update:caseName', ($event.target as HTMLInputElement).value)"
+          class="case-name-input"
+          placeholder="Name simulation..."
+          aria-label="Simulation Case Name"
+        />
+        <span class="edit-hint-icon" title="Rename Case">✏️</span>
+      </div>
+
       <!-- Archetype Switcher Dropdown -->
       <div class="archetype-dropdown-wrapper" ref="archetypeDropdownRef">
         <button
@@ -68,7 +83,7 @@
           class="engine-pill-btn"
           :class="solverMode || 'cfd'"
           @click="showEngineMenu = !showEngineMenu"
-          title="Select CFD Physics Engine (Rust SIMD, PINN AI, or Python SciPy)"
+          title="Select solver engine (Python projection solver, Rust kernel, or instant potential-flow preview)"
         >
           <span class="engine-icon">{{ currentEngineInfo.icon }}</span>
           <span class="engine-label">{{ currentEngineInfo.name }}</span>
@@ -120,7 +135,7 @@
           class="colab-btn"
           :class="{ connected: isConnected, connecting: isConnecting }"
           @click="showColabMenu = !showColabMenu"
-          title="Google Colab-style Local Hardware Bridge"
+          title="Backend connection and host resources"
         >
           <span class="colab-icon">✓</span>
           <span class="colab-label">RAM</span>
@@ -140,16 +155,16 @@
             <div class="dropdown-header">
               <div class="header-status">
                 <span class="pulse-dot"></span>
-                <strong>Connected to Local Hardware</strong>
+                <strong>{{ isConnected ? 'Solver backend connected' : 'Solver backend not connected' }}</strong>
               </div>
-              <span class="header-host">127.0.0.1:8000</span>
+              <span class="header-host">this machine</span>
             </div>
 
             <div class="resource-breakdown">
               <div class="resource-item">
                 <div class="res-info">
                   <span>System RAM</span>
-                  <strong>{{ (ramUsage * 0.32).toFixed(1) }} GB / 32.0 GB</strong>
+                  <strong>{{ ramText }}</strong>
                 </div>
                 <div class="res-meter">
                   <div class="res-fill" :style="{ width: ramUsage + '%' }"></div>
@@ -158,8 +173,8 @@
 
               <div class="resource-item">
                 <div class="res-info">
-                  <span>Local NVMe Disk</span>
-                  <strong>{{ (diskUsage * 10).toFixed(0) }} GB / 1024 GB</strong>
+                  <span>Disk</span>
+                  <strong>{{ diskText }}</strong>
                 </div>
                 <div class="res-meter">
                   <div class="res-fill disk" :style="{ width: diskUsage + '%' }"></div>
@@ -169,17 +184,14 @@
               <div class="resource-item">
                 <div class="res-info">
                   <span>Compute Device</span>
-                  <span class="device-tag">NVIDIA CUDA GPU (Local)</span>
+                  <span class="device-tag">CPU{{ system?.cpu_count ? ` (${system.cpu_count} cores)` : '' }} — no GPU code</span>
                 </div>
               </div>
             </div>
 
             <div class="dropdown-actions">
               <button class="menu-action-btn" @click="handleReconnect">
-                <span>🔄 Reconnect Local Bridge</span>
-              </button>
-              <button class="menu-action-btn" @click="showColabMenu = false">
-                <span>⚙️ Change Runtime Type</span>
+                <span>🔄 Refresh</span>
               </button>
             </div>
           </div>
@@ -281,6 +293,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { SimulationArchetype, AiProviderConfig, SolverMode } from '../types/cfd';
 
 const props = defineProps<{
+  caseName?: string;
   currentArchetype: SimulationArchetype;
   solverMode?: SolverMode;
   aiConfig: AiProviderConfig;
@@ -291,6 +304,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (e: 'update:caseName', name: string): void;
   (e: 'update:archetype', arch: SimulationArchetype): void;
   (e: 'update:solverMode', mode: SolverMode): void;
   (e: 'openSettings'): void;
@@ -315,9 +329,9 @@ const colabWidgetRef = ref<HTMLDivElement | null>(null);
 const exportDropdownRef = ref<HTMLDivElement | null>(null);
 
 const engines: { id: SolverMode; name: string; icon: string; badge: string; tech: string; desc: string; speed: string; speedClass: string }[] = [
-  { id: 'rust', name: 'Rust Bare-Metal', icon: '🦀', badge: 'SIMD', tech: 'Axum + Rayon', desc: 'Multi-threaded Navier-Stokes & Poisson solver', speed: 'Fastest ⚡', speedClass: 'fastest' },
-  { id: 'ai', name: 'PINN AI Surrogate', icon: '⚡', badge: '<50ms', tech: 'Neural Network', desc: 'Instant physics-informed neural operator flow prediction', speed: 'Instant 🚀', speedClass: 'instant' },
-  { id: 'cfd', name: 'Python SciPy', icon: '🔬', badge: 'Sparse', tech: 'SciPy + NumPy', desc: 'High-precision sparse fractional-step CPU solver', speed: 'High-Res 🎯', speedClass: 'precise' }
+  { id: 'rust', name: 'Rust Kernel', icon: '🦀', badge: 'Rayon', tech: 'Axum + Rayon', desc: 'Explicit Navier-Stokes, multi-threaded Jacobi pressure solve (needs the sidecar running)', speed: 'Single result', speedClass: 'fastest' },
+  { id: 'ai', name: 'Instant Preview', icon: '⚡', badge: 'No ML', tech: 'Potential flow / Stokes', desc: 'One sparse solve: inviscid flow around the body (Stokes for the cavity). No drag, wake or separation.', speed: 'Instant 🚀', speedClass: 'instant' },
+  { id: 'cfd', name: 'Python SciPy', icon: '🔬', badge: 'Sparse LU', tech: 'SciPy + NumPy', desc: 'Fractional-step projection solver, streamed live (first-order upwind)', speed: 'Live frames', speedClass: 'precise' }
 ];
 
 const currentEngineInfo = computed(() => {
@@ -330,16 +344,58 @@ function selectEngine(id: SolverMode) {
   emit('update:solverMode', id);
 }
 
-const ramUsage = ref(38);
-const diskUsage = ref(24);
+// Real host figures from GET /api/system (no invented hardware numbers)
+const system = ref<{
+  cpu_count: number | null;
+  disk_total: number | null;
+  disk_used: number | null;
+  mem_total: number | null;
+  mem_available: number | null;
+} | null>(null);
+const GB = 1024 ** 3;
+const ramUsage = computed(() => {
+  const s = system.value;
+  return s?.mem_total && s.mem_available != null ? 100 * (1 - s.mem_available / s.mem_total) : 0;
+});
+const diskUsage = computed(() => {
+  const s = system.value;
+  return s?.disk_total && s.disk_used != null ? (100 * s.disk_used) / s.disk_total : 0;
+});
+const ramText = computed(() => {
+  const s = system.value;
+  if (!s?.mem_total) return 'unavailable';
+  const total = (s.mem_total / GB).toFixed(1);
+  return s.mem_available != null ? `${((s.mem_total - s.mem_available) / GB).toFixed(1)} GB / ${total} GB` : `${total} GB total`;
+});
+const diskText = computed(() => {
+  const s = system.value;
+  return s?.disk_total && s.disk_used != null
+    ? `${(s.disk_used / GB).toFixed(0)} GB / ${(s.disk_total / GB).toFixed(0)} GB`
+    : 'unavailable';
+});
+
+async function refreshSystem() {
+  const envApi = (import.meta as any).env?.VITE_API_URL;
+  const base = envApi || (window.location.host.includes('5173') ? 'http://127.0.0.1:8000' : '');
+  try {
+    const resp = await fetch(`${base}/api/system`);
+    system.value = resp.ok ? await resp.json() : null;
+  } catch {
+    system.value = null;
+  }
+}
 
 const archetypes: { id: SimulationArchetype; name: string; icon: string; solver: string; desc: string }[] = [
-  { id: 'plume', name: 'Buoyant Thermal Plume', icon: '💨', solver: 'buoyantBoussinesqSimpleFoam', desc: 'Coupled thermal buoyancy jet' },
-  { id: 'airfoil', name: 'NACA 0012 Airfoil Flow', icon: '✈️', solver: 'simpleFoam', desc: 'Wing aerodynamics, Lift & Drag' },
-  { id: 'cylinder', name: 'Bluff Body & Vortex Street', icon: '🔴', solver: 'pimpleFoam', desc: 'Von Kármán transient wake' },
-  { id: 'venturi', name: 'Venturi Nozzle Flow', icon: '🚿', solver: 'rhoSimpleFoam', desc: 'Compressible throat acceleration' },
-  { id: 'cavity', name: '3D Lid-Driven Cavity', icon: '🌀', solver: 'icoFoam', desc: 'Shear-driven vortex recirculation' },
-  { id: 'cad', name: 'Custom CAD Upload (.STL)', icon: '📤', solver: 'snappyHexMesh + simpleFoam', desc: 'Arbitrary 3D geometry' }
+  // All cases run on the same 2-D incompressible solver
+  { id: 'airfoil', name: 'NACA 0012 Airfoil Flow', icon: '✈️', solver: '2-D channel', desc: 'Lift & drag vs angle of attack' },
+  { id: 'f1', name: 'F1 Front Wing Aerodynamics', icon: '🏎️', solver: '2-D channel', desc: 'Wing section over a moving ground' },
+  { id: 'drone', name: 'Quadcopter Drone Rotor', icon: '🚁', solver: '2-D channel', desc: 'Rotor-arm section in cross-flow' },
+  { id: 'submarine', name: 'Submarine Hydrodynamic Hull', icon: '🌊', solver: '2-D channel', desc: 'Hull + sail drag, cavitation number' },
+  { id: 'plume', name: 'Buoyant Thermal Plume', icon: '💨', solver: 'Boussinesq', desc: 'Heated strip in a cross-wind' },
+  { id: 'cylinder', name: 'Bluff Body (Cylinder)', icon: '🔴', solver: '2-D channel', desc: 'Cylinder wake and drag' },
+  { id: 'venturi', name: 'Venturi Nozzle Flow', icon: '🚿', solver: '2-D channel', desc: 'Incompressible throat speed-up & pressure drop' },
+  { id: 'cavity', name: 'Lid-Driven Cavity (2-D)', icon: '🌀', solver: 'sealed box', desc: 'Benchmark vs Ghia et al. (1982)' },
+  { id: 'cad', name: 'Custom Shape (Builder)', icon: '🧩', solver: '2-D channel', desc: 'Circle / square / rectangle / airfoil primitive' }
 ];
 
 const currentArchetypeInfo = computed(() => {
@@ -351,14 +407,10 @@ const hasAiKey = computed(() => {
 });
 
 const aiModelDisplay = computed(() => {
-  if (props.aiConfig.provider === 'ollama') return '🦙 Ollama (Local)';
+  if (props.aiConfig.provider === 'ollama') return `🦙 ${props.aiConfig.model || 'Ollama'}`;
   if (!props.aiConfig.apiKey) return 'Set AI Key';
-  if (props.aiConfig.provider === 'gemini') return 'Gemini 2.5 Flash';
-  if (props.aiConfig.provider === 'openai') return 'GPT-4o';
-  if (props.aiConfig.provider === 'claude') return 'Claude 3.5';
-  if (props.aiConfig.provider === 'deepseek') return 'DeepSeek-V3';
-  if (props.aiConfig.provider === 'groq') return 'Groq Llama 3';
-  return 'AI Configured';
+  // Show the model actually configured, not a hardcoded name per provider
+  return props.aiConfig.model || 'AI Configured';
 });
 
 function selectArchetype(id: SimulationArchetype) {
@@ -367,7 +419,7 @@ function selectArchetype(id: SimulationArchetype) {
 }
 
 function handleReconnect() {
-  showColabMenu.value = false;
+  refreshSystem();
 }
 
 function handleExport(type: 'zip' | 'vtk' | 'png') {
@@ -393,6 +445,7 @@ function handleClickOutside(e: MouseEvent) {
 
 onMounted(() => {
   window.addEventListener('click', handleClickOutside);
+  refreshSystem();
 });
 
 onUnmounted(() => {
@@ -485,6 +538,64 @@ onUnmounted(() => {
   letter-spacing: -0.2px;
   color: #ffffff;
   margin: 0;
+}
+
+/* Editable Simulation / Case Name Pill */
+.case-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+}
+
+.case-name-wrapper:hover {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.case-name-wrapper:focus-within {
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.case-icon {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.case-name-input {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+  font-weight: 600;
+  outline: none;
+  min-width: 130px;
+  max-width: 200px;
+  letter-spacing: -0.2px;
+}
+
+.case-name-input::placeholder {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.edit-hint-icon {
+  font-size: 10px;
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.case-name-wrapper:hover .edit-hint-icon {
+  opacity: 1;
 }
 
 /* Archetype Dropdown Switcher */

@@ -1,5 +1,9 @@
 # 🔬 Hybrid Python + Rust Architecture for CFD & AI Research
 
+> **Status (Nov 2026):** research roadmap. There is no PyO3 binding or trained AI
+> surrogate in the repository; Python talks to the Rust sidecar over HTTP, and the "ai" mode
+> is a potential-flow / Stokes solve (see `PHYSICS_AND_SOLVER.md`).
+
 This document outlines how to combine **Python** and **Rust** in this project to create a research platform for **benchmarking, AI surrogate training, parameter sweeps, and academic publication**.
 
 ---

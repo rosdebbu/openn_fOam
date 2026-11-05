@@ -3,260 +3,394 @@
     <!-- Hub Header -->
     <div class="hub-header">
       <div class="hub-title-row">
-        <div class="title-with-badge">
-          <h2 class="hub-title">OpenFOAM Physics & Case Hub</h2>
+        <div class="hub-title-left">
+          <span class="hub-icon">📁</span>
+          <h2 class="hub-title">OpenFOAM Case Hub</h2>
           <span class="version-tag">v2406 FVM</span>
         </div>
         <button
-          class="sidebar-close-btn"
-          @click="$emit('close')"
-          title="Collapse Sidebar (Ctrl + \\)"
-          aria-label="Collapse Sidebar"
+          class="collapse-sidebar-btn"
+          @click="$emit('closeSidebar')"
+          title="Collapse Case Hub into Slide Bar (Ctrl + \)"
         >
-          <svg class="close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="18" height="18" x="3" y="3" rx="2"/>
-            <path d="M9 3v18"/>
-            <path d="m14 9-3 3 3 3"/>
-          </svg>
+          ◀ Hide
         </button>
       </div>
-      <p class="hub-subtitle">Conservation of Mass, Momentum, Energy & Gravity</p>
+      <p class="hub-subtitle">Standard OpenFOAM Directory Tree & Physical Controls</p>
     </div>
 
-    <!-- AI Slide Bar Drawer Toggle -->
-    <div class="ai-slide-toggle-bar" @click="isAiDrawerOpen = !isAiDrawerOpen">
-      <div class="toggle-left">
-        <span class="ai-icon">🤖</span>
-        <span class="toggle-label">AI Copilot & Idea Assistant</span>
+    <!-- Mode Switcher Pill (Matching Approved Mockup) -->
+    <div class="mode-toggle-wrapper">
+      <button
+        class="mode-btn"
+        :class="{ active: activeMode === 'manual' }"
+        @click="setMode('manual')"
+      >
+        <span>⚙️ Manual OpenFOAM</span>
+      </button>
+      <button
+        class="mode-btn"
+        :class="{ active: activeMode === 'ai' }"
+        @click="setMode('ai')"
+      >
+        <span>🤖 AI Copilot</span>
         <span class="ai-chip">{{ aiStatusBadge }}</span>
-      </div>
-      <button class="slide-arrow-btn">
-        {{ isAiDrawerOpen ? '▲ Slide Close' : '▼ Slide Open' }}
       </button>
     </div>
 
-    <!-- AI Slide Drawer (Collapsible) -->
-    <transition name="slide-down">
-      <div v-show="isAiDrawerOpen" class="ai-slide-drawer">
-        <div class="copilot-chat-history" ref="chatHistoryRef">
-          <div v-for="(msg, i) in chatMessages" :key="i" class="chat-msg" :class="msg.role">
-            <div class="msg-author">{{ msg.role === 'user' ? '👤 Idea Input' : '⚡ AI Assistant' }}</div>
-            <div class="msg-content">{{ msg.text }}</div>
-            <button
-              v-if="msg.dictCode"
-              class="apply-snippet-btn"
-              @click="applyAiSnippet(msg.dictCode)"
-            >
-              📋 Apply & Repair in Case
-            </button>
-
-            <!-- Autonomous Agent Action Card -->
-            <div v-if="msg.simConfig" class="agent-action-card">
-              <div class="agent-action-header">
-                <span class="agent-action-badge">⚡ Autonomous Agent Executed</span>
-                <span class="agent-action-title">{{ msg.simConfig.summary }}</span>
-              </div>
-              <div class="agent-pills-row">
-                <span v-if="msg.simConfig.archetype" class="agent-pill domain">Domain: {{ msg.simConfig.archetype.toUpperCase() }}</span>
-                <span v-if="msg.simConfig.substance" class="agent-pill fluid">Fluid: {{ msg.simConfig.substance.toUpperCase() }}</span>
-                <span v-if="msg.simConfig.reynoldsNumber" class="agent-pill re">Re: {{ msg.simConfig.reynoldsNumber }}</span>
-                <span v-if="msg.simConfig.angleDegrees !== undefined" class="agent-pill aoa">AoA: {{ msg.simConfig.angleDegrees }}°</span>
-              </div>
-              <div class="agent-action-footer">
-                <button class="agent-rerun-btn" @click="emit('autoRunSimulation')">
-                  🚀 Launch / Rerun Simulation
-                </button>
-              </div>
-            </div>
-          </div>
-          <div v-if="isAiLoading" class="chat-msg ai loading">
-            <div class="msg-author">⚡ AI Assistant</div>
-            <div class="msg-content">🧠 Computing Navier-Stokes equations, boundary conditions & mesh...</div>
-          </div>
-        </div>
-
-        <!-- Quick Idea Chips -->
-        <div class="quick-prompt-chips">
-          <button class="chip-btn" @click="sendQuickPrompt('Setup water sloshing under Earth gravity g = [0, 0, -9.81]')">
-            💧 Water Gravity
-          </button>
-          <button class="chip-btn" @click="sendQuickPrompt('Thermal plume rising with Boussinesq buoyancy at 350K')">
-            🔥 Thermal Buoyancy
-          </button>
-          <button class="chip-btn" @click="sendQuickPrompt('High Reynolds aerodynamic flow over car with ground effect')">
-            🏎️ Ground Effect
-          </button>
-        </div>
-
-        <!-- Copilot Input Row -->
-        <div class="copilot-input-row">
-          <input
-            type="text"
-            v-model="userPrompt"
-            placeholder="Type physics idea or describe boundary conditions..."
-            class="copilot-input"
-            @keyup.enter="handleSendAiPrompt"
-          />
-          <button class="copilot-send-btn" :disabled="isAiLoading || !userPrompt.trim()" @click="handleSendAiPrompt">
-            ➤
-          </button>
-        </div>
-      </div>
-    </transition>
-
-    <!-- Hub Mode Tabs: Natural Physics vs Manual Repair -->
-    <div class="hub-tabs-row">
-      <button
-        class="hub-tab-btn"
-        :class="{ active: activeTab === 'physics' }"
-        @click="activeTab = 'physics'"
-      >
-        🌍 Natural Physics & Forces
-      </button>
-      <button
-        class="hub-tab-btn"
-        :class="{ active: activeTab === 'repair' }"
-        @click="activeTab = 'repair'"
-      >
-        🛠️ Manual Repair & OpenFOAM Case
-      </button>
-    </div>
-
-    <!-- TAB 1: Natural Physics & Forces Engine (Gravity, Temperature, Density, Water, Volume) -->
-    <div v-show="activeTab === 'physics'" class="physics-tab-content">
-      <!-- Card: Fluid Substance & Density -->
-      <div class="hub-card substance-card">
-        <div class="card-header">
-          <div class="card-title-row">
-            <span class="card-title">🧪 Fluid Substance & Thermodynamic Density (ρ)</span>
-          </div>
-          <p class="card-desc">Equation of State: Continuity & Momentum properties</p>
-        </div>
-
-        <div class="substance-grid">
-          <button
-            v-for="sub in substances"
-            :key="sub.id"
-            class="substance-btn"
-            :class="{ active: currentSubstance.id === sub.id }"
-            @click="selectSubstance(sub)"
-          >
-            <span class="sub-name">{{ sub.name }}</span>
-            <span class="sub-prop">ρ: {{ sub.density }} kg/m³</span>
-            <span class="sub-prop">ν: {{ sub.kinematicViscosity.toExponential(1) }} m²/s</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Card: Natural Forces — Gravity & Buoyancy -->
-      <div class="hub-card forces-card">
-        <div class="card-header">
-          <div class="card-title-row">
-            <span class="card-title">🌍 Natural Gravity Vector (g) & Temperature (T)</span>
-          </div>
-          <p class="card-desc">Momentum source: ρg + Energy equation: ∇·(k∇T)</p>
-        </div>
-
-        <div class="sliders-list">
-          <!-- Gravity Z Slider -->
-          <div class="slider-group">
-            <div class="slider-labels">
-              <label>Gravity Z (gz) [m/s²]</label>
-              <span class="slider-val-badge">{{ gravityZ.toFixed(2) }} m/s²</span>
-            </div>
-            <input
-              type="range"
-              min="-20.0"
-              max="20.0"
-              step="0.1"
-              v-model.number="gravityZ"
-              @input="emitForcesChange"
-            />
-            <div class="preset-pills">
-              <button class="preset-btn" @click="setGravity(-9.81)">🌍 Earth (-9.81)</button>
-              <button class="preset-btn" @click="setGravity(-1.62)">🌙 Moon (-1.62)</button>
-              <button class="preset-btn" @click="setGravity(0.0)">🛰️ Zero-G (0.0)</button>
-              <button class="preset-btn" @click="setGravity(9.81)">🔄 Inverted (+9.81)</button>
-            </div>
-          </div>
-
-          <!-- Ambient Temperature -->
-          <div class="slider-group">
-            <div class="slider-labels">
-              <label>Core Fluid Temperature (T)</label>
-              <span class="slider-val-badge">{{ coreTemp.toFixed(1) }} K ({{ (coreTemp - 273.15).toFixed(1) }} °C)</span>
-            </div>
-            <input
-              type="range"
-              min="250.0"
-              max="450.0"
-              step="1.0"
-              v-model.number="coreTemp"
-              @input="emitForcesChange"
-            />
-          </div>
-
-          <!-- Thermal Expansion (Buoyancy) -->
-          <div class="slider-group">
-            <div class="slider-labels">
-              <label>Thermal Expansion (β) — Boussinesq</label>
-              <span class="slider-val-badge">{{ thermalBeta.toFixed(4) }} 1/K</span>
-            </div>
-            <input
-              type="range"
-              min="0.0005"
-              max="0.01"
-              step="0.0001"
-              v-model.number="thermalBeta"
-              @input="emitForcesChange"
-            />
-          </div>
-
-          <!-- Water / Multiphase Volume Fraction -->
-          <div class="slider-group" v-if="currentSubstance.id === 'water'">
-            <div class="slider-labels">
-              <label>💧 Water Volume Fraction (α) — VOF</label>
-              <span class="slider-val-badge">{{ (waterAlpha * 100).toFixed(0) }}% Water / {{ ((1 - waterAlpha) * 100).toFixed(0) }}% Air</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="1.0"
-              step="0.05"
-              v-model.number="waterAlpha"
-              @input="emitForcesChange"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 2: Manual Repair & OpenFOAM Case Hub -->
-    <div v-show="activeTab === 'repair'" class="repair-tab-content">
-      <!-- Diagnostics & Repair Action Bar -->
-      <div class="diagnostics-action-card">
-        <div class="diag-left">
-          <span class="diag-icon">🛡️</span>
-          <div>
-            <strong>OpenFOAM Case Consistency Validator</strong>
-            <p>Checks Courant Co &lt; 1.0, mesh skewness, and boundary conditions</p>
-          </div>
-        </div>
-        <button class="run-diag-btn" @click="runCaseDiagnostics">
-          ⚡ Auto-Diagnose & Repair
+    <!-- MODE 1: Manual OpenFOAM (Structured Tabbed Layout) -->
+    <div v-show="activeMode === 'manual'" class="manual-mode-content">
+      <!-- Sub-Tab Navigation Strip -->
+      <div class="sub-tab-strip">
+        <button
+          class="sub-tab-pill"
+          :class="{ active: activeSubTab === 'physics' }"
+          @click="activeSubTab = 'physics'"
+          title="Fluid medium, inflow speed, turbulence, and gravity"
+        >
+          <span>🌊 Physics & Water</span>
+        </button>
+        <button
+          class="sub-tab-pill"
+          :class="{ active: activeSubTab === 'geometry' }"
+          @click="activeSubTab = 'geometry'"
+          title="Vehicle archetype, submarine hull, drone rotors, and CAD dropzone"
+        >
+          <span>🧱 Geometry</span>
+        </button>
+        <button
+          class="sub-tab-pill"
+          :class="{ active: activeSubTab === 'files' }"
+          @click="activeSubTab = 'files'"
+          title="OpenFOAM standard directory tree (system, constant, 0)"
+        >
+          <span>📁 Case Tree</span>
+        </button>
+        <button
+          class="sub-tab-pill"
+          :class="{ active: activeSubTab === 'changelog' }"
+          @click="activeSubTab = 'changelog'"
+          title="Simulation naming, change history, and snapshot saving"
+        >
+          <span>📝 History</span>
         </button>
       </div>
 
-      <div v-if="diagReport" class="diag-report-banner" :class="diagReport.type">
-        <span>{{ diagReport.message }}</span>
+      <!-- TAB 1: Physics & Water -->
+      <div v-show="activeSubTab === 'physics'" class="tab-pane physics-pane">
+        <!-- Parameters Card -->
+        <div class="hub-card params-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Flow Parameters</span>
+              <span class="token-tag">Aerodynamics & Hydrodynamics</span>
+            </div>
+          </div>
+
+          <div class="sliders-list">
+            <!-- Flow Velocity -->
+            <div class="slider-group">
+              <div class="slider-labels">
+                <label>Flow Speed (U)</label>
+                <span class="slider-val-badge">{{ studioParams.irisPurple.toFixed(2) }} m/s</span>
+              </div>
+              <input
+                type="range"
+                min="0.05"
+                max="5.0"
+                step="0.05"
+                v-model.number="studioParams.irisPurple"
+                @input="emitParamsChange"
+              />
+            </div>
+
+            <!-- Vorticity Angle / AoA -->
+            <div class="slider-group">
+              <div class="slider-labels">
+                <label>Vorticity Angle / AoA</label>
+                <span class="slider-val-badge">{{ (studioParams.vorticityAngle * 57.2958).toFixed(1) }}°</span>
+              </div>
+              <input
+                type="range"
+                min="-0.35"
+                max="0.35"
+                step="0.01"
+                v-model.number="studioParams.vorticityAngle"
+                @input="emitParamsChange"
+              />
+            </div>
+
+            <!-- Reynolds number (log scale: 10 .. 100 000) -->
+            <div class="slider-group">
+              <div class="slider-labels">
+                <label>Reynolds Number (Re)</label>
+                <span class="slider-val-badge">{{ Math.round(params.reynoldsNumber).toLocaleString() }}</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="5"
+                step="0.05"
+                :value="Math.log10(Math.max(params.reynoldsNumber, 10))"
+                @input="emitReynolds(Number(($event.target as HTMLInputElement).value))"
+              />
+            </div>
+
+            <!-- Thermal Core -->
+            <div class="slider-group">
+              <div class="slider-labels">
+                <label>Thermal Core / Fluid Temp</label>
+                <span class="slider-val-badge">{{ studioParams.butterscotchCore.toFixed(1) }} °C</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="120"
+                step="1"
+                v-model.number="studioParams.butterscotchCore"
+                @input="emitParamsChange"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Fluid Medium & Hydrodynamics Card -->
+        <div class="hub-card natural-drawer-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Fluid Medium & Gravity</span>
+              <span class="substance-chip">{{ currentSubstance.name }}</span>
+            </div>
+          </div>
+
+          <div class="card-body-section">
+            <label class="section-label">Select Substance:</label>
+            <div class="substance-pills-row">
+              <button
+                v-for="sub in substances"
+                :key="sub.id"
+                class="sub-pill-btn"
+                :class="{ active: currentSubstance.id === sub.id }"
+                @click="selectSubstance(sub)"
+              >
+                {{ sub.name }}
+              </button>
+            </div>
+
+            <!-- Substance Physical Properties Info Grid -->
+            <div class="substance-props-grid">
+              <div class="prop-item">
+                <span class="prop-label">Density (ρ):</span>
+                <span class="prop-value">{{ currentSubstance.density }} kg/m³</span>
+              </div>
+              <div class="prop-item">
+                <span class="prop-label">Viscosity (ν):</span>
+                <span class="prop-value">{{ currentSubstance.kinematicViscosity.toExponential(2) }} m²/s</span>
+              </div>
+              <div class="prop-item">
+                <span class="prop-label">Spec. Heat (Cp):</span>
+                <span class="prop-value">{{ currentSubstance.specificHeat }} J/kg·K</span>
+              </div>
+              <div class="prop-item" v-if="currentSubstance.surfaceTension">
+                <span class="prop-label">Surface Tension:</span>
+                <span class="prop-value">{{ currentSubstance.surfaceTension }} N/m</span>
+              </div>
+            </div>
+
+            <label class="section-label" style="margin-top: 10px;">Gravity Presets:</label>
+            <div class="gravity-presets-row">
+              <button
+                class="preset-pill"
+                :class="{ active: Math.abs(gravityZ - (-9.81)) < 0.1 }"
+                @click="setGravity(-9.81)"
+              >
+                🌍 Earth (-9.81)
+              </button>
+              <button
+                class="preset-pill"
+                :class="{ active: Math.abs(gravityZ - (-1.62)) < 0.1 }"
+                @click="setGravity(-1.62)"
+              >
+                🌑 Moon (-1.62)
+              </button>
+              <button
+                class="preset-pill"
+                :class="{ active: Math.abs(gravityZ) < 0.1 }"
+                @click="setGravity(0.0)"
+              >
+                🌌 Zero-G
+              </button>
+              <button
+                class="preset-pill"
+                :class="{ active: Math.abs(gravityZ - 9.81) < 0.1 }"
+                @click="setGravity(9.81)"
+              >
+                🔄 Inverted
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Hub Grid: File Tree on Left, Boundary Editor & Dropzone on Right -->
-      <div class="hub-grid">
-        <!-- Card 1: OpenFOAM Case File Tree -->
-        <div class="hub-card tree-card">
+      <!-- TAB 2: Geometry & Archetype -->
+      <div v-show="activeSubTab === 'geometry'" class="tab-pane geometry-pane">
+        <!-- Archetype Selector Card -->
+        <div class="hub-card archetype-card">
           <div class="card-header">
-            <span class="card-title">Case File Tree</span>
+            <div class="card-title-row">
+              <span class="card-title">Simulation Archetype</span>
+              <span class="token-tag">{{ params.archetype.toUpperCase() }}</span>
+            </div>
+          </div>
+
+          <div class="archetype-grid">
+            <button
+              v-for="arch in availableArchetypes"
+              :key="arch.id"
+              class="archetype-pill-btn"
+              :class="{ active: params.archetype === arch.id }"
+              @click="selectArchetype(arch.id)"
+            >
+              <span class="arch-icon">{{ arch.icon }}</span>
+              <span class="arch-name">{{ arch.name }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Geometry Builder — lets users build THEIR OWN simulation -->
+        <div class="hub-card geometry-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Custom Geometry Builder</span>
+              <span class="token-tag">SOLID OBSTACLE</span>
+            </div>
+          </div>
+
+          <p class="builder-hint">
+            Draw your own body: the solver meshes it as a no-slip solid inside
+            the flow tunnel and computes real drag & lift around it.
+          </p>
+
+          <div class="archetype-grid builder-shape-grid">
+            <button
+              v-for="shape in builderShapes"
+              :key="shape.id"
+              class="archetype-pill-btn"
+              :class="{ active: builderShape === shape.id }"
+              @click="setBuilderShape(shape.id)"
+            >
+              <span class="arch-icon">{{ shape.icon }}</span>
+              <span class="arch-name">{{ shape.name }}</span>
+            </button>
+          </div>
+
+          <template v-if="builderShape">
+            <div class="sliders-list builder-sliders">
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Position X</label>
+                  <span class="slider-val-badge">{{ builderCx.toFixed(2) }}</span>
+                </div>
+                <input type="range" min="0.15" max="0.85" step="0.05" v-model.number="builderCx" @input="emitCustomGeometry" />
+              </div>
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Position Y</label>
+                  <span class="slider-val-badge">{{ builderCy.toFixed(2) }}</span>
+                </div>
+                <input type="range" min="0.15" max="0.85" step="0.05" v-model.number="builderCy" @input="emitCustomGeometry" />
+              </div>
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label>Size</label>
+                  <span class="slider-val-badge">{{ builderSize.toFixed(2) }}</span>
+                </div>
+                <input type="range" min="0.05" max="0.35" step="0.01" v-model.number="builderSize" @input="emitCustomGeometry" />
+              </div>
+              <div class="slider-group" v-if="builderShape === 'airfoil'">
+                <div class="slider-labels">
+                  <label>Angle of Attack</label>
+                  <span class="slider-val-badge">{{ builderAoa.toFixed(0) }}°</span>
+                </div>
+                <input type="range" min="-20" max="20" step="1" v-model.number="builderAoa" @input="emitCustomGeometry" />
+              </div>
+            </div>
+
+            <button class="apply-btn" @click="applyBuilderToSimulation">
+              ▶ Run Simulation with This Geometry
+            </button>
+          </template>
+        </div>
+
+        <!-- Geometry input / Photo dropzone Card -->
+        <div class="hub-card geometry-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">CAD / Mesh Upload</span>
+              <span class="token-tag">Not implemented</span>
+            </div>
+          </div>
+
+          <div
+            class="photo-dropzone"
+            :class="{ dragging: isDraggingOver, 'has-file': !!uploadedFileName }"
+            @dragover.prevent="isDraggingOver = true"
+            @dragleave.prevent="isDraggingOver = false"
+            @drop.prevent="handleFileDrop"
+            @click="triggerFileInput"
+          >
+            <input
+              type="file"
+              ref="fileInputRef"
+              style="display: none"
+              accept=".stl,.obj,.step,.png,.jpg,.jpeg"
+              @change="handleFileChange"
+            />
+
+            <div class="dropzone-content">
+              <div class="upload-icon-wrapper">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <span class="dropzone-title">CAD import is not implemented yet</span>
+              <span class="dropzone-sub">The 2-D solver cannot read mesh files. Use the Geometry Builder above to place a custom shape.</span>
+              <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }} — not used</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Case Tree -->
+      <div v-show="activeSubTab === 'files'" class="tab-pane files-pane">
+        <div class="hub-card tree-card full-width">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">OpenFOAM Case Directory</span>
+              <span class="token-tag">system/ constant/ 0/</span>
+            </div>
+            <div class="tree-header-actions">
+              <button
+                class="auto-diag-btn"
+                @click="runCaseDiagnostics"
+                title="Run OpenFOAM numerical stability & Courant check"
+              >
+                ⚡ Check & Repair
+              </button>
+              <button
+                class="download-case-btn"
+                @click="downloadCasePackage"
+                title="Download full OpenFOAM case directory as .ZIP"
+              >
+                📦 Export ZIP
+              </button>
+            </div>
+          </div>
+
+          <div v-if="diagReport" class="diag-report-banner" :class="diagReport.type">
+            <span>{{ diagReport.message }}</span>
           </div>
 
           <div class="file-tree-container">
@@ -324,89 +458,154 @@
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Right Column: Boundary Repair & Photo Dropzone -->
-        <div class="right-controls-column">
-          <!-- Boundary Condition Inspector & Repair -->
-          <div class="hub-card bc-repair-card">
-            <div class="card-header">
-              <span class="card-title">Boundary Repair</span>
-            </div>
-
-            <div class="bc-list">
-              <div class="bc-item">
-                <div class="bc-meta">
-                  <span class="bc-name">inlet</span>
-                  <span class="bc-type">fixedValue</span>
-                </div>
-                <div class="bc-input-row">
-                  <span class="unit-lbl">U:</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    v-model.number="studioParams.irisPurple"
-                    class="bc-num-input"
-                    @input="emitParamsChange"
-                  />
-                  <span class="unit-lbl">m/s</span>
-                </div>
-              </div>
-
-              <div class="bc-item">
-                <div class="bc-meta">
-                  <span class="bc-name">outlet</span>
-                  <span class="bc-type">zeroGradient / p=0</span>
-                </div>
-                <span class="bc-desc">Free atmospheric outflow</span>
-              </div>
-
-              <div class="bc-item">
-                <div class="bc-meta">
-                  <span class="bc-name">walls / ground</span>
-                  <span class="bc-type">noSlip (Wall Function)</span>
-                </div>
-                <span class="bc-desc">Viscous boundary layer adherence</span>
-              </div>
+      <!-- TAB 4: History & Save -->
+      <div v-show="activeSubTab === 'changelog'" class="tab-pane history-pane">
+        <!-- Simulation Identity Card -->
+        <div class="hub-card identity-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Simulation Identity</span>
+              <span class="token-tag">Naming & Snapshots</span>
             </div>
           </div>
-
-          <!-- Geometry input / Photo dropzone Card -->
-          <div class="hub-card geometry-card">
-            <div class="card-header">
-              <span class="card-title">Geometry input</span>
-            </div>
-
-            <div
-              class="photo-dropzone"
-              :class="{ dragging: isDraggingOver, 'has-file': !!uploadedFileName }"
-              @dragover.prevent="isDraggingOver = true"
-              @dragleave.prevent="isDraggingOver = false"
-              @drop.prevent="handleFileDrop"
-              @click="triggerFileInput"
-            >
+          <div class="identity-form">
+            <label class="section-label">Case Identifier:</label>
+            <div class="case-name-row">
               <input
-                type="file"
-                ref="fileInputRef"
-                style="display: none"
-                accept=".stl,.obj,.step,.png,.jpg,.jpeg"
-                @change="handleFileChange"
+                type="text"
+                v-model="caseNameInput"
+                class="case-name-input"
+                placeholder="e.g. Submarine_HighSpeed_Recon"
+                @keyup.enter="handleSaveCaseName"
               />
+              <button class="save-name-btn" @click="handleSaveCaseName">Save</button>
+            </div>
+          </div>
+        </div>
 
-              <div class="dropzone-content">
-                <div class="upload-icon-wrapper">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                  </svg>
-                </div>
-                <span class="dropzone-title">Photo / CAD Dropzone</span>
-                <span class="dropzone-sub">Drag & drop .stl / .obj / .step / photo</span>
-                <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
+        <!-- Saved Snapshots Card -->
+        <div class="hub-card history-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Saved Snapshots</span>
+              <span class="token-tag">{{ savedProjects.length }} saved</span>
+            </div>
+          </div>
+          <div class="changelog-list">
+            <div v-if="savedProjects.length === 0" class="changelog-entry">
+              <div class="entry-desc">Nothing saved yet. "Save" stores the full case: physics, geometry and dictionary edits.</div>
+            </div>
+            <div v-for="proj in savedProjects" :key="proj.name" class="changelog-entry">
+              <div class="entry-header">
+                <span class="badge-source manual">{{ proj.archetype || 'case' }}</span>
+                <span class="entry-time">{{ proj.savedAt }}</span>
+              </div>
+              <div class="entry-desc">
+                {{ proj.displayName }}
+                <button class="save-name-btn" @click="emit('loadProject', proj.name)">Load</button>
               </div>
             </div>
           </div>
         </div>
+
+        <!-- Changelog Timeline Card -->
+        <div class="hub-card history-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Modification History</span>
+              <span class="token-tag">{{ changeLog.length }} records</span>
+            </div>
+          </div>
+          <div class="changelog-list">
+            <div v-for="(entry, idx) in changeLog" :key="idx" class="changelog-entry">
+              <div class="entry-header">
+                <span class="badge-source" :class="entry.source.toLowerCase()">{{ entry.source }}</span>
+                <span class="entry-time">{{ entry.timestamp }}</span>
+              </div>
+              <div class="entry-desc">{{ entry.description }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODE 2: AI Copilot Mode -->
+    <div v-show="activeMode === 'ai'" class="ai-mode-content">
+      <div class="copilot-chat-history" ref="chatHistoryRef">
+        <div v-for="(msg, i) in chatMessages" :key="i" class="chat-msg" :class="msg.role">
+          <div class="msg-author">{{ msg.role === 'user' ? '👤 Idea Input' : '⚡ AI Assistant' }}</div>
+          <div class="msg-content">{{ msg.text }}</div>
+
+          <!-- Autonomous Action Card -->
+          <div v-if="msg.detectedAction" class="ai-action-card">
+            <div class="action-card-header">
+              <span class="action-pulse-dot"></span>
+              <span class="action-badge">Autonomous Action</span>
+              <span class="action-label">{{ msg.detectedAction.label }}</span>
+            </div>
+            <div class="action-card-buttons">
+              <button
+                class="apply-and-run-btn"
+                @click="executeAiAction(msg.detectedAction)"
+              >
+                ▶ 1-Click Apply to 3D Studio & Run
+              </button>
+              <button
+                v-if="msg.dictCode"
+                class="apply-snippet-btn"
+                @click="applyAiSnippet(msg.dictCode)"
+              >
+                📋 View Case Dict
+              </button>
+            </div>
+          </div>
+          <button
+            v-else-if="msg.dictCode"
+            class="apply-snippet-btn"
+            @click="applyAiSnippet(msg.dictCode)"
+          >
+            📋 Apply & Repair in Case
+          </button>
+        </div>
+        <div v-if="isAiLoading" class="chat-msg ai loading">
+          <div class="msg-author">⚡ AI Assistant</div>
+          <div class="msg-content">🧠 Computing Navier-Stokes equations, boundary conditions & mesh...</div>
+        </div>
+      </div>
+
+      <!-- Quick Idea Chips -->
+      <div class="quick-prompt-chips">
+        <button class="chip-btn" @click="sendQuickPrompt('Configure Formula 1 front wing in ground effect at 80 m/s with inverted multi-element downforce')">
+          🏎️ F1 Downforce
+        </button>
+        <button class="chip-btn" @click="sendQuickPrompt('Analyze NACA 0012 swept wing at 14 degrees angle of attack with boundary layer separation')">
+          ✈️ Wing Stall
+        </button>
+        <button class="chip-btn" @click="sendQuickPrompt('Simulate quadcopter multi-rotor propeller downwash and slipstream contraction in air')">
+          🚁 Drone Downwash
+        </button>
+        <button class="chip-btn" @click="sendQuickPrompt('Simulate submarine hydrodynamic teardrop hull in seawater at 20 knots with boundary layer wake')">
+          🌊 Submarine Hull
+        </button>
+        <button class="chip-btn" @click="sendQuickPrompt('Thermal plume rising with Boussinesq buoyancy at 350K')">
+          🔥 Thermal Plume
+        </button>
+      </div>
+
+      <!-- Copilot Input Row -->
+      <div class="copilot-input-row">
+        <input
+          type="text"
+          v-model="userPrompt"
+          placeholder="Type physics idea or describe boundary conditions..."
+          class="copilot-input"
+          @keyup.enter="handleSendAiPrompt"
+        />
+        <button class="copilot-send-btn" :disabled="isAiLoading || !userPrompt.trim()" @click="handleSendAiPrompt">
+          ➤
+        </button>
       </div>
     </div>
 
@@ -438,45 +637,151 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, nextTick } from 'vue';
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue';
 import type {
   SimulationParams,
+  SimulationArchetype,
   StudioParameters,
   OpenFoamDictFile,
   AiProviderConfig,
   FluidProperties
 } from '../types/cfd';
-import { queryAiCopilot, type AiSimulationConfig } from '../utils/aiCopilot';
+import { queryAiCopilot } from '../utils/aiCopilot';
+import { fetchProjects, type SavedProjectMeta } from '../utils/projectStore';
 
 const props = defineProps<{
   params: SimulationParams;
   aiConfig: AiProviderConfig;
   isComputing?: boolean;
+  projectsVersion?: number;
 }>();
 
 const emit = defineEmits<{
   (e: 'update:params', params: SimulationParams): void;
   (e: 'fileUploaded', file: File): void;
-  (e: 'autoRunSimulation'): void;
-  (e: 'close'): void;
+  (e: 'startSimulation'): void;
+  (e: 'closeSidebar'): void;
+  (e: 'update:customGeometry', spec: { shape: string; cx: number; cy: number; size: number; aoa: number } | null): void;
+  (e: 'applyDict', file: OpenFoamDictFile): void;
+  (e: 'saveProject', name: string): void;
+  (e: 'loadProject', name: string): void;
 }>();
 
-const activeTab = ref<'physics' | 'repair'>('physics');
-const isAiDrawerOpen = ref(false);
+// Saved snapshots (backend/saved_projects, or localStorage when offline)
+const savedProjects = ref<SavedProjectMeta[]>([]);
+async function refreshSavedProjects() {
+  savedProjects.value = (await fetchProjects()).projects;
+}
+onMounted(refreshSavedProjects);
+watch(() => props.projectsVersion, refreshSavedProjects);
+
+const activeMode = ref<'manual' | 'ai'>('manual');
+const activeSubTab = ref<'physics' | 'geometry' | 'files' | 'changelog'>('physics');
 const isDraggingOver = ref(false);
 const uploadedFileName = ref<string | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+// Archetype list with icons
+const availableArchetypes: Array<{ id: SimulationArchetype; name: string; icon: string }> = [
+  { id: 'submarine', name: 'Submarine', icon: '🌊' },
+  { id: 'drone', name: 'Drone Rotors', icon: '🚁' },
+  { id: 'airfoil', name: 'NACA Airfoil', icon: '✈️' },
+  { id: 'f1', name: 'F1 Aero Wing', icon: '🏎️' },
+  { id: 'venturi', name: 'Venturi Nozzle', icon: '⏳' },
+  { id: 'water_dam', name: 'Water Dam Break', icon: '💧' },
+  { id: 'cylinder', name: 'Cylinder Wake', icon: '⚪' },
+  { id: 'plume', name: 'Thermal Plume', icon: '🔥' },
+  { id: 'cavity', name: 'Lid Cavity', icon: '🌀' },
+  { id: 'cad', name: 'Custom Builder', icon: '🧩' }
+];
+
+// Simulation Case Identity & Changelog
+const caseNameInput = ref(props.params.caseName || 'openzess_sim_01');
+const changeLog = ref<Array<{ timestamp: string; source: 'AI' | 'Manual'; description: string }>>([
+  { timestamp: new Date().toLocaleTimeString(), source: 'Manual', description: 'Session initialized with baseline OpenFOAM parameters' }
+]);
+
+function logChange(source: 'AI' | 'Manual', description: string) {
+  changeLog.value.unshift({
+    timestamp: new Date().toLocaleTimeString(),
+    source,
+    description
+  });
+  if (changeLog.value.length > 50) changeLog.value.pop();
+}
+
+function selectArchetype(arch: SimulationArchetype) {
+  const updated = { ...props.params, archetype: arch };
+  emit('update:params', updated);
+  logChange('Manual', `Switched simulation archetype to ${arch.toUpperCase()}`);
+}
+
+// --- Custom Geometry Builder state ---
+const builderShapes = [
+  { id: 'circle', name: 'Cylinder', icon: '⚪' },
+  { id: 'square', name: 'Square', icon: '⬛' },
+  { id: 'rectangle', name: 'Plate', icon: '▬' },
+  { id: 'airfoil', name: 'Airfoil', icon: '✈️' }
+];
+const builderShape = ref<string | null>(null);
+const builderCx = ref(0.4);
+const builderCy = ref(0.5);
+const builderSize = ref(0.15);
+const builderAoa = ref(8);
+
+function setBuilderShape(id: string) {
+  builderShape.value = id;
+  emitCustomGeometry();
+}
+
+function emitCustomGeometry() {
+  emit('update:customGeometry', builderShape.value ? {
+    shape: builderShape.value,
+    cx: builderCx.value,
+    cy: builderCy.value,
+    size: builderSize.value,
+    aoa: builderAoa.value
+  } : null);
+}
+
+function applyBuilderToSimulation() {
+  emitCustomGeometry();
+  if (props.params.archetype !== 'cad') {
+    emit('update:params', {
+      ...props.params,
+      archetype: 'cad',
+      caseName: `Custom_${builderShape.value}_Run`
+    });
+  }
+  logChange('Manual', `Built custom ${builderShape.value} geometry at (x=${builderCx.value.toFixed(2)}, y=${builderCy.value.toFixed(2)}) and launched the solver`);
+  emit('startSimulation');
+}
+
+function handleSaveCaseName() {
+  const safe = (caseNameInput.value || 'openzess_sim_01').trim();
+  caseNameInput.value = safe;
+  const updated = { ...props.params, caseName: safe };
+  emit('update:params', updated);
+  emit('saveProject', safe);
+  logChange('Manual', `Saved snapshot "${safe}" (physics, geometry and dictionary edits)`);
+}
+
+function downloadCasePackage() {
+  const safe = encodeURIComponent(caseNameInput.value || 'openzess_openfoam_case');
+  window.open(`/api/export/openfoam-zip?name=${safe}`, '_blank');
+  logChange('Manual', `Exported full OpenFOAM case package ZIP for "${caseNameInput.value}"`);
+}
 
 // Natural Physics State
 const gravityZ = ref(props.params.naturalForces?.gravity?.[1] ?? -9.81);
 const coreTemp = ref(props.params.naturalForces?.ambientTemp ?? 310.0);
 const thermalBeta = ref(0.0034);
-const waterAlpha = ref(0.65);
 
 // Substances
 const substances: FluidProperties[] = [
   { id: 'air', name: '💨 Air', density: 1.225, kinematicViscosity: 1.5e-5, specificHeat: 1005, thermalExpansion: 0.0034 },
-  { id: 'water', name: '💧 Water', density: 998.0, kinematicViscosity: 1.0e-6, specificHeat: 4182, thermalExpansion: 0.00021, surfaceTension: 0.0728 },
+  { id: 'water', name: '💧 Fresh Water', density: 998.0, kinematicViscosity: 1.0e-6, specificHeat: 4182, thermalExpansion: 0.00021, surfaceTension: 0.0728 },
+  { id: 'seawater', name: '🌊 Ocean / Seawater', density: 1025.0, kinematicViscosity: 1.05e-6, specificHeat: 3993, thermalExpansion: 0.00024, surfaceTension: 0.0735 },
   { id: 'co2', name: '🫧 CO₂ Gas', density: 1.980, kinematicViscosity: 8.3e-6, specificHeat: 844, thermalExpansion: 0.0037 },
   { id: 'oil', name: '🛢️ Oil', density: 890.0, kinematicViscosity: 4.5e-5, specificHeat: 1900, thermalExpansion: 0.0007 },
   { id: 'ethanol', name: '🍷 Ethanol', density: 789.0, kinematicViscosity: 1.52e-6, specificHeat: 2440, thermalExpansion: 0.0011 }
@@ -490,17 +795,29 @@ const currentSubstance = ref<FluidProperties>(
 const userPrompt = ref('');
 const isAiLoading = ref(false);
 const chatHistoryRef = ref<HTMLDivElement | null>(null);
-const chatMessages = ref<{ role: 'user' | 'ai'; text: string; dictCode?: string; simConfig?: AiSimulationConfig }[]>([
+
+interface ChatMessageItem {
+  role: 'user' | 'ai';
+  text: string;
+  dictCode?: string;
+  detectedAction?: {
+    archetype?: SimulationArchetype;
+    substance?: string;
+    re?: number;
+    label: string;
+  } | null;
+}
+
+const chatMessages = ref<ChatMessageItem[]>([
   {
     role: 'ai',
-    text: '⚡ OpenFOAM Physics Assistant: Give me an idea or sketch, and I will set up the governing equations (mass, momentum, gravity, temperature, and multiphase).'
+    text: '⚡ OpenFOAM Physics Assistant: Give me an idea or scenario, and I will calculate the Navier-Stokes equations and auto-configure your 3D simulation.'
   }
 ]);
 
 const studioParams = reactive<StudioParameters>({
   irisPurple: props.params.studioParams?.irisPurple ?? 0.45,
   vorticityAngle: props.params.studioParams?.vorticityAngle ?? 0.209,
-  vorticityCore: props.params.studioParams?.vorticityCore ?? 50,
   butterscotchCore: props.params.studioParams?.butterscotchCore ?? 100
 });
 
@@ -518,6 +835,12 @@ const aiStatusBadge = computed(() => {
   if (!props.aiConfig.apiKey) return '🔑 Key Needed';
   return props.aiConfig.model;
 });
+
+// Switches the sidebar panel only. (It used to also change the solver
+// engine, so opening the chat silently swapped the physics for the preview.)
+function setMode(mode: 'manual' | 'ai') {
+  activeMode.value = mode;
+}
 
 function selectSubstance(sub: FluidProperties) {
   currentSubstance.value = sub;
@@ -543,6 +866,11 @@ function emitForcesChange() {
   });
 }
 
+// Re drives the solver's viscosity (nu = U L / Re). The slider is log-scaled.
+function emitReynolds(log10Re: number) {
+  emit('update:params', { ...props.params, reynoldsNumber: Math.round(10 ** log10Re) });
+}
+
 function emitParamsChange() {
   emit('update:params', {
     ...props.params,
@@ -550,26 +878,38 @@ function emitParamsChange() {
   });
 }
 
+// Reports only what is actually computed here: the inlet-based Courant
+// number of the requested dt. (The solver also enforces CFL <= 0.4 and the
+// explicit-diffusion limit on every step, whatever dt is requested.)
 function runCaseDiagnostics() {
   const courant = (studioParams.irisPurple * props.params.dt) / (1.0 / props.params.gridResolution);
-  if (courant > 1.0) {
+  if (courant > 0.4) {
     diagReport.value = {
       type: 'warn',
-      message: `⚠️ Courant number Co = ${courant.toFixed(2)} > 1.0! Auto-reduced dt to ${(0.8 * (1.0 / props.params.gridResolution) / studioParams.irisPurple).toFixed(4)}s to prevent numerical divergence.`
+      message: `⚠️ Requested dt gives Co = ${courant.toFixed(2)} at the inlet speed; the solver will cap each step at Co = 0.4, so it runs with a smaller dt than requested.`
     };
   } else {
     diagReport.value = {
       type: 'success',
-      message: `✅ All OpenFOAM checks passed: Co = ${courant.toFixed(2)} ≤ 1.0, Poisson matrix symmetric positive definite, boundary flux conservative.`
+      message: `✅ Requested dt gives Co = ${courant.toFixed(2)} ≤ 0.4 at the inlet speed. (Only the Courant number is checked here.)`
     };
   }
 }
 
 function saveDictionaryFile() {
-  if (selectedFile.value) {
-    alert(`File ${selectedFile.value.path} successfully recompiled into OpenFOAM case!`);
-    selectedFile.value = null;
-  }
+  if (!selectedFile.value) return;
+  // ACTUALLY apply the edit: send the modified dict to the parent, which
+  // forwards it to the backend so the re-run honors the user's changes.
+  emit('applyDict', {
+    ...selectedFile.value,
+    content: selectedFile.value.content
+  });
+  logChange('Manual', `Applied edited ${selectedFile.value.category}/${selectedFile.value.name} to the live solver run`);
+  diagReport.value = {
+    type: 'success',
+    message: `✅ ${selectedFile.value.name} applied — solver restarted with your dictionary edits.`
+  };
+  selectedFile.value = null;
 }
 
 const currentSystemFiles = computed<OpenFoamDictFile[]>(() => {
@@ -595,10 +935,15 @@ startFrom       startTime;
 startTime       0;
 stopAt          endTime;
 endTime         1000;
-deltaT          ${props.params.dt};
+deltaT          ${props.params.dt || 0.005};
 writeControl    timeStep;
-writeInterval   50;
+writeInterval   20;
+purgeWrite      0;
+writeFormat     ascii;
 writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
 runTimeModifiable true;`
     },
     {
@@ -613,9 +958,10 @@ runTimeModifiable true;`
     location    "system";
     object      fvSchemes;
 }
-ddtSchemes { default Euler; }
+ddtSchemes { default steadyState; }
 gradSchemes { default Gauss linear; }
-divSchemes {
+divSchemes
+{
     default none;
     div(phi,U) Gauss linearUpwind grad(U);
     div(phi,T) Gauss limitedLinear 1;
@@ -640,6 +986,35 @@ solvers
     U { solver smoothSolver; smoother symGaussSeidel; tolerance 1e-08; }
     T { solver PBiCGStab; preconditioner DILU; tolerance 1e-08; }
 }`
+    },
+    {
+      name: 'blockMeshDict',
+      path: 'system/blockMeshDict',
+      category: 'system',
+      content: `FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+convertToMeters 1;
+vertices
+(
+    (-2.0 -1.0 -1.0)
+    ( 2.0 -1.0 -1.0)
+    ( 2.0  1.0 -1.0)
+    (-2.0  1.0 -1.0)
+    (-2.0 -1.0  1.0)
+    ( 2.0 -1.0  1.0)
+    ( 2.0  1.0  1.0)
+    (-2.0  1.0  1.0)
+);
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (${props.params.gridResolution} ${props.params.gridResolution} 32) simpleGrading (1 1 1)
+);`
     }
   ];
 });
@@ -724,6 +1099,27 @@ boundaryField
     outlet { type fixedValue; value uniform 0; }
     walls { type zeroGradient; }
 }`
+    },
+    {
+      name: 'T',
+      path: '0/T',
+      category: '0',
+      content: `FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      T;
+}
+dimensions      [0 0 0 1 0 0 0];
+internalField   uniform 293.15;
+boundaryField
+{
+    inlet { type fixedValue; value uniform 293.15; }
+    heaterSource { type fixedValue; value uniform ${(studioParams.butterscotchCore + 273.15).toFixed(2)}; }
+    walls { type zeroGradient; }
+}`
     }
   ];
 });
@@ -758,6 +1154,66 @@ function handleFileDrop(e: DragEvent) {
   }
 }
 
+function parseActionFromAiResponse(aiText: string, userText: string) {
+  const combined = (aiText + ' ' + userText).toLowerCase();
+  let arch: SimulationArchetype | undefined;
+  if (combined.includes('submarine') || combined.includes('hull')) arch = 'submarine';
+  else if (combined.includes('airfoil') || combined.includes('naca') || combined.includes('wing')) arch = 'airfoil';
+  else if (combined.includes('drone') || combined.includes('rotor') || combined.includes('quadcopter')) arch = 'drone';
+  else if (combined.includes('f1') || combined.includes('formula 1') || combined.includes('downforce')) arch = 'f1';
+  else if (combined.includes('cylinder') || combined.includes('von karman')) arch = 'cylinder';
+  else if (combined.includes('venturi') || combined.includes('converging')) arch = 'venturi';
+
+  let substance: string | undefined;
+  if (combined.includes('seawater') || combined.includes('water')) substance = 'water';
+  else if (combined.includes('air')) substance = 'air';
+  else if (combined.includes('oil')) substance = 'oil';
+
+  let re: number | undefined;
+  const reMatch = combined.match(/re\s*[=:\s]+([0-9]+)/i);
+  if (reMatch) {
+    re = parseInt(reMatch[1], 10);
+  }
+
+  if (arch || substance || re) {
+    const parts = [];
+    if (arch) parts.push(`Archetype: ${arch.toUpperCase()}`);
+    if (substance) parts.push(`Medium: ${substance.toUpperCase()}`);
+    if (re) parts.push(`Re = ${re.toLocaleString()}`);
+    return {
+      archetype: arch,
+      substance,
+      re,
+      label: parts.join(' • ')
+    };
+  }
+  return null;
+}
+
+function executeAiAction(action: any) {
+  const updated = { ...props.params };
+  if (action.archetype) {
+    updated.archetype = action.archetype;
+  }
+  if (action.substance) {
+    updated.substance = action.substance;
+    const found = substances.find(s => s.id === action.substance);
+    if (found) currentSubstance.value = found;
+  }
+  if (action.re) {
+    updated.reynoldsNumber = action.re;
+  }
+  emit('update:params', updated);
+  emit('startSimulation');
+  chatMessages.value.push({
+    role: 'ai',
+    text: `⚡ Autonomous Action Executed: Successfully configured ${action.label} and launched live 3D simulation in viewport!`
+  });
+  nextTick(() => {
+    if (chatHistoryRef.value) chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight;
+  });
+}
+
 async function handleSendAiPrompt() {
   if (!userPrompt.value.trim() || isAiLoading.value) return;
 
@@ -773,40 +1229,23 @@ async function handleSendAiPrompt() {
   const res = await queryAiCopilot(promptText, context);
 
   isAiLoading.value = false;
+  const detectedAction = parseActionFromAiResponse(res.analysis, promptText);
+  const dictCode = res.openfoamDictSnippet || extractDictCode(res.analysis);
+
   chatMessages.value.push({
     role: 'ai',
     text: res.analysis,
-    dictCode: res.dictCode,
-    simConfig: res.simConfig
+    dictCode,
+    detectedAction
   });
-
-  // Autonomous Agent Parameter Injection & Auto-Launch
-  if (res.simConfig) {
-    const cfg = res.simConfig;
-    const updated = JSON.parse(JSON.stringify(props.params)) as SimulationParams;
-
-    if (cfg.archetype) updated.archetype = cfg.archetype;
-    if (cfg.substance) {
-      updated.substance = cfg.substance;
-      const subObj = substances.find(s => s.id === cfg.substance);
-      if (subObj) currentSubstance.value = subObj;
-    }
-    if (cfg.reynoldsNumber) updated.reynoldsNumber = cfg.reynoldsNumber;
-    if (cfg.angleDegrees !== undefined) {
-      updated.studioParams.vorticityAngle = (cfg.angleDegrees * Math.PI) / 180;
-    }
-
-    emit('update:params', updated);
-
-    if (cfg.autoRun) {
-      setTimeout(() => {
-        emit('autoRunSimulation');
-      }, 300);
-    }
-  }
 
   await nextTick();
   if (chatHistoryRef.value) chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight;
+}
+
+function extractDictCode(text: string): string | undefined {
+  const codeBlockMatch = text.match(/```(?:openfoam|cpp|text)?\s*([\s\S]*?)```/);
+  return codeBlockMatch ? codeBlockMatch[1].trim() : undefined;
 }
 
 function sendQuickPrompt(text: string) {
@@ -822,21 +1261,29 @@ function applyAiSnippet(code: string) {
     content: code
   };
 }
+
+watch(() => props.params.studioParams, (newParams) => {
+  if (newParams) {
+    Object.assign(studioParams, newParams);
+  }
+}, { deep: true });
 </script>
 
 <style scoped>
 .case-hub-panel {
-  width: 480px;
-  min-width: 440px;
+  width: 440px;
+  min-width: 400px;
+  flex-shrink: 0;
   height: 100%;
   background: var(--bg-canvas);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  padding: 12px 16px;
+  padding: 12px 14px;
   gap: 10px;
   overflow-y: auto;
   user-select: none;
+  transition: width 0.25s ease, opacity 0.2s ease;
 }
 
 .hub-header {
@@ -849,40 +1296,16 @@ function applyAiSnippet(code: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
 }
 
-.title-with-badge {
+.hub-title-left {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.sidebar-close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #94a3b8;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  flex-shrink: 0;
-}
-
-.sidebar-close-btn:hover {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.4);
-  color: #38bdf8;
-  transform: scale(1.05);
-}
-
-.close-svg {
-  width: 16px;
-  height: 16px;
+.hub-icon {
+  font-size: 15px;
 }
 
 .hub-title {
@@ -901,193 +1324,42 @@ function applyAiSnippet(code: string) {
   border-radius: 4px;
 }
 
+.collapse-sidebar-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.collapse-sidebar-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-border);
+}
+
 .hub-subtitle {
   font-size: 10.5px;
   color: var(--text-secondary);
 }
 
-/* AI Slide Toggle Bar */
-.ai-slide-toggle-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--btn-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 7px;
-  padding: 6px 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.ai-slide-toggle-bar:hover {
-  background: var(--bg-card);
-  border-color: var(--accent-border);
-}
-
-.toggle-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ai-icon {
-  font-size: 13px;
-}
-
-.toggle-label {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #f1f5f9;
-}
-
-.ai-chip {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 1px 5px;
-  border-radius: 4px;
-}
-
-.slide-arrow-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* AI Slide Drawer Content */
-.ai-slide-drawer {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.copilot-chat-history {
-  max-height: 90px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.chat-msg {
-  padding: 5px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-}
-
-.chat-msg.user {
-  background: rgba(0, 0, 0, 0.3);
-  border-left: 2px solid var(--accent-border);
-}
-
-.chat-msg.ai {
-  background: rgba(0, 0, 0, 0.2);
-  border-left: 2px solid var(--text-secondary);
-}
-
-.msg-author {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  margin-bottom: 2px;
-}
-
-.msg-content {
-  color: #e2e8f0;
-  white-space: pre-wrap;
-}
-
-.apply-snippet-btn {
-  margin-top: 4px;
-  padding: 3px 8px;
-  background: var(--btn-surface);
-  border: 1px solid var(--accent-border);
-  color: #ffffff;
-  border-radius: 4px;
-  font-size: 9.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.quick-prompt-chips {
-  display: flex;
-  gap: 5px;
-  overflow-x: auto;
-}
-
-.chip-btn {
-  background: var(--btn-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 9.5px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chip-btn:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--accent-border);
-  color: #ffffff;
-}
-
-.copilot-input-row {
-  display: flex;
-  gap: 6px;
-}
-
-.copilot-input {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--border-subtle);
-  border-radius: 5px;
-  padding: 5px 8px;
-  color: #f1f5f9;
-  font-size: 11px;
-  outline: none;
-}
-
-.copilot-input:focus {
-  border-color: var(--accent-border);
-}
-
-.copilot-send-btn {
-  background: var(--btn-surface);
-  border: 1px solid var(--accent-border);
-  border-radius: 5px;
-  color: white;
-  padding: 0 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.copilot-send-btn:hover {
-  background: var(--bg-card-hover);
-}
-
-/* Tabs: Natural Physics vs Manual Repair */
-.hub-tabs-row {
+/* Mode Switcher Pill */
+.mode-toggle-wrapper {
   display: flex;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   padding: 3px;
-  gap: 3px;
+  gap: 4px;
 }
 
-.hub-tab-btn {
+.mode-btn {
   flex: 1;
-  padding: 7px 10px;
+  padding: 6px 10px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -1095,167 +1367,339 @@ function applyAiSnippet(code: string) {
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  text-align: center;
-  transition: all 0.15s ease;
-}
-
-.hub-tab-btn.active {
-  background: var(--btn-surface);
-  border-color: var(--accent-border);
-  color: #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Physics Tab */
-.physics-tab-content {
+  transition: all 0.2s ease;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.substance-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
-.substance-btn {
+.mode-btn.active {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.mode-btn:hover:not(.active) {
+  color: #ffffff;
+}
+
+.ai-chip {
+  font-size: 9px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* Manual Mode Content */
+.manual-mode-content {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  gap: 8px;
+}
+
+/* Sub-Tab Navigation Bar */
+.sub-tab-strip {
+  display: flex;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 3px;
+  overflow-x: auto;
+}
+
+.sub-tab-pill {
+  flex: 1;
+  padding: 5px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.sub-tab-pill:hover:not(.active) {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sub-tab-pill.active {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #38bdf8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Tab Panes */
+.tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* Substance Physical Properties Grid */
+.substance-props-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.prop-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prop-label {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.prop-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+/* Archetype Grid */
+.archetype-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.archetype-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.archetype-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.archetype-pill-btn.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+/* Custom Geometry Builder */
+.builder-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 6px 0 2px;
+}
+
+.builder-shape-grid {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+
+.builder-shape-grid .archetype-pill-btn {
+  justify-content: center;
+  padding: 7px 4px;
+  gap: 4px;
+  font-size: 10.5px;
+}
+
+.builder-sliders {
+  margin-top: 8px;
+}
+
+.apply-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #04121d;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.apply-btn:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+/* Manual Mode Content */
+
+.arch-icon {
+  font-size: 16px;
+}
+
+/* History & Save Pane */
+.identity-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.case-name-row {
+  display: flex;
+  gap: 6px;
+}
+
+.case-name-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.case-name-input:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+
+.save-name-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--accent-border);
+  color: #38bdf8;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-name-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.changelog-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   padding: 6px 8px;
+}
+
+.entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.badge-source {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.badge-source.ai {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+.badge-source.manual {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+.entry-time {
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+.entry-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.download-case-btn {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
   cursor: pointer;
-  text-align: left;
   transition: all 0.15s ease;
 }
 
-.substance-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--accent-border);
-}
-
-.substance-btn.active {
-  background: var(--btn-surface);
-  border-color: var(--accent-border);
-  box-shadow: 0 0 0 1px var(--accent-border);
-}
-
-.sub-name {
-  font-size: 11.5px;
-  font-weight: 700;
+.download-case-btn:hover {
+  background: rgba(16, 185, 129, 0.3);
   color: #ffffff;
 }
 
-.sub-prop {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--text-secondary);
-}
-
-.preset-pills {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-  flex-wrap: wrap;
-}
-
-.preset-btn {
-  background: var(--btn-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 9.5px;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.preset-btn:hover {
-  background: var(--bg-card-hover);
-  color: #ffffff;
-}
-
-/* Repair Tab Content */
-.repair-tab-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.diagnostics-action-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 8px 10px;
-  gap: 8px;
-}
-
-.diag-left {
+.tree-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.diag-icon {
-  font-size: 18px;
-}
-
-.diag-left strong {
-  font-size: 11.5px;
-  color: #f1f5f9;
-}
-
-.diag-left p {
-  font-size: 9.5px;
-  color: var(--text-secondary);
-}
-
-.run-diag-btn {
-  background: var(--btn-surface);
-  border: 1px solid var(--accent-border);
-  color: white;
-  border-radius: 5px;
-  padding: 6px 10px;
-  font-size: 10.5px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.run-diag-btn:hover {
-  background: var(--bg-card-hover);
-  border-color: #ffffff;
-}
-
-.diag-report-banner {
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 10.5px;
-}
-
-.diag-report-banner.success {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.diag-report-banner.warn {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-/* Hub Grid Layout */
 .hub-grid {
   display: grid;
   grid-template-columns: 1.15fr 1fr;
   gap: 10px;
+  flex: 1;
+  overflow-y: auto;
 }
 
+/* Hub Cards */
 .hub-card {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
@@ -1265,21 +1709,17 @@ function applyAiSnippet(code: string) {
   flex-direction: column;
 }
 
-.geometry-card {
-  background: var(--bg-card-alt);
-  border-color: var(--accent-border);
-}
-
 .card-header {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
 }
 
 .card-title-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .card-title {
@@ -1288,22 +1728,54 @@ function applyAiSnippet(code: string) {
   color: #ffffff;
 }
 
-.card-desc {
-  font-size: 9.5px;
-  color: #94a3b8;
-}
-
 .token-tag {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 8.5px;
+  font-size: 9px;
   color: var(--text-secondary);
   opacity: 0.8;
+}
+
+.auto-diag-btn {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auto-diag-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  color: #ffffff;
+}
+
+.diag-report-banner {
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.diag-report-banner.success {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #86efac;
+}
+
+.diag-report-banner.warn {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fde047;
 }
 
 /* File Tree */
 .tree-card {
   overflow-y: auto;
-  max-height: 280px;
+  max-height: calc(100vh - 170px);
 }
 
 .file-tree-container {
@@ -1314,6 +1786,11 @@ function applyAiSnippet(code: string) {
   font-size: 11px;
 }
 
+.tree-folder {
+  display: flex;
+  flex-direction: column;
+}
+
 .folder-header {
   display: flex;
   align-items: center;
@@ -1322,6 +1799,7 @@ function applyAiSnippet(code: string) {
   border-radius: 4px;
   cursor: pointer;
   color: #e2e8f0;
+  transition: background 0.15s ease;
 }
 
 .folder-header:hover {
@@ -1334,13 +1812,17 @@ function applyAiSnippet(code: string) {
   width: 10px;
 }
 
+.folder-icon {
+  font-size: 11px;
+}
+
 .folder-name {
   font-weight: 600;
   color: #38bdf8;
 }
 
 .folder-children {
-  margin-left: 16px;
+  margin-left: 14px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1351,11 +1833,12 @@ function applyAiSnippet(code: string) {
 .tree-file {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 6px;
+  gap: 5px;
+  padding: 3px 5px;
   border-radius: 4px;
   cursor: pointer;
   color: #cbd5e1;
+  transition: all 0.15s ease;
 }
 
 .tree-file:hover {
@@ -1368,6 +1851,14 @@ function applyAiSnippet(code: string) {
   color: #e9d5ff;
 }
 
+.file-icon {
+  font-size: 10px;
+}
+
+.file-name {
+  font-size: 10.5px;
+}
+
 /* Right Column */
 .right-controls-column {
   display: flex;
@@ -1375,71 +1866,14 @@ function applyAiSnippet(code: string) {
   gap: 10px;
 }
 
-.bc-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.params-card {
+  flex: 1;
 }
 
-.bc-item {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
-  padding: 5px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.bc-meta {
-  display: flex;
-  justify-content: space-between;
-}
-
-.bc-name {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #38bdf8;
-}
-
-.bc-type {
-  font-size: 9px;
-  color: #a855f7;
-}
-
-.bc-input-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.bc-num-input {
-  width: 55px;
-  background: #0f1016;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  color: white;
-  padding: 2px 4px;
-  font-size: 10.5px;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.unit-lbl {
-  font-size: 10px;
-  color: #94a3b8;
-}
-
-.bc-desc {
-  font-size: 9px;
-  color: #94a3b8;
-}
-
-/* Sliders */
 .sliders-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .slider-group {
@@ -1455,38 +1889,145 @@ function applyAiSnippet(code: string) {
 }
 
 .slider-labels label {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: #cbd5e1;
 }
 
 .slider-val-badge {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
   padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Natural Forces Collapsible Drawer */
+.natural-drawer-card {
+  padding: 8px 10px;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.drawer-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawer-icon {
+  font-size: 12px;
+}
+
+.drawer-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.substance-chip {
+  font-size: 9px;
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  padding: 1px 5px;
   border-radius: 4px;
 }
 
-/* Photo Dropzone */
+.drawer-arrow {
+  font-size: 9px;
+  color: #94a3b8;
+}
+
+.drawer-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.substance-pills-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sub-pill-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sub-pill-btn:hover {
+  color: #ffffff;
+  border-color: var(--accent-border);
+}
+
+.sub-pill-btn.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.gravity-presets-row {
+  display: flex;
+  gap: 3px;
+}
+
+.preset-pill {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 9px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.preset-pill.active {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
+}
+
+/* Geometry Card & Dropzone */
+.geometry-card {
+  min-height: 100px;
+}
+
 .photo-dropzone {
   border: 1px dashed rgba(255, 255, 255, 0.2);
   border-radius: 6px;
-  padding: 10px;
+  padding: 10px 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   cursor: pointer;
   background: rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
 }
 
 .photo-dropzone:hover,
 .photo-dropzone.dragging {
-  border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.08);
+  border-color: var(--accent-border);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .dropzone-content {
@@ -1518,10 +2059,118 @@ function applyAiSnippet(code: string) {
   color: #10b981;
   background: rgba(16, 185, 129, 0.15);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
-/* Modal View & Editor */
+/* AI Mode Panel */
+.ai-mode-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.copilot-chat-history {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-height: calc(100vh - 280px);
+}
+
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.chat-msg.user {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  align-self: flex-end;
+  max-width: 90%;
+}
+
+.chat-msg.ai {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  align-self: flex-start;
+  max-width: 95%;
+}
+
+.msg-author {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.msg-content {
+  color: #e2e8f0;
+}
+
+.quick-prompt-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.chip-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.copilot-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.copilot-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.copilot-input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.copilot-send-btn {
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  color: #38bdf8;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+/* Modal View */
 .dict-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1535,12 +2184,12 @@ function applyAiSnippet(code: string) {
 }
 
 .dict-modal {
-  width: 680px;
+  width: 600px;
   max-width: 90vw;
   max-height: 80vh;
   background: #141b24;
   border: 1px solid var(--border-active);
-  border-radius: 10px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1571,131 +2220,50 @@ function applyAiSnippet(code: string) {
 }
 
 .save-file-btn {
-  background: #10b981;
-  color: white;
+  background: #0284c7;
+  color: #ffffff;
   border: none;
   border-radius: 4px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-}
-
-.save-file-btn:hover {
-  background: #059669;
 }
 
 .close-btn {
   background: transparent;
   border: none;
   color: #94a3b8;
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
 }
 
 .modal-body {
   padding: 12px;
+  overflow-y: auto;
   background: #0d1219;
-  flex: 1;
-  display: flex;
 }
 
 .dict-editor-textarea {
   width: 100%;
   height: 380px;
   background: transparent;
+  border: none;
   color: #38bdf8;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11.5px;
-  border: none;
-  outline: none;
+  line-height: 1.5;
   resize: none;
-  line-height: 1.4;
+  outline: none;
 }
 
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.2s ease-out;
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
 }
 
-.slide-down-enter-from,
-.slide-down-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
 }
-
-.agent-action-card {
-  margin-top: 8px;
-  background: rgba(16, 185, 129, 0.10);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  border-radius: 6px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.agent-action-header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.agent-action-badge {
-  font-size: 9px;
-  font-weight: 700;
-  color: #10b981;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.agent-action-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.agent-pills-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.agent-pill {
-  font-size: 9px;
-  font-family: var(--font-mono);
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--text-secondary);
-}
-
-.agent-pill.domain { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); }
-.agent-pill.fluid { color: #a855f7; border-color: rgba(168, 85, 247, 0.3); }
-.agent-pill.re { color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
-.agent-pill.aoa { color: #ec4899; border-color: rgba(236, 72, 153, 0.3); }
-
-.agent-action-footer {
-  margin-top: 4px;
-}
-
-.agent-rerun-btn {
-  width: 100%;
-  background: linear-gradient(135deg, #059669, #10b981);
-  border: none;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 5px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.agent-rerun-btn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
 </style>

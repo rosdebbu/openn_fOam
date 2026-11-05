@@ -71,14 +71,22 @@ async fn health_check() -> impl IntoResponse {
     }))
 }
 
-async fn cfd_solve_handler(Json(payload): Json<cfd_solver::CfdConfig>) -> impl IntoResponse {
-    let result = cfd_solver::run_simulation(payload);
-    Json(result)
+// The solver is CPU-bound for up to seconds, so it runs on Tokio's blocking
+// pool instead of stalling the async worker threads (and /health with them).
+async fn cfd_solve_handler(Json(payload): Json<cfd_solver::CfdConfig>) -> Response {
+    match tokio::task::spawn_blocking(move || cfd_solver::run_simulation(payload)).await {
+        Ok(Ok(result)) => Json(result).into_response(),
+        Ok(Err(msg)) => (StatusCode::BAD_REQUEST, msg).into_response(),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
+    }
 }
 
-async fn cfd_benchmark_handler(Json(payload): Json<cfd_solver::CfdConfig>) -> impl IntoResponse {
-    let result = cfd_solver::run_benchmark(payload);
-    Json(result)
+async fn cfd_benchmark_handler(Json(payload): Json<cfd_solver::CfdConfig>) -> Response {
+    match tokio::task::spawn_blocking(move || cfd_solver::run_benchmark(payload)).await {
+        Ok(Ok(result)) => Json(result).into_response(),
+        Ok(Err(msg)) => (StatusCode::BAD_REQUEST, msg).into_response(),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
+    }
 }
 
 async fn graph_shortest_path_handler(Json(payload): Json<graph::PathRequest>) -> impl IntoResponse {

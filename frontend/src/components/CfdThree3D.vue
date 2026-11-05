@@ -5,16 +5,17 @@
       <!-- Line 1: Title, Simulation Archetype, and Aerodynamic Telemetry -->
       <div class="header-status-line">
         <div class="status-left">
-          <span class="viewport-title">OpenZess 3D Studio</span>
+          <span class="viewport-title">Three.js CFD Viewport</span>
           <span class="archetype-badge">{{ archetypeBadgeTitle }}</span>
-          <span class="live-tag" :class="{ 'live-active': isReceivingLive }">
-            <span class="pulse-dot"></span> {{ isReceivingLive ? 'SOLVER STREAMING' : 'IDLE' }}
-          </span>
+          <span v-if="params.caseName" class="case-tag-badge" :title="'Active Case: ' + params.caseName">📁 {{ params.caseName }}</span>
         </div>
         <div class="status-right">
-          <span class="telemetry-pill">Co_max: {{ telemetry.courantMax ? telemetry.courantMax.toFixed(2) : '0.00' }}</span>
-          <span class="telemetry-pill forces">Cd: {{ telemetry.cd ? telemetry.cd.toFixed(3) : '0.000' }}</span>
-          <span class="telemetry-pill forces">Cl: {{ telemetry.cl ? telemetry.cl.toFixed(3) : '0.000' }}</span>
+          <span class="telemetry-pill">Co_max: {{ telemetry.courantMax.toFixed(2) }}</span>
+          <span class="telemetry-pill forces">Cd: {{ telemetry.cd.toFixed(3) }}</span>
+          <span class="telemetry-pill forces">Cl: {{ telemetry.cl.toFixed(3) }}</span>
+          <span v-if="telemetry.downforce !== undefined && params.archetype === 'f1'" class="telemetry-pill forces special">Downforce: {{ telemetry.downforce.toFixed(0) }} N</span>
+          <span v-if="telemetry.thrust !== undefined && params.archetype === 'drone'" class="telemetry-pill forces special">Thrust: {{ telemetry.thrust.toFixed(1) }} N</span>
+          <span v-if="telemetry.cavitationIndex !== undefined && params.archetype === 'submarine'" class="telemetry-pill forces special">σ: {{ telemetry.cavitationIndex.toFixed(2) }}</span>
         </div>
       </div>
 
@@ -32,8 +33,9 @@
             >
               <option value="U">🌀 Velocity |U| [m/s]</option>
               <option value="p">🔴 Pressure (p) [Pa]</option>
-              <option value="omega">🌪️ Vorticity (ω) [1/s]</option>
               <option value="T">🌡️ Temperature (T) [K]</option>
+              <option value="omega">🌪️ Vorticity (ω) [1/s]</option>
+              <option value="q_crit">✨ Q-Criterion (Vortices)</option>
             </select>
           </div>
 
@@ -42,11 +44,11 @@
             <select
               id="colormap-select"
               :value="activeColormap"
-              @change="onColormapChange(($event.target as HTMLSelectElement).value as ColormapScheme)"
+              @change="activeColormap = ($event.target as HTMLSelectElement).value as ColormapScheme"
               class="colormap-dropdown"
             >
-              <option value="coolwarm">❄️ Coolwarm</option>
               <option value="turbo">🌈 Turbo</option>
+              <option value="coolwarm">❄️ Coolwarm</option>
               <option value="jet">🌊 Jet</option>
               <option value="viridis">🌌 Viridis</option>
               <option value="inferno">🔥 Inferno</option>
@@ -59,56 +61,38 @@
           <div class="tool-btn-group">
             <button
               class="hud-tool-btn"
-              :class="{ active: isSliceRakeOpen }"
-              @click="isSliceRakeOpen = !isSliceRakeOpen"
-              title="Open Interactive Slice Plane Position & Streamline Rake Sliders"
+              :class="{ active: showParticles }"
+              @click="showParticles = !showParticles"
+              title="Toggle RK4 Particle Advection Tracers"
             >
-              🎛️ Slice & Rake
-            </button>
-
-            <button
-              class="hud-tool-btn"
-              :class="{ active: showStreamlines }"
-              @click="showStreamlines = !showStreamlines"
-              title="Toggle Continuous 3D Fluid Ribbon Streamlines"
-            >
-              🌊 Ribbons
-            </button>
-
-            <button
-              class="hud-tool-btn"
-              :class="{ active: showGeometry }"
-              @click="showGeometry = !showGeometry"
-              title="Toggle 3D Physical Obstacle Surface"
-            >
-              🧱 3D Body
-            </button>
-
-            <button
-              class="hud-tool-btn"
-              :class="{ active: showCutplanes }"
-              @click="showCutplanes = !showCutplanes"
-              title="Toggle Bilinear DataTexture Slice Plane"
-            >
-              📐 Slice Plane
+              ✨ Particles
             </button>
 
             <button
               class="hud-tool-btn"
               :class="{ active: showGlyphs }"
               @click="showGlyphs = !showGlyphs"
-              title="Toggle 3D Velocity Vector Cones"
+              title="Toggle 3D Vector Glyph Cones (Hedgehogs)"
             >
-              🏹 Glyphs
+              🏹 Vector Glyphs
             </button>
 
             <button
               class="hud-tool-btn"
-              :class="{ active: showFloorGrid }"
-              @click="showFloorGrid = !showFloorGrid"
-              title="Toggle Ground Grid & Contact Shadow"
+              :class="{ active: showGeometry }"
+              @click="showGeometry = !showGeometry"
+              title="Toggle 3D Physical Obstacle Mesh"
             >
-              🏁 Grid
+              🧱 3D Model
+            </button>
+
+            <button
+              class="hud-tool-btn"
+              :class="{ active: showCutplanes }"
+              @click="showCutplanes = !showCutplanes"
+              title="Toggle Orthogonal Sliced Cutplanes"
+            >
+              📐 Cut-Planes
             </button>
           </div>
 
@@ -119,13 +103,13 @@
               @click="isAutoRotate = !isAutoRotate"
               title="Toggle 3D Orbit Auto-Rotation"
             >
-              🔄 Orbit
+              🔄 Auto-Rotate
             </button>
 
             <button
               class="hud-tool-btn"
               @click="resetCamera"
-              title="Reset 3D Camera to Standard Engineering Isometric View"
+              title="Reset 3D Camera View"
             >
               🎯 Reset
             </button>
@@ -134,176 +118,19 @@
       </div>
     </div>
 
-    <!-- Interactive Slice Plane & Streamline Rake Floating HUD Panel -->
-    <transition name="hud-fade">
-      <div v-if="isSliceRakeOpen" class="interactive-controls-hud">
-        <div class="hud-panel-header">
-          <span class="hud-panel-title">🎛️ Interactive CFD Probes & Manipulators</span>
-          <button class="hud-close-btn" @click="isSliceRakeOpen = false" title="Close Panel">✕</button>
-        </div>
-
-        <!-- Section 1: Interactive Slice Plane -->
-        <div class="hud-section">
-          <div class="hud-section-title">
-            <span>📐 Slice Plane Position & Axis</span>
-            <span class="hud-param-badge">{{ sliceAxis.toUpperCase() }} = {{ slicePos.toFixed(2) }} m</span>
-          </div>
-
-          <!-- Axis Selector Pills -->
-          <div class="axis-pill-group">
-            <button
-              class="axis-pill-btn"
-              :class="{ active: sliceAxis === 'z' }"
-              @click="setSliceAxis('z')"
-            >
-              XY (Spanwise Z)
-            </button>
-            <button
-              class="axis-pill-btn"
-              :class="{ active: sliceAxis === 'y' }"
-              @click="setSliceAxis('y')"
-            >
-              XZ (Vertical Y)
-            </button>
-            <button
-              class="axis-pill-btn"
-              :class="{ active: sliceAxis === 'x' }"
-              @click="setSliceAxis('x')"
-            >
-              YZ (Wake Cross X)
-            </button>
-          </div>
-
-          <!-- Position Slider -->
-          <div class="slider-control-row">
-            <label class="slider-label">Position:</label>
-            <input
-              type="range"
-              :min="sliceMin"
-              :max="sliceMax"
-              step="0.02"
-              v-model.number="slicePos"
-              @input="onSlicePosChange"
-              class="hud-slider"
-            />
-            <span class="slider-val">{{ slicePos.toFixed(2) }}</span>
-          </div>
-
-          <!-- Opacity Slider -->
-          <div class="slider-control-row">
-            <label class="slider-label">Opacity:</label>
-            <input
-              type="range"
-              min="0.2"
-              max="1.0"
-              step="0.05"
-              v-model.number="sliceOpacity"
-              @input="onSliceOpacityChange"
-              class="hud-slider"
-            />
-            <span class="slider-val">{{ Math.round(sliceOpacity * 100) }}%</span>
-          </div>
-
-          <!-- SimScale Style Slice Statistics -->
-          <div class="hud-stats-row" v-if="props.data">
-            <div class="stat-pill">
-              <span class="stat-lbl">U max</span>
-              <span class="stat-val">{{ sliceStats.uMax.toFixed(2) }} m/s</span>
-            </div>
-            <div class="stat-pill">
-              <span class="stat-lbl">P range</span>
-              <span class="stat-val">[{{ sliceStats.pMin.toFixed(0) }}, {{ sliceStats.pMax.toFixed(0) }}]</span>
-            </div>
-            <div class="stat-pill">
-              <span class="stat-lbl">U avg</span>
-              <span class="stat-val">{{ sliceStats.uAvg.toFixed(2) }} m/s</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section 2: Draggable Streamline Rake -->
-        <div class="hud-section">
-          <div class="hud-section-title">
-            <span>🌊 Streamline Emitter Rake</span>
-            <span class="hud-param-badge">Pos: ({{ rakeX.toFixed(2) }}, {{ rakeY.toFixed(2) }})</span>
-          </div>
-
-          <!-- Rake Presets -->
-          <div class="preset-pill-group">
-            <button class="preset-pill-btn" @click="applyRakePreset('inlet')">
-              Inlet
-            </button>
-            <button class="preset-pill-btn" @click="applyRakePreset('nose')">
-              🎯 Stagnation Nose
-            </button>
-            <button class="preset-pill-btn" @click="applyRakePreset('boundary')">
-              📐 Boundary Layer
-            </button>
-            <button class="preset-pill-btn" @click="applyRakePreset('wake')">
-              🌪️ Recirculation Wake
-            </button>
-          </div>
-
-          <!-- Rake X Slider -->
-          <div class="slider-control-row">
-            <label class="slider-label">Rake X:</label>
-            <input
-              type="range"
-              min="-1.95"
-              max="1.2"
-              step="0.05"
-              v-model.number="rakeX"
-              @input="onRakeChange"
-              class="hud-slider"
-            />
-            <span class="slider-val">{{ rakeX.toFixed(2) }}</span>
-          </div>
-
-          <!-- Rake Y Slider -->
-          <div class="slider-control-row">
-            <label class="slider-label">Rake Y:</label>
-            <input
-              type="range"
-              min="-0.85"
-              max="0.85"
-              step="0.05"
-              v-model.number="rakeY"
-              @input="onRakeChange"
-              class="hud-slider"
-            />
-            <span class="slider-val">{{ rakeY.toFixed(2) }}</span>
-          </div>
-
-          <!-- Rake Span / Spread Slider -->
-          <div class="slider-control-row">
-            <label class="slider-label">Spread:</label>
-            <input
-              type="range"
-              min="0.15"
-              max="1.8"
-              step="0.05"
-              v-model.number="rakeSpan"
-              @input="onRakeChange"
-              class="hud-slider"
-            />
-            <span class="slider-val">{{ rakeSpan.toFixed(2) }} m</span>
-          </div>
-        </div>
+    <!-- ParaView-Grade Vertical Scientific Colorbar Legend HUD -->
+    <div class="paraview-colorbar-card" v-if="showColorbar">
+      <div class="colorbar-header">
+        <span class="colorbar-field-title">{{ colorbarData.title }}</span>
+        <span class="colorbar-field-unit">{{ colorbarData.unit }}</span>
       </div>
-    </transition>
 
-    <!-- Scientific Colorbar Legend (HUD Overlay) -->
-    <div v-if="showColorbar" class="scientific-colorbar-dock">
-      <div class="colorbar-card">
-        <div class="colorbar-header">
-          <span class="colorbar-title">{{ colorbarData.title }}</span>
-          <span class="colorbar-unit">{{ colorbarData.unit }}</span>
-        </div>
-
-        <div class="colorbar-gradient-track">
+      <div class="colorbar-body">
+        <div class="colorbar-gradient" :class="activeColormap">
           <div
-            class="colorbar-gradient-fill"
-            :style="{ background: colorbarGradientStyle }"
+            v-if="probe.active"
+            class="colorbar-probe-marker"
+            :style="{ bottom: probeNormalizedPos + '%' }"
           ></div>
         </div>
 
@@ -312,16 +139,6 @@
           <span class="tick mid">{{ colorbarData.midVal }}</span>
           <span class="tick min">{{ colorbarData.minVal }}</span>
         </div>
-      </div>
-    </div>
-
-    <!-- Engineering Coordinate Triad Overlay (Bottom Left) -->
-    <div class="engineering-triad-dock">
-      <canvas ref="triadCanvasRef" width="100" height="100" class="triad-canvas"></canvas>
-      <div class="triad-labels">
-        <span class="axis-badge x">X: Streamwise</span>
-        <span class="axis-badge y">Y: Normal/Lift</span>
-        <span class="axis-badge z">Z: Spanwise</span>
       </div>
     </div>
 
@@ -337,7 +154,7 @@
       <div class="probe-hud-card">
         <div class="probe-val-row">
           <span class="probe-val-title">{{ probe.label }}</span>
-          <span class="probe-val-num">{{ probe.value.toFixed(3) }} {{ probe.unit }}</span>
+          <span class="probe-val-num">{{ probe.value === null ? '—' : fmtTick(probe.value) }} {{ probe.value === null ? '' : probe.unit }}</span>
         </div>
         <div class="probe-hud-tag">
           <span>{{ probe.subtext }}</span>
@@ -364,384 +181,236 @@ const emit = defineEmits<{
 }>();
 
 const canvasMountRef = ref<HTMLDivElement | null>(null);
-const triadCanvasRef = ref<HTMLCanvasElement | null>(null);
 
 const activeField = ref<FieldVariable>(props.params.activeField || 'U');
-const activeColormap = ref<ColormapScheme>('coolwarm');
+const activeColormap = ref<ColormapScheme>('turbo');
 
 const showGeometry = ref(true);
 const showCutplanes = ref(true);
-const showStreamlines = ref(true);
+const showParticles = ref(true);
 const showGlyphs = ref(false);
-const showFloorGrid = ref(true);
 const showColorbar = ref(true);
 const isAutoRotate = ref(false);
-
-// Interactive Slice & Rake Panel State
-const isSliceRakeOpen = ref(true); // Open by default for immediate discovery
-const sliceAxis = ref<'x' | 'y' | 'z'>('z');
-const slicePos = ref(0.0);
-const sliceOpacity = ref(0.88);
-
-const sliceStats = computed(() => {
-  if (!props.data) {
-    return { uMax: 0, pMin: 0, pMax: 0, uAvg: 0 };
-  }
-  // High-performance O(1) path directly from backend solver telemetry
-  if (props.data.uMax !== undefined) {
-    return {
-      uMax: props.data.uMax,
-      pMin: props.data.pMin ?? 0,
-      pMax: props.data.pMax ?? 0,
-      uAvg: props.data.uAvg ?? 0
-    };
-  }
-  if (!props.data.speed) {
-    return { uMax: 0, pMin: 0, pMax: 0, uAvg: 0 };
-  }
-  const speeds = Array.isArray(props.data.speed) ? props.data.speed.flat() : [];
-  const ps = Array.isArray(props.data.p) ? props.data.p.flat() : [0];
-  let sum = 0, uMax = 0;
-  for (let i = 0; i < speeds.length; i++) {
-    const s = Number(speeds[i]) || 0;
-    sum += s;
-    if (s > uMax) uMax = s;
-  }
-  let pMin = Number(ps[0]) || 0, pMax = Number(ps[0]) || 0;
-  for (let i = 1; i < ps.length; i++) {
-    const pVal = Number(ps[i]) || 0;
-    if (pVal < pMin) pMin = pVal;
-    if (pVal > pMax) pMax = pVal;
-  }
-  return {
-    uMax,
-    pMin,
-    pMax,
-    uAvg: speeds.length > 0 ? sum / speeds.length : 0
-  };
-});
-
-// Draggable Streamline Rake State
-const rakeX = ref(-1.95);
-const rakeY = ref(0.0);
-const rakeSpan = ref(1.72);
-
-const sliceMin = computed(() => {
-  if (sliceAxis.value === 'x') return -1.9;
-  if (sliceAxis.value === 'y') return -0.9;
-  return -0.55;
-});
-
-const sliceMax = computed(() => {
-  if (sliceAxis.value === 'x') return 1.9;
-  if (sliceAxis.value === 'y') return 0.9;
-  return 0.55;
-});
-
-const isReceivingLive = computed(() => {
-  return !!props.data && props.data.iteration > 0;
-});
 
 // Flow Probe Tooltip State
 const probe = ref({
   active: false,
   screenX: 0,
   screenY: 0,
-  value: 0.0,
-  unit: 'm/s',
-  label: 'Velocity |U|',
-  subtext: 'OpenFOAM Point Probe HUD'
+  value: null as number | null,
+  unit: '',
+  label: '',
+  subtext: ''
 });
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
-let renderer: THREE.WebGLRenderer;
+let renderer: THREE.WebGLRenderer | undefined;
 let animId: number;
-
-// Triad Scene & Renderer
-let triadScene: THREE.Scene;
-let triadCamera: THREE.PerspectiveCamera;
-let triadRenderer: THREE.WebGLRenderer;
-let triadGroup: THREE.Group;
 
 let mainGroup: THREE.Group;
 let geometryGroup: THREE.Group;
-let ribbonStreamlinesGroup: THREE.Group;
+let flowFieldGroup: THREE.Group;
 let cutplanesGroup: THREE.Group;
 let glyphsGroup: THREE.Group;
-let floorGroup: THREE.Group;
-let pulsesGroup: THREE.Group;
-let rakeBarGroup: THREE.Group;
+let rk4ParticlesGroup: THREE.Points | null = null;
 
-let cutplaneMesh: THREE.Mesh | null = null;
-let dataTexture: THREE.DataTexture | null = null;
-let textureBuffer: Uint8Array | null = null;
-let textureWidth = 80;
-let textureHeight = 40;
-
+let cutplaneXY: THREE.Mesh;
+let cutplaneXZ: THREE.Mesh;
 let probeMarker: THREE.Mesh;
-let obstacleMesh: THREE.Mesh | null = null;
-let rakeBarMesh: THREE.Mesh | null = null;
 
-// Ribbon Streamlines Data (Genuine 3D Quads with Width & Lighting)
-const NUM_STREAMLINES = 36;
-const STREAMLINE_STEPS = 52;
-const RIBBON_WIDTH = 0.024;
-
-interface RibbonStreamline {
-  seed: THREE.Vector3;
-  mesh: THREE.Mesh;
-  geom: THREE.BufferGeometry;
-  positions: Float32Array; // Centerline points
-  meshPositions: Float32Array; // Ribbon quads (2 * STEPS * 3)
-  meshColors: Float32Array;    // Ribbon vertex colors
-  pulsePos: number;            // 0..1
-}
-let ribbonStreamlines: RibbonStreamline[] = [];
-
-let pulsePoints: THREE.Points | null = null;
-let pulsePositions: Float32Array;
-let pulseColors: Float32Array;
+// Particle Advection Data
+const NUM_PARTICLES = 2500;
+let particlePositions: Float32Array;
+let particleColors: Float32Array;
+let particleVelocities: Float32Array;
+let particleLifespans: Float32Array;
 
 // Mouse drag & raycast state
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
-let targetRotationX = 0.32;
-let targetRotationY = -0.68;
+let targetRotationX = 0.35;
+let targetRotationY = -0.65;
 let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
-
-// Domain bounds in Three.js world space
-const DOMAIN = {
-  minX: -2.0,
-  maxX: 2.0,
-  minY: -1.0,
-  maxY: 1.0,
-  minZ: -0.6,
-  maxZ: 0.6
-};
 
 const archetypeBadgeTitle = computed(() => {
   switch (props.params.archetype) {
     case 'airfoil': return '✈️ NACA 0012 Wing Aerodynamics';
-    case 'cylinder': return '🔴 Von Kármán Vortex Shedding (Re=' + (props.params.reynoldsNumber || 100) + ')';
-    case 'cavity': return '🌀 Lid-Driven Cavity (Ghia Benchmark)';
-    case 'venturi': return '🚿 Venturi Nozzle Flow';
-    case 'cad': return '📤 CAD Wind Tunnel';
-    default: return '🌊 Incompressible Navier-Stokes Flow';
+    case 'f1': return '🏎️ F1 Front Wing & Ground Effect';
+    case 'drone': return '🚁 Quadcopter Rotor Downwash';
+    case 'submarine': return '🌊 Submarine Hydrodynamic Hull';
+    case 'cylinder': return '🔴 Cylinder in Cross-Flow';
+    case 'venturi': return '🚿 Venturi Nozzle (Incompressible)';
+    case 'cavity': return '🌀 Lid-Driven Cavity (2-D)';
+    case 'cad': return '📤 Custom CAD Wind Tunnel';
+    case 'plume':
+    default: return '💨 Buoyant Thermal Plume';
   }
 });
 
+const FIELD_META: Record<FieldVariable, { title: string; unit: string }> = {
+  U: { title: 'Velocity |U|', unit: '[m/s]' },
+  p: { title: 'Pressure (p - p_ref)', unit: '[Pa]' },
+  T: { title: 'Temperature (T)', unit: '[K]' },
+  omega: { title: 'Vorticity (ω)', unit: '[s⁻¹]' },
+  q_crit: { title: 'Q-Criterion', unit: '[s⁻²]' }
+};
+
+function fmtTick(v: number): string {
+  const a = Math.abs(v);
+  return a !== 0 && (a < 1e-2 || a >= 1e4) ? v.toExponential(2) : v.toFixed(3);
+}
+
+// Colorbar ticks are the actual min / mid / max of the displayed field
 const colorbarData = computed(() => {
-  const f = activeField.value;
-  if (f === 'p') {
-    return { title: 'Pressure (p)', unit: '[Pa]', maxVal: '+2.00', midVal: '0.00', minVal: '-1.50' };
-  } else if (f === 'omega') {
-    return { title: 'Vorticity (ω)', unit: '[s⁻¹]', maxVal: '+15.0', midVal: '0.0', minVal: '-15.0' };
-  } else if (f === 'T') {
-    return { title: 'Temperature (T)', unit: '[K]', maxVal: '350.0', midVal: '320.0', minVal: '293.15' };
+  const meta = { ...FIELD_META[activeField.value] };
+  if (activeField.value === 'T' && props.data?.scalarName && props.data.scalarName !== 'T') {
+    meta.title = props.data.scalarName === 'alpha.heavy' ? 'Heavy-fluid fraction (α)' : 'Passive tracer';
+    meta.unit = '[-]';
   }
-  return { title: 'Velocity |U|', unit: '[m/s]', maxVal: '1.800', midVal: '0.900', minVal: '0.000' };
+  const range = fieldRange.value;
+  if (!range) {
+    const why = props.data ? 'not computed for this case' : 'waiting for solver data';
+    return { ...meta, maxVal: '—', midVal: why, minVal: '—' };
+  }
+  return {
+    ...meta,
+    maxVal: fmtTick(range.max),
+    midVal: fmtTick((range.min + range.max) / 2),
+    minVal: fmtTick(range.min)
+  };
 });
 
-const colorbarGradientStyle = computed(() => {
-  const s = activeColormap.value;
-  if (s === 'coolwarm') return 'linear-gradient(to right, #3b82f6, #f8fafc, #ef4444)';
-  if (s === 'viridis') return 'linear-gradient(to right, #440154, #21918c, #fde725)';
-  if (s === 'inferno') return 'linear-gradient(to right, #000004, #bb3754, #fcffa4)';
-  if (s === 'jet') return 'linear-gradient(to right, #0000ff, #00ffff, #ffff00, #ff0000)';
-  return 'linear-gradient(to right, #30123b, #1ae4b6, #a2fc3c, #e83f12, #7a0403)'; // Turbo
+const probeNormalizedPos = computed(() => {
+  const val = probe.value.value;
+  const range = fieldRange.value;
+  if (val === null || !range) return 0;
+  return Math.max(0, Math.min(100, ((val - range.min) / ((range.max - range.min) || 1)) * 100));
+});
+
+// Min/max of the active scalar field from the live CFD solution, used to
+// normalize colormap values on the cutplanes.
+// ---------------------------------------------------------------------------
+// Live solver data on the viewport
+// The 2-D domain [0,lx] x [0,ly] is drawn in the XY plane (z = 0), centred on
+// the origin with ONE uniform scale (no distortion); bodies are extruded
+// along z (span). Everything sampled below is real solver output.
+// ---------------------------------------------------------------------------
+const VIEW_W = 3.6;
+const VIEW_H = 2.2;
+const SPAN = 1.6;
+let lastMask: boolean[][] | null = null;
+
+const domain = computed(() => {
+  const d = props.data;
+  if (!d || !d.u?.length || !d.u[0]?.length) return null;
+  const nx = d.u.length;
+  const ny = d.u[0].length;
+  const lx = (d.dx ?? 1 / nx) * nx;
+  const ly = (d.dy ?? 1 / ny) * ny;
+  const scale = Math.min(VIEW_W / lx, VIEW_H / ly);
+  return { nx, ny, W: lx * scale, H: ly * scale };
+});
+
+const isClosedCase = computed(() => ['cavity', 'water_dam'].includes(props.params.archetype));
+
+function clamp(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+// Continuous cell-index coordinates (cell centres sit at k + 0.5)
+function toCell(x: number, y: number) {
+  const dom = domain.value!;
+  return {
+    ci: ((x + dom.W / 2) / dom.W) * dom.nx - 0.5,
+    cj: ((y + dom.H / 2) / dom.H) * dom.ny - 0.5
+  };
+}
+
+function inDomain(x: number, y: number): boolean {
+  const dom = domain.value;
+  return !!dom && Math.abs(x) <= dom.W / 2 && Math.abs(y) <= dom.H / 2;
+}
+
+function isSolidAt(x: number, y: number): boolean {
+  if (!lastMask || !domain.value) return false;
+  const { ci, cj } = toCell(x, y);
+  const i = clamp(Math.round(ci), 0, domain.value.nx - 1);
+  const j = clamp(Math.round(cj), 0, domain.value.ny - 1);
+  return !!lastMask[i]?.[j];
+}
+
+// Bilinear interpolation between cell centres
+function sampleField(field: number[][], x: number, y: number): number {
+  const dom = domain.value!;
+  const { ci, cj } = toCell(x, y);
+  const i0 = clamp(Math.floor(ci), 0, dom.nx - 1);
+  const j0 = clamp(Math.floor(cj), 0, dom.ny - 1);
+  const i1 = Math.min(i0 + 1, dom.nx - 1);
+  const j1 = Math.min(j0 + 1, dom.ny - 1);
+  const ti = clamp(ci - i0, 0, 1);
+  const tj = clamp(cj - j0, 0, 1);
+  const a = field[i0][j0] * (1 - ti) + field[i1][j0] * ti;
+  const b = field[i0][j1] * (1 - ti) + field[i1][j1] * ti;
+  return a * (1 - tj) + b * tj;
+}
+
+// Fields derived from the live frame: pressure in Pa (solver p is kinematic),
+// vorticity and Q-criterion from central differences of (u, v).
+const derivedFields = computed(() => {
+  const d = props.data;
+  const dom = domain.value;
+  if (!d || !dom) return null;
+  const { nx, ny } = dom;
+  const dx = d.dx ?? 1 / nx;
+  const dy = d.dy ?? 1 / ny;
+  const u = d.u;
+  const v = d.v;
+  const omega: number[][] = Array.from({ length: nx }, () => new Array(ny).fill(0));
+  const q: number[][] = Array.from({ length: nx }, () => new Array(ny).fill(0));
+  for (let i = 1; i < nx - 1; i++) {
+    for (let j = 1; j < ny - 1; j++) {
+      const ux = (u[i + 1][j] - u[i - 1][j]) / (2 * dx);
+      const uy = (u[i][j + 1] - u[i][j - 1]) / (2 * dy);
+      const vx = (v[i + 1][j] - v[i - 1][j]) / (2 * dx);
+      const vy = (v[i][j + 1] - v[i][j - 1]) / (2 * dy);
+      omega[i][j] = vx - uy;
+      q[i][j] = -0.5 * (ux * ux + vy * vy) - uy * vx; // Q = (|Ω|² - |S|²) / 2
+    }
+  }
+  const rho = d.rho ?? 1;
+  return {
+    U: d.speed,
+    p: d.p.map(row => row.map(val => val * rho)),
+    T: d.scalar ?? null,
+    omega,
+    q_crit: q
+  } as Record<FieldVariable, number[][] | null>;
+});
+
+// Min/max of the active field over FLUID cells only
+const fieldRange = computed(() => {
+  const fields = derivedFields.value;
+  const field = fields?.[activeField.value];
+  if (!field) return null;
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  for (let i = 0; i < field.length; i++) {
+    for (let j = 0; j < field[i].length; j++) {
+      if (lastMask?.[i]?.[j]) continue;
+      const val = field[i][j];
+      if (val < minVal) minVal = val;
+      if (val > maxVal) maxVal = val;
+    }
+  }
+  return Number.isFinite(minVal) ? { min: minVal, max: maxVal } : null;
 });
 
 function onFieldChange(field: FieldVariable) {
   activeField.value = field;
   emit('update:activeField', field);
-  updateSliceDataTexture();
-  updateObstacleSurfaceColors();
-  updateRibbonStreamlinesGeometry();
-}
-
-function onColormapChange(cm: ColormapScheme) {
-  activeColormap.value = cm;
-  updateSliceDataTexture();
-  updateObstacleSurfaceColors();
-  updateRibbonStreamlinesGeometry();
-}
-
-// Slice Plane Controls Handlers
-function setSliceAxis(axis: 'x' | 'y' | 'z') {
-  sliceAxis.value = axis;
-  slicePos.value = 0.0;
-  rebuildSlicePlane();
-}
-
-function onSlicePosChange() {
-  if (!cutplaneMesh) return;
-  if (sliceAxis.value === 'z') {
-    cutplaneMesh.position.set(0, 0, slicePos.value);
-  } else if (sliceAxis.value === 'y') {
-    cutplaneMesh.position.set(0, slicePos.value, 0);
-  } else if (sliceAxis.value === 'x') {
-    cutplaneMesh.position.set(slicePos.value, 0, 0);
-  }
-  updateSliceDataTexture();
-}
-
-function onSliceOpacityChange() {
-  if (cutplaneMesh && cutplaneMesh.material) {
-    (cutplaneMesh.material as THREE.MeshBasicMaterial).opacity = sliceOpacity.value;
-  }
-}
-
-// Rake Handlers & Presets
-function applyRakePreset(preset: 'inlet' | 'nose' | 'boundary' | 'wake') {
-  if (preset === 'inlet') {
-    rakeX.value = -1.95;
-    rakeY.value = 0.0;
-    rakeSpan.value = 1.72;
-  } else if (preset === 'nose') {
-    rakeX.value = -1.25;
-    rakeY.value = 0.0;
-    rakeSpan.value = 0.45;
-  } else if (preset === 'boundary') {
-    rakeX.value = -1.15;
-    rakeY.value = 0.42;
-    rakeSpan.value = 0.35;
-  } else if (preset === 'wake') {
-    rakeX.value = -0.35;
-    rakeY.value = 0.0;
-    rakeSpan.value = 0.70;
-  }
-  onRakeChange();
-}
-
-function onRakeChange() {
-  updateRakeSeeds();
-  updateRakeBarGeometry();
-  updateRibbonStreamlinesGeometry();
-}
-
-function updateRakeSeeds() {
-  const isCavity = props.params.archetype === 'cavity';
-  for (let i = 0; i < ribbonStreamlines.length; i++) {
-    const sl = ribbonStreamlines[i];
-    if (isCavity) {
-      const radius = 0.18 + (i / NUM_STREAMLINES) * 0.92;
-      const angle = (i / NUM_STREAMLINES) * Math.PI * 2;
-      sl.seed.set(Math.cos(angle) * radius, Math.sin(angle) * radius, ((i % 2) - 0.5) * 0.25);
-    } else {
-      const yOffset = -rakeSpan.value * 0.5 + (i / (NUM_STREAMLINES - 1)) * rakeSpan.value;
-      const seedY = rakeY.value + yOffset;
-      const seedZ = ((i % 3) - 1) * 0.28;
-      sl.seed.set(rakeX.value, seedY, seedZ);
-    }
-  }
-}
-
-// =========================================================================
-// REAL FLUID FIELD SAMPLING (Navier-Stokes Solution Bilinear Interpolator)
-// =========================================================================
-function sampleFluidField(x: number, y: number): { u: number; v: number; p: number; speed: number; omega: number } {
-  const data = props.data;
-  const isCavity = props.params.archetype === 'cavity';
-
-  if (data && data.u && data.u.length > 0 && data.u[0].length > 0) {
-    const uArr = data.u;
-    const vArr = data.v;
-    const pArr = data.p;
-    const nx = uArr.length;
-    const ny = uArr[0].length;
-
-    let dMinX = isCavity ? -1.2 : DOMAIN.minX;
-    let dMaxX = isCavity ? 1.2 : DOMAIN.maxX;
-    let dMinY = isCavity ? -1.2 : DOMAIN.minY;
-    let dMaxY = isCavity ? 1.2 : DOMAIN.maxY;
-
-    let gx = ((x - dMinX) / (dMaxX - dMinX)) * (nx - 1);
-    let gy = ((y - dMinY) / (dMaxY - dMinY)) * (ny - 1);
-
-    gx = Math.max(0, Math.min(nx - 1.001, gx));
-    gy = Math.max(0, Math.min(ny - 1.001, gy));
-
-    const i0 = Math.floor(gx);
-    const i1 = Math.min(nx - 1, i0 + 1);
-    const j0 = Math.floor(gy);
-    const j1 = Math.min(ny - 1, j0 + 1);
-
-    const fx = gx - i0;
-    const fy = gy - j0;
-
-    const u00 = uArr[i0][j0], u10 = uArr[i1][j0];
-    const u01 = uArr[i0][j1], u11 = uArr[i1][j1];
-    const u = (1 - fx) * (1 - fy) * u00 + fx * (1 - fy) * u10 + (1 - fx) * fy * u01 + fx * fy * u11;
-
-    const v00 = vArr[i0][j0], v10 = vArr[i1][j0];
-    const v01 = vArr[i0][j1], v11 = vArr[i1][j1];
-    const v = (1 - fx) * (1 - fy) * v00 + fx * (1 - fy) * v10 + (1 - fx) * fy * v01 + fx * fy * v11;
-
-    const p00 = pArr[i0][j0], p10 = pArr[i1][j0];
-    const p01 = pArr[i0][j1], p11 = pArr[i1][j1];
-    const p = (1 - fx) * (1 - fy) * p00 + fx * (1 - fy) * p10 + (1 - fx) * fy * p01 + fx * fy * p11;
-
-    const dv_dx = (vArr[Math.min(nx - 1, i0 + 1)][j0] - vArr[Math.max(0, i0 - 1)][j0]) / (2 * (dMaxX - dMinX) / nx);
-    const du_dy = (uArr[i0][Math.min(ny - 1, j0 + 1)] - uArr[i0][Math.max(0, j0 - 1)]) / (2 * (dMaxY - dMinY) / ny);
-    const omega = dv_dx - du_dy;
-
-    return { u, v, p, speed: Math.sqrt(u * u + v * v), omega };
-  }
-
-  // Initial clean physical baseline before simulation starts
-  if (isCavity) {
-    const r = Math.sqrt(x * x + y * y);
-    const u = -y * Math.max(0, 1 - r);
-    const v = x * Math.max(0, 1 - r);
-    return { u, v, p: 0.0, speed: Math.sqrt(u * u + v * v), omega: 2.0 };
-  }
-
-  const cx = -0.8;
-  const cy = 0.0;
-  const rad = 0.35;
-  const dx = x - cx;
-  const dy = y - cy;
-  const r2 = dx * dx + dy * dy;
-  const U_inf = 1.0;
-
-  if (r2 < rad * rad) {
-    return { u: 0.0, v: 0.0, p: 1.0, speed: 0.0, omega: 0.0 };
-  }
-
-  const u = U_inf * (1 - (rad * rad * (dx * dx - dy * dy)) / (r2 * r2));
-  const v = -U_inf * (rad * rad * (2 * dx * dy)) / (r2 * r2);
-  const speed = Math.sqrt(u * u + v * v);
-  const p = 0.5 * (1.0 - speed * speed);
-  return { u, v, p, speed, omega: 0.0 };
-}
-
-// Colormap mapping function
-function getColormapRgb(normalizedVal: number, scheme: ColormapScheme): [number, number, number] {
-  const v = Math.max(0, Math.min(1, normalizedVal));
-  if (scheme === 'coolwarm') {
-    return [v, 0.2 + 0.3 * (1 - Math.abs(v - 0.5)), 1 - v];
-  } else if (scheme === 'inferno') {
-    return [Math.pow(v, 0.7), Math.pow(v, 2.0), Math.pow(v, 4.0)];
-  } else if (scheme === 'viridis') {
-    return [0.267 + v * 0.6, 0.004 + v * 0.8, 0.329 + (1 - v) * 0.4];
-  } else if (scheme === 'jet') {
-    let r = 0, g = 0, b = 0;
-    if (v < 0.25) { b = 1; g = 4 * v; }
-    else if (v < 0.5) { b = 1 - 4 * (v - 0.25); g = 1; }
-    else if (v < 0.75) { g = 1; r = 4 * (v - 0.5); }
-    else { r = 1; g = 1 - 4 * (v - 0.75); }
-    return [r, g, b];
-  }
-  // Turbo palette
-  let r = 0, g = 0, b = 0;
-  if (v < 0.125) b = 0.5 + 4 * v;
-  else if (v < 0.375) { b = 1; g = 4 * (v - 0.125); }
-  else if (v < 0.625) { b = 1 - 4 * (v - 0.375); g = 1; r = 4 * (v - 0.375); }
-  else if (v < 0.875) { g = 1 - 4 * (v - 0.625); r = 1; }
-  else { r = 1 - 2 * (v - 0.875); }
-  return [r, g, b];
+  buildCutplanes();
 }
 
 function initThree() {
@@ -750,75 +419,56 @@ function initThree() {
   const width = canvasMountRef.value.clientWidth || 800;
   const height = canvasMountRef.value.clientHeight || 600;
 
-  // Scene
+  // 1. Scene
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0c0810);
+  scene.background = new THREE.Color(0x130f16);
 
-  // Camera
-  camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-  camera.position.set(3.6, -4.0, 3.0);
+  // 2. Camera
+  camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 1000);
+  camera.position.set(4.5, -4.8, 3.8);
   camera.lookAt(0, 0, 0);
 
-  // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  // 3. Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   canvasMountRef.value.innerHTML = '';
   canvasMountRef.value.appendChild(renderer.domElement);
 
-  // Professional Studio Lighting
-  const ambient = new THREE.AmbientLight(0xffffff, 0.82);
+  // 4. Lights
+  const ambient = new THREE.AmbientLight(0xffffff, 0.95);
   scene.add(ambient);
 
-  const keyLight = new THREE.DirectionalLight(0x00d2ff, 1.4);
-  keyLight.position.set(6, 6, 8);
-  keyLight.castShadow = true;
-  scene.add(keyLight);
+  const cyanLight = new THREE.DirectionalLight(0x00d2ff, 1.4);
+  cyanLight.position.set(6, 6, 8);
+  scene.add(cyanLight);
 
-  const rimLight = new THREE.DirectionalLight(0xa855f7, 1.1);
-  rimLight.position.set(-6, -6, 5);
-  scene.add(rimLight);
+  const magentaLight = new THREE.DirectionalLight(0xa855f7, 1.2);
+  magentaLight.position.set(-6, -6, 4);
+  scene.add(magentaLight);
 
-  const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
-  fillLight.position.set(0, 8, 2);
-  scene.add(fillLight);
-
-  // Root Groups
+  // 5. Main Root Groups
   mainGroup = new THREE.Group();
   geometryGroup = new THREE.Group();
-  ribbonStreamlinesGroup = new THREE.Group();
+  flowFieldGroup = new THREE.Group();
   cutplanesGroup = new THREE.Group();
   glyphsGroup = new THREE.Group();
-  floorGroup = new THREE.Group();
-  pulsesGroup = new THREE.Group();
-  rakeBarGroup = new THREE.Group();
 
   mainGroup.add(geometryGroup);
-  mainGroup.add(ribbonStreamlinesGroup);
+  mainGroup.add(flowFieldGroup);
   mainGroup.add(cutplanesGroup);
   mainGroup.add(glyphsGroup);
-  mainGroup.add(floorGroup);
-  mainGroup.add(pulsesGroup);
-  mainGroup.add(rakeBarGroup);
   scene.add(mainGroup);
 
-  // Build Scene Components
+  // 6. Build Scene elements
   buildActiveArchetype();
-  rebuildSlicePlane();
-  buildRibbonStreamlines();
+  buildCutplanes();
+  initRK4Particles();
   buildVectorGlyphs();
-  buildGroundGridAndShadow();
-  buildDomainBoundingBox();
-  buildRakeBarMesh();
   buildProbeMarker();
 
-  // Initialize Engineering Triad HUD
-  initEngineeringTriad();
-
-  // Listeners
+  // 7. Event Listeners
   const dom = renderer.domElement;
   dom.addEventListener('mousedown', onMouseDown);
   dom.addEventListener('mousemove', onMouseMove);
@@ -840,627 +490,485 @@ function clearGroup(g: THREE.Group) {
   }
 }
 
-// =========================================================================
-// 1. CONTINUOUS 3D FLUID RIBBON STREAMLINES (THREE.BufferGeometry Quads)
-// =========================================================================
-function buildRibbonStreamlines() {
-  clearGroup(ribbonStreamlinesGroup);
-  clearGroup(pulsesGroup);
-  ribbonStreamlines = [];
-
-  for (let i = 0; i < NUM_STREAMLINES; i++) {
-    const yOffset = -rakeSpan.value * 0.5 + (i / (NUM_STREAMLINES - 1)) * rakeSpan.value;
-    const seedY = rakeY.value + yOffset;
-    const seedZ = ((i % 3) - 1) * 0.28;
-
-    const positions = new Float32Array(STREAMLINE_STEPS * 3);
-    const numVerts = STREAMLINE_STEPS * 2;
-    const meshPositions = new Float32Array(numVerts * 3);
-    const meshColors = new Float32Array(numVerts * 3);
-
-    const indices: number[] = [];
-    for (let s = 0; s < STREAMLINE_STEPS - 1; s++) {
-      const i0 = s * 2;
-      const i1 = s * 2 + 1;
-      const i2 = (s + 1) * 2;
-      const i3 = (s + 1) * 2 + 1;
-      indices.push(i0, i1, i2);
-      indices.push(i1, i3, i2);
+// The body the solver actually simulated: every solid cell of the obstacle
+// mask, extruded along the span. Exact position, size and angle of attack.
+function buildSimulatedGeometry(): boolean {
+  const dom = domain.value;
+  if (!lastMask || !dom) return false;
+  const cells: Array<[number, number]> = [];
+  for (let i = 0; i < dom.nx; i++) {
+    for (let j = 0; j < dom.ny; j++) {
+      if (lastMask[i]?.[j]) cells.push([i, j]);
     }
-
-    const geom = new THREE.BufferGeometry();
-    geom.setIndex(indices);
-    geom.setAttribute('position', new THREE.BufferAttribute(meshPositions, 3));
-    geom.setAttribute('color', new THREE.BufferAttribute(meshColors, 3));
-
-    const mat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.85,
-      metalness: 0.35,
-      roughness: 0.3
-    });
-
-    const mesh = new THREE.Mesh(geom, mat);
-    ribbonStreamlinesGroup.add(mesh);
-
-    ribbonStreamlines.push({
-      seed: new THREE.Vector3(rakeX.value, seedY, seedZ),
-      mesh,
-      geom,
-      positions,
-      meshPositions,
-      meshColors,
-      pulsePos: (i / NUM_STREAMLINES)
-    });
   }
-
-  pulsePositions = new Float32Array(NUM_STREAMLINES * 3);
-  pulseColors = new Float32Array(NUM_STREAMLINES * 3);
-
-  const pulseGeom = new THREE.BufferGeometry();
-  pulseGeom.setAttribute('position', new THREE.BufferAttribute(pulsePositions, 3));
-  pulseGeom.setAttribute('color', new THREE.BufferAttribute(pulseColors, 3));
-
-  const pulseMat = new THREE.PointsMaterial({
-    size: 0.08,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.95,
-    blending: THREE.AdditiveBlending
-  });
-
-  pulsePoints = new THREE.Points(pulseGeom, pulseMat);
-  pulsesGroup.add(pulsePoints);
-
-  updateRibbonStreamlinesGeometry();
-}
-
-function updateRibbonStreamlinesGeometry() {
-  const isCavity = props.params.archetype === 'cavity';
-  const ds = isCavity ? 0.045 : 0.065;
-
-  for (let sIdx = 0; sIdx < ribbonStreamlines.length; sIdx++) {
-    const sl = ribbonStreamlines[sIdx];
-    let curX = sl.seed.x;
-    let curY = sl.seed.y;
-    let curZ = sl.seed.z;
-
-    for (let step = 0; step < STREAMLINE_STEPS; step++) {
-      sl.positions[step * 3] = curX;
-      sl.positions[step * 3 + 1] = curY;
-      sl.positions[step * 3 + 2] = curZ;
-
-      const { u, v } = sampleFluidField(curX, curY);
-
-      const midX = curX + 0.5 * ds * u;
-      const midY = curY + 0.5 * ds * v;
-      const mid = sampleFluidField(midX, midY);
-
-      curX += ds * mid.u;
-      curY += ds * mid.v;
-
-      if (curX > DOMAIN.maxX || curX < DOMAIN.minX || curY > DOMAIN.maxY || curY < DOMAIN.minY) {
-        for (let rem = step + 1; rem < STREAMLINE_STEPS; rem++) {
-          sl.positions[rem * 3] = curX;
-          sl.positions[rem * 3 + 1] = curY;
-          sl.positions[rem * 3 + 2] = curZ;
-        }
-        break;
-      }
-    }
-
-    for (let step = 0; step < STREAMLINE_STEPS; step++) {
-      const px = sl.positions[step * 3];
-      const py = sl.positions[step * 3 + 1];
-      const pz = sl.positions[step * 3 + 2];
-
-      let tx = 1.0, ty = 0.0;
-      if (step < STREAMLINE_STEPS - 1) {
-        tx = sl.positions[(step + 1) * 3] - px;
-        ty = sl.positions[(step + 1) * 3 + 1] - py;
-      } else if (step > 0) {
-        tx = px - sl.positions[(step - 1) * 3];
-        ty = py - sl.positions[(step - 1) * 3 + 1];
-      }
-      const tLen = Math.sqrt(tx * tx + ty * ty) || 1.0;
-      tx /= tLen;
-      ty /= tLen;
-
-      const nx = -ty;
-      const ny = tx;
-
-      const { speed, p, omega } = sampleFluidField(px, py);
-      const w = RIBBON_WIDTH * (0.8 + 0.4 * Math.min(speed, 1.5));
-
-      const v0Idx = step * 2;
-      sl.meshPositions[v0Idx * 3] = px + nx * w;
-      sl.meshPositions[v0Idx * 3 + 1] = py + ny * w;
-      sl.meshPositions[v0Idx * 3 + 2] = pz;
-
-      const v1Idx = step * 2 + 1;
-      sl.meshPositions[v1Idx * 3] = px - nx * w;
-      sl.meshPositions[v1Idx * 3 + 1] = py - ny * w;
-      sl.meshPositions[v1Idx * 3 + 2] = pz;
-
-      let val = speed / 1.6;
-      if (activeField.value === 'p') val = (p + 1.2) / 2.6;
-      else if (activeField.value === 'omega') val = (omega + 10.0) / 20.0;
-
-      const [r, g, b] = getColormapRgb(val, activeColormap.value);
-      sl.meshColors[v0Idx * 3] = r;
-      sl.meshColors[v0Idx * 3 + 1] = g;
-      sl.meshColors[v0Idx * 3 + 2] = b;
-
-      sl.meshColors[v1Idx * 3] = r;
-      sl.meshColors[v1Idx * 3 + 1] = g;
-      sl.meshColors[v1Idx * 3 + 2] = b;
-    }
-
-    (sl.geom.attributes.position as THREE.BufferAttribute).needsUpdate = true;
-    (sl.geom.attributes.color as THREE.BufferAttribute).needsUpdate = true;
-    sl.geom.computeVertexNormals();
-  }
-}
-
-function updateTracerPulses(dt = 0.015) {
-  if (!pulsePoints) return;
-
-  const posAttr = pulsePoints.geometry.attributes.position as THREE.BufferAttribute;
-  const colAttr = pulsePoints.geometry.attributes.color as THREE.BufferAttribute;
-
-  for (let i = 0; i < ribbonStreamlines.length; i++) {
-    const sl = ribbonStreamlines[i];
-    sl.pulsePos += dt * 0.75;
-    if (sl.pulsePos > 1.0) sl.pulsePos -= 1.0;
-
-    const stepIdx = Math.floor(sl.pulsePos * (STREAMLINE_STEPS - 1));
-    const nextIdx = Math.min(STREAMLINE_STEPS - 1, stepIdx + 1);
-    const alpha = sl.pulsePos * (STREAMLINE_STEPS - 1) - stepIdx;
-
-    const px = (1 - alpha) * sl.positions[stepIdx * 3] + alpha * sl.positions[nextIdx * 3];
-    const py = (1 - alpha) * sl.positions[stepIdx * 3 + 1] + alpha * sl.positions[nextIdx * 3 + 1];
-    const pz = (1 - alpha) * sl.positions[stepIdx * 3 + 2] + alpha * sl.positions[nextIdx * 3 + 2];
-
-    pulsePositions[i * 3] = px;
-    pulsePositions[i * 3 + 1] = py;
-    pulsePositions[i * 3 + 2] = pz;
-
-    pulseColors[i * 3] = 1.0;
-    pulseColors[i * 3 + 1] = 1.0;
-    pulseColors[i * 3 + 2] = 1.0;
-  }
-
-  posAttr.needsUpdate = true;
-  colAttr.needsUpdate = true;
-}
-
-// =========================================================================
-// 2. HARDWARE BILINEAR DataTexture MULTI-AXIS SLICE PLANE
-// =========================================================================
-function rebuildSlicePlane() {
-  clearGroup(cutplanesGroup);
-
-  textureWidth = 80;
-  textureHeight = 40;
-  textureBuffer = new Uint8Array(textureWidth * textureHeight * 4);
-
-  dataTexture = new THREE.DataTexture(
-    textureBuffer,
-    textureWidth,
-    textureHeight,
-    THREE.RGBAFormat,
-    THREE.UnsignedByteType
+  if (cells.length === 0) return true; // no solid body in this case
+  const cw = dom.W / dom.nx;
+  const ch = dom.H / dom.ny;
+  const mesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(cw, ch, SPAN),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.6, roughness: 0.35 }),
+    cells.length
   );
-  dataTexture.magFilter = THREE.LinearFilter;
-  dataTexture.minFilter = THREE.LinearFilter;
-  dataTexture.generateMipmaps = false;
-
-  let planeGeom: THREE.PlaneGeometry;
-
-  if (sliceAxis.value === 'z') {
-    // XY plane (Spanwise)
-    planeGeom = new THREE.PlaneGeometry(3.9, 1.95);
-  } else if (sliceAxis.value === 'y') {
-    // XZ plane (Horizontal)
-    planeGeom = new THREE.PlaneGeometry(3.9, 1.15);
-  } else {
-    // YZ plane (Cross-flow wake)
-    planeGeom = new THREE.PlaneGeometry(1.95, 1.15);
-  }
-
-  const planeMat = new THREE.MeshBasicMaterial({
-    map: dataTexture,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: sliceOpacity.value
+  const dummy = new THREE.Object3D();
+  cells.forEach(([i, j], k) => {
+    dummy.position.set(-dom.W / 2 + (i + 0.5) * cw, -dom.H / 2 + (j + 0.5) * ch, 0);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(k, dummy.matrix);
   });
-
-  cutplaneMesh = new THREE.Mesh(planeGeom, planeMat);
-
-  if (sliceAxis.value === 'z') {
-    cutplaneMesh.rotation.set(0, 0, 0);
-    cutplaneMesh.position.set(0, 0, slicePos.value);
-  } else if (sliceAxis.value === 'y') {
-    cutplaneMesh.rotation.set(-Math.PI / 2, 0, 0);
-    cutplaneMesh.position.set(0, slicePos.value, 0);
-  } else {
-    cutplaneMesh.rotation.set(0, Math.PI / 2, 0);
-    cutplaneMesh.position.set(slicePos.value, 0, 0);
-  }
-
-  cutplanesGroup.add(cutplaneMesh);
-  updateSliceDataTexture();
+  mesh.instanceMatrix.needsUpdate = true;
+  geometryGroup.add(mesh);
+  return true;
 }
 
-function updateSliceDataTexture() {
-  if (!dataTexture || !textureBuffer) return;
-
-  for (let j = 0; j < textureHeight; j++) {
-    for (let i = 0; i < textureWidth; i++) {
-      const uCoord = i / (textureWidth - 1);
-      const vCoord = j / (textureHeight - 1);
-
-      let worldX = 0, worldY = 0;
-
-      if (sliceAxis.value === 'z') {
-        worldX = DOMAIN.minX + uCoord * (DOMAIN.maxX - DOMAIN.minX);
-        worldY = DOMAIN.minY + vCoord * (DOMAIN.maxY - DOMAIN.minY);
-      } else if (sliceAxis.value === 'y') {
-        worldX = DOMAIN.minX + uCoord * (DOMAIN.maxX - DOMAIN.minX);
-        worldY = slicePos.value;
-      } else {
-        // YZ wake slice: uCoord is Y, vCoord is Z
-        worldX = slicePos.value;
-        worldY = DOMAIN.minY + uCoord * (DOMAIN.maxY - DOMAIN.minY);
-      }
-
-      const { speed, p, omega } = sampleFluidField(worldX, worldY);
-
-      let val = speed / 1.6;
-      if (activeField.value === 'p') val = (p + 1.2) / 2.6;
-      else if (activeField.value === 'omega') val = (omega + 10.0) / 20.0;
-
-      const [r, g, b] = getColormapRgb(val, activeColormap.value);
-      const idx = (j * textureWidth + i) * 4;
-
-      textureBuffer[idx + 0] = Math.floor(r * 255);
-      textureBuffer[idx + 1] = Math.floor(g * 255);
-      textureBuffer[idx + 2] = Math.floor(b * 255);
-      textureBuffer[idx + 3] = 230;
-    }
-  }
-
-  dataTexture.needsUpdate = true;
-}
-
-// Physical Streamline Rake Emitter Bar
-function buildRakeBarMesh() {
-  clearGroup(rakeBarGroup);
-
-  const barGeom = new THREE.CylinderGeometry(0.015, 0.015, rakeSpan.value, 16);
-  const barMat = new THREE.MeshStandardMaterial({
-    color: 0x38bdf8,
-    metalness: 0.8,
-    roughness: 0.2,
-    emissive: 0x075985
-  });
-
-  rakeBarMesh = new THREE.Mesh(barGeom, barMat);
-  rakeBarMesh.position.set(rakeX.value, rakeY.value, 0);
-  rakeBarGroup.add(rakeBarMesh);
-}
-
-function updateRakeBarGeometry() {
-  if (!rakeBarMesh) return;
-  rakeBarMesh.position.set(rakeX.value, rakeY.value, 0);
-  rakeBarMesh.scale.set(1, rakeSpan.value / 1.72, 1);
-}
-
-// 3D Physical Obstacle Surface
 function buildActiveArchetype() {
   clearGroup(geometryGroup);
-  obstacleMesh = null;
+  // Once the solver has sent its obstacle mask, show the real geometry; the
+  // stylised models below are only a placeholder before the first frame.
+  if (buildSimulatedGeometry()) return;
 
-  const arch = props.params.archetype || 'cylinder';
+  const arch = props.params.archetype || 'plume';
+  const vorticityAngle = props.params.studioParams?.vorticityAngle ?? 0.152;
 
-  if (arch === 'cylinder') {
-    const cylGeom = new THREE.CylinderGeometry(0.35, 0.35, 1.4, 64, 24);
-    cylGeom.rotateX(Math.PI / 2);
-
-    const cylMat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      metalness: 0.25,
-      roughness: 0.22,
-      side: THREE.DoubleSide
-    });
-
-    obstacleMesh = new THREE.Mesh(cylGeom, cylMat);
-    obstacleMesh.position.set(-0.8, 0, 0);
-    obstacleMesh.castShadow = true;
-    geometryGroup.add(obstacleMesh);
-    updateObstacleSurfaceColors();
-
-  } else if (arch === 'airfoil') {
+  if (arch === 'airfoil') {
+    // ✈️ 3D NACA 0012 Airfoil Wing Geometry
     const shape = new THREE.Shape();
-    const chord = 2.0;
-    const nPts = 60;
-    const pts: THREE.Vector2[] = [];
+    const chord = 2.4;
+    const nPoints = 60;
+    const points: THREE.Vector2[] = [];
 
-    for (let i = 0; i <= nPts; i++) {
-      const xc = i / nPts;
+    for (let i = 0; i <= nPoints; i++) {
+      const xc = i / nPoints;
       const yt = 0.6 * (0.2969 * Math.sqrt(xc) - 0.1260 * xc - 0.3516 * Math.pow(xc, 2) + 0.2843 * Math.pow(xc, 3) - 0.1015 * Math.pow(xc, 4));
-      pts.push(new THREE.Vector2((xc - 0.4) * chord, yt));
+      const px = (xc - 0.4) * chord;
+      points.push(new THREE.Vector2(px, yt));
     }
-    for (let i = nPts; i >= 0; i--) {
-      const xc = i / nPts;
+    for (let i = nPoints; i >= 0; i--) {
+      const xc = i / nPoints;
       const yt = 0.6 * (0.2969 * Math.sqrt(xc) - 0.1260 * xc - 0.3516 * Math.pow(xc, 2) + 0.2843 * Math.pow(xc, 3) - 0.1015 * Math.pow(xc, 4));
-      pts.push(new THREE.Vector2((xc - 0.4) * chord, -yt));
+      const px = (xc - 0.4) * chord;
+      points.push(new THREE.Vector2(px, -yt));
     }
-    shape.setFromPoints(pts);
 
-    const extrudeSettings = { depth: 1.2, bevelEnabled: false };
+    shape.setFromPoints(points);
+    const extrudeSettings = { depth: 2.0, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.04, bevelThickness: 0.04 };
     const wingGeom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
     wingGeom.center();
 
     const wingMat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      metalness: 0.35,
-      roughness: 0.25,
-      side: THREE.DoubleSide
+      color: 0xe2e8f0,
+      metalness: 0.85,
+      roughness: 0.18
     });
 
-    obstacleMesh = new THREE.Mesh(wingGeom, wingMat);
-    obstacleMesh.castShadow = true;
-    geometryGroup.add(obstacleMesh);
-    updateObstacleSurfaceColors();
+    const wingMesh = new THREE.Mesh(wingGeom, wingMat);
+    wingMesh.rotation.z = -vorticityAngle;
+    geometryGroup.add(wingMesh);
+
+  } else if (arch === 'cylinder') {
+    // 🔴 3D Cylinder Obstacle
+    const cylGeom = new THREE.CylinderGeometry(0.35, 0.35, 2.2, 32);
+    const cylMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      metalness: 0.9,
+      roughness: 0.1
+    });
+    const cylMesh = new THREE.Mesh(cylGeom, cylMat);
+    cylMesh.position.set(-0.8, 0, 0);
+    geometryGroup.add(cylMesh);
+
+  } else if (arch === 'venturi') {
+    // 🚿 Venturi Nozzle Glass Tube
+    const points: THREE.Vector2[] = [];
+    for (let i = 0; i <= 30; i++) {
+      const x = -2.0 + (i / 30) * 4.0;
+      const r = 0.85 - 0.45 * Math.exp(-Math.pow(x, 2) / 0.6);
+      points.push(new THREE.Vector2(r, x));
+    }
+    const venturiGeom = new THREE.LatheGeometry(points, 32);
+    const venturiMat = new THREE.MeshPhysicalMaterial({
+      color: 0xa855f7,
+      transparent: true,
+      opacity: 0.35,
+      roughness: 0.1,
+      transmission: 0.8,
+      thickness: 0.5,
+      side: THREE.DoubleSide
+    });
+    const venturiMesh = new THREE.Mesh(venturiGeom, venturiMat);
+    venturiMesh.rotation.z = Math.PI / 2;
+    geometryGroup.add(venturiMesh);
 
   } else if (arch === 'cavity') {
-    const boxGeom = new THREE.BoxGeometry(2.4, 2.4, 1.2);
+    // 🌀 3D Transparent Cavity Cube
+    const boxGeom = new THREE.BoxGeometry(2.4, 2.4, 2.4);
     const boxMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       wireframe: true,
       transparent: true,
-      opacity: 0.35
+      opacity: 0.4
     });
     const boxMesh = new THREE.Mesh(boxGeom, boxMat);
     geometryGroup.add(boxMesh);
 
-    const lidGeom = new THREE.BoxGeometry(2.4, 0.05, 1.2);
-    const lidMat = new THREE.MeshStandardMaterial({
-      color: 0x10b981,
-      metalness: 0.6,
-      roughness: 0.2,
-      emissive: 0x052e16
-    });
+    const lidGeom = new THREE.PlaneGeometry(2.4, 2.4);
+    const lidMat = new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
     const lidMesh = new THREE.Mesh(lidGeom, lidMat);
     lidMesh.position.set(0, 1.2, 0);
+    lidMesh.rotation.x = Math.PI / 2;
     geometryGroup.add(lidMesh);
-  }
-}
 
-function updateObstacleSurfaceColors() {
-  if (!obstacleMesh || !obstacleMesh.geometry) return;
+  } else if (arch === 'f1') {
+    // 🏎️ F1 Front Wing & Ground Effect Cascade
+    const f1Group = new THREE.Group();
+    const mainShape = new THREE.Shape();
+    mainShape.moveTo(-1.0, 0.1);
+    mainShape.quadraticCurveTo(-0.3, -0.25, 0.8, -0.05);
+    mainShape.quadraticCurveTo(0.2, 0.15, -1.0, 0.1);
+    const mainGeom = new THREE.ExtrudeGeometry(mainShape, { depth: 2.6, bevelEnabled: true, bevelSize: 0.02, steps: 1 });
+    mainGeom.center();
+    const carbonMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.9, roughness: 0.2 });
+    const mainWing = new THREE.Mesh(mainGeom, carbonMat);
+    mainWing.position.set(0, -0.35, 0);
+    f1Group.add(mainWing);
 
-  const geom = obstacleMesh.geometry;
-  const posAttr = geom.attributes.position;
-  const count = posAttr.count;
+    const flapShape = new THREE.Shape();
+    flapShape.moveTo(-0.4, 0.2);
+    flapShape.quadraticCurveTo(0.1, -0.05, 0.9, 0.18);
+    flapShape.quadraticCurveTo(0.3, 0.32, -0.4, 0.2);
+    const flapGeom = new THREE.ExtrudeGeometry(flapShape, { depth: 2.4, bevelEnabled: true, bevelSize: 0.02, steps: 1 });
+    flapGeom.center();
+    const flapMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.7, roughness: 0.3 });
+    const flapMesh = new THREE.Mesh(flapGeom, flapMat);
+    flapMesh.position.set(0.15, -0.15, 0);
+    f1Group.add(flapMesh);
 
-  let colorAttr = geom.attributes.color as THREE.BufferAttribute;
-  if (!colorAttr || colorAttr.count !== count) {
-    const colors = new Float32Array(count * 3);
-    colorAttr = new THREE.BufferAttribute(colors, 3);
-    geom.setAttribute('color', colorAttr);
-  }
+    const epGeom = new THREE.BoxGeometry(2.0, 0.7, 0.04);
+    const epLeft = new THREE.Mesh(epGeom, carbonMat);
+    epLeft.position.set(0, -0.2, -1.3);
+    const epRight = new THREE.Mesh(epGeom, carbonMat);
+    epRight.position.set(0, -0.2, 1.3);
+    f1Group.add(epLeft);
+    f1Group.add(epRight);
 
-  const pColors = colorAttr.array as Float32Array;
+    const groundGeom = new THREE.PlaneGeometry(3.5, 3.0);
+    const groundMat = new THREE.MeshBasicMaterial({ color: 0x3f3f46, wireframe: true, transparent: true, opacity: 0.25 });
+    const groundMesh = new THREE.Mesh(groundGeom, groundMat);
+    groundMesh.position.set(0, -0.7, 0);
+    groundMesh.rotation.x = Math.PI / 2;
+    f1Group.add(groundMesh);
 
-  for (let i = 0; i < count; i++) {
-    const localX = posAttr.getX(i);
-    const localY = posAttr.getY(i);
-    const worldX = localX + obstacleMesh.position.x;
-    const worldY = localY + obstacleMesh.position.y;
+    geometryGroup.add(f1Group);
 
-    const norm = Math.sqrt(localX * localX + localY * localY) || 1.0;
-    const sampleX = worldX + (localX / norm) * 0.08;
-    const sampleY = worldY + (localY / norm) * 0.08;
+  } else if (arch === 'drone') {
+    // 🚁 Quadcopter Drone Airframe with 4 Rotor Disks
+    const droneGroup = new THREE.Group();
+    const bodyGeom = new THREE.SphereGeometry(0.35, 16, 16);
+    bodyGeom.scale(1.2, 0.5, 0.9);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, metalness: 0.8, roughness: 0.2 });
+    const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
+    droneGroup.add(bodyMesh);
 
-    const { p, speed } = sampleFluidField(sampleX, sampleY);
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.4 });
+    const armAngles = [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4];
+    armAngles.forEach(ang => {
+      const armGeom = new THREE.CylinderGeometry(0.04, 0.04, 1.3, 8);
+      const armMesh = new THREE.Mesh(armGeom, armMat);
+      armMesh.rotation.z = Math.PI / 2;
+      armMesh.rotation.y = ang;
+      droneGroup.add(armMesh);
 
-    let val = 0.5;
-    if (activeField.value === 'p') {
-      val = (p + 1.2) / 2.6;
-    } else {
-      val = speed / 1.6;
+      const motorGeom = new THREE.CylinderGeometry(0.09, 0.09, 0.16, 16);
+      const motorMesh = new THREE.Mesh(motorGeom, bodyMat);
+      const rx = Math.cos(ang) * 0.95;
+      const rz = Math.sin(ang) * 0.95;
+      motorMesh.position.set(rx, 0.06, rz);
+      droneGroup.add(motorMesh);
+
+      const rotorGeom = new THREE.TorusGeometry(0.42, 0.02, 8, 32);
+      const rotorMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7 });
+      const rotorMesh = new THREE.Mesh(rotorGeom, rotorMat);
+      rotorMesh.rotation.x = Math.PI / 2;
+      rotorMesh.position.set(rx, 0.15, rz);
+      droneGroup.add(rotorMesh);
+    });
+    geometryGroup.add(droneGroup);
+
+  } else if (arch === 'submarine') {
+    // 🌊 Submarine Hydrodynamic Teardrop Hull
+    const subGroup = new THREE.Group();
+    const hullPoints: THREE.Vector2[] = [];
+    for (let i = 0; i <= 30; i++) {
+      const u = i / 30;
+      const x = -1.6 + u * 3.4;
+      const r = u < 0.4 
+        ? 0.42 * Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.4) / 0.4, 2)))
+        : 0.42 * (1 - Math.pow((u - 0.4) / 0.6, 1.4));
+      hullPoints.push(new THREE.Vector2(Math.max(r, 0.01), x));
     }
+    const hullGeom = new THREE.LatheGeometry(hullPoints, 32);
+    const subMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.92, roughness: 0.15 });
+    const hullMesh = new THREE.Mesh(hullGeom, subMat);
+    hullMesh.rotation.z = Math.PI / 2;
+    subGroup.add(hullMesh);
 
-    const [r, g, b] = getColormapRgb(val, activeColormap.value);
-    pColors[i * 3] = r;
-    pColors[i * 3 + 1] = g;
-    pColors[i * 3 + 2] = b;
+    const sailGeom = new THREE.BoxGeometry(0.65, 0.55, 0.18);
+    const sailMesh = new THREE.Mesh(sailGeom, subMat);
+    sailMesh.position.set(-0.25, 0.42, 0);
+    subGroup.add(sailMesh);
+
+    const bowPlaneGeom = new THREE.BoxGeometry(0.2, 0.04, 0.85);
+    const bowPlaneMesh = new THREE.Mesh(bowPlaneGeom, subMat);
+    bowPlaneMesh.position.set(-0.25, 0.48, 0);
+    subGroup.add(bowPlaneMesh);
+
+    const finVGeom = new THREE.BoxGeometry(0.35, 0.75, 0.04);
+    const finVMesh = new THREE.Mesh(finVGeom, subMat);
+    finVMesh.position.set(1.5, 0, 0);
+    subGroup.add(finVMesh);
+
+    const finHGeom = new THREE.BoxGeometry(0.35, 0.04, 0.75);
+    const finHMesh = new THREE.Mesh(finHGeom, subMat);
+    finHMesh.position.set(1.5, 0, 0);
+    subGroup.add(finHMesh);
+
+    geometryGroup.add(subGroup);
   }
-
-  colorAttr.needsUpdate = true;
 }
 
-// Ground Grid and Contact Shadow
-function buildGroundGridAndShadow() {
-  clearGroup(floorGroup);
+// 4th-Order Runge-Kutta (RK4) Velocity Field Vector Evaluation
+// Velocity for particles/glyphs in viewport units: real (u, v) / U_ref.
+// Before any solver frame exists, particles simply drift with a uniform
+// placeholder stream — no invented per-archetype flow fields.
+function evaluateVelocityField(x: number, y: number, _z: number): [number, number, number] {
+  const d = props.data;
+  if (!d || !domain.value) return [1.0, 0.0, 0.0];
+  if (!inDomain(x, y) || isSolidAt(x, y)) return [0.0, 0.0, 0.0];
+  const uRef = Math.max(props.params.studioParams?.irisPurple ?? 1, 1e-3);
+  return [sampleField(d.u, x, y) / uRef, sampleField(d.v, x, y) / uRef, 0.0];
+}
 
-  const grid = new THREE.GridHelper(5.2, 26, 0x00d2ff, 0x1e293b);
-  grid.position.set(0, -1.25, 0);
-  grid.material.transparent = true;
-  grid.material.opacity = 0.45;
-  floorGroup.add(grid);
+function initRK4Particles() {
+  clearGroup(flowFieldGroup);
 
-  const shadowCanvas = document.createElement('canvas');
-  shadowCanvas.width = 128;
-  shadowCanvas.height = 128;
-  const ctx = shadowCanvas.getContext('2d');
-  if (ctx) {
-    const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    grad.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
-    grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.25)');
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 128, 128);
+  particlePositions = new Float32Array(NUM_PARTICLES * 3);
+  particleColors = new Float32Array(NUM_PARTICLES * 3);
+  particleVelocities = new Float32Array(NUM_PARTICLES * 3);
+  particleLifespans = new Float32Array(NUM_PARTICLES);
+
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    respawnParticle(i, true);
   }
 
-  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
-  const shadowMat = new THREE.MeshBasicMaterial({
-    map: shadowTex,
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+  geom.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.08,
+    vertexColors: true,
     transparent: true,
-    depthWrite: false
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending
   });
-  const shadowMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), shadowMat);
-  shadowMesh.position.set(-0.8, -1.24, 0);
-  shadowMesh.rotation.x = -Math.PI / 2;
-  floorGroup.add(shadowMesh);
+
+  rk4ParticlesGroup = new THREE.Points(geom, mat);
+  flowFieldGroup.add(rk4ParticlesGroup);
 }
 
-// Vector Glyphs
+function respawnParticle(i: number, randomX = false) {
+  const dom = domain.value;
+  const W = dom?.W ?? 4.4;
+  const H = dom?.H ?? 2.2;
+  // Open channels are seeded at the inlet; sealed boxes anywhere inside
+  const x = randomX || isClosedCase.value ? (Math.random() - 0.5) * W : -W / 2;
+  const y = (Math.random() - 0.5) * H;
+  const z = (Math.random() - 0.5) * SPAN;
+
+  particlePositions[i * 3] = x;
+  particlePositions[i * 3 + 1] = y;
+  particlePositions[i * 3 + 2] = z;
+
+  particleLifespans[i] = Math.random() * 100 + 40;
+
+  const [vx, vy, vz] = evaluateVelocityField(x, y, z);
+  particleVelocities[i * 3] = vx;
+  particleVelocities[i * 3 + 1] = vy;
+  particleVelocities[i * 3 + 2] = vz;
+
+  const [r, g, b] = getColormapRgb(particleColorValue(vx, vy, vz), activeColormap.value);
+  particleColors[i * 3] = r;
+  particleColors[i * 3 + 1] = g;
+  particleColors[i * 3 + 2] = b;
+}
+
+// Colour particles by |U| relative to the fastest fluid cell of the frame
+function particleColorValue(vx: number, vy: number, vz: number): number {
+  const uRef = Math.max(props.params.studioParams?.irisPurple ?? 1, 1e-3);
+  const uMax = Math.max(props.data?.uMax ?? uRef, 1e-6);
+  return (Math.sqrt(vx * vx + vy * vy + vz * vz) * uRef) / uMax;
+}
+
+function updateRK4Particles(dt = 0.02) {
+  if (!rk4ParticlesGroup) return;
+
+  const pos = rk4ParticlesGroup.geometry.attributes.position as THREE.BufferAttribute;
+  const col = rk4ParticlesGroup.geometry.attributes.color as THREE.BufferAttribute;
+
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    let px = particlePositions[i * 3];
+    let py = particlePositions[i * 3 + 1];
+    let pz = particlePositions[i * 3 + 2];
+
+    // RK4 Integration Step
+    const [k1x, k1y, k1z] = evaluateVelocityField(px, py, pz);
+    const [k2x, k2y, k2z] = evaluateVelocityField(px + 0.5 * dt * k1x, py + 0.5 * dt * k1y, pz + 0.5 * dt * k1z);
+    const [k3x, k3y, k3z] = evaluateVelocityField(px + 0.5 * dt * k2x, py + 0.5 * dt * k2y, pz + 0.5 * dt * k2z);
+    const [k4x, k4y, k4z] = evaluateVelocityField(px + dt * k3x, py + dt * k3y, pz + dt * k3z);
+
+    px += (dt / 6.0) * (k1x + 2 * k2x + 2 * k3x + k4x);
+    py += (dt / 6.0) * (k1y + 2 * k2y + 2 * k3y + k4y);
+    pz += (dt / 6.0) * (k1z + 2 * k2z + 2 * k3z + k4z);
+
+    particleLifespans[i] -= 1;
+
+    // Check bounds or lifespan expiry
+    const halfW = (domain.value?.W ?? 4.4) / 2 + 0.05;
+    const halfH = (domain.value?.H ?? 2.2) / 2 + 0.05;
+    if (Math.abs(px) > halfW || Math.abs(py) > halfH || Math.abs(pz) > SPAN || particleLifespans[i] <= 0) {
+      respawnParticle(i, false);
+    } else {
+      particlePositions[i * 3] = px;
+      particlePositions[i * 3 + 1] = py;
+      particlePositions[i * 3 + 2] = pz;
+
+      const [r, g, b] = getColormapRgb(particleColorValue(k1x, k1y, k1z), activeColormap.value);
+      particleColors[i * 3] = r;
+      particleColors[i * 3 + 1] = g;
+      particleColors[i * 3 + 2] = b;
+    }
+  }
+
+  pos.needsUpdate = true;
+  col.needsUpdate = true;
+}
+
 function buildVectorGlyphs() {
   clearGroup(glyphsGroup);
+  const dom = domain.value;
+  if (!dom) return;
 
-  const coneGeom = new THREE.ConeGeometry(0.025, 0.09, 8);
+  const coneGeom = new THREE.ConeGeometry(0.025, 0.1, 8);
   coneGeom.rotateX(Math.PI / 2);
-
   const coneMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-  const instMesh = new THREE.InstancedMesh(coneGeom, coneMat, 120);
-
+  const nGx = 14;
+  const nGy = Math.max(4, Math.round((nGx * dom.H) / dom.W));
+  const instancedMesh = new THREE.InstancedMesh(coneGeom, coneMat, nGx * nGy);
   const dummy = new THREE.Object3D();
   let count = 0;
 
-  for (let x = -1.8; x <= 1.8; x += 0.4) {
-    for (let y = -0.8; y <= 0.8; y += 0.4) {
-      if (count >= 120) break;
-      const { u, v, speed } = sampleFluidField(x, y);
-
-      dummy.position.set(x, y, 0.02);
-      dummy.scale.set(Math.max(0.1, speed * 0.7), Math.max(0.1, speed * 0.7), Math.max(0.1, speed * 0.7));
-
-      if (speed > 0.001) {
-        dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(u, v, 0).normalize());
-      }
+  for (let a = 0; a < nGx; a++) {
+    for (let b = 0; b < nGy; b++) {
+      const x = -dom.W / 2 + ((a + 0.5) / nGx) * dom.W;
+      const y = -dom.H / 2 + ((b + 0.5) / nGy) * dom.H;
+      const [vx, vy, vz] = evaluateVelocityField(x, y, 0);
+      const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+      if (speed < 1e-6) continue; // solid cell or stagnant
+      dummy.position.set(x, y, 0);
+      dummy.scale.setScalar(Math.min(speed, 2.5) * 0.8);
+      dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(vx, vy, vz).normalize());
       dummy.updateMatrix();
-
-      instMesh.setMatrixAt(count, dummy.matrix);
-      count++;
+      instancedMesh.setMatrixAt(count++, dummy.matrix);
     }
   }
-
-  instMesh.instanceMatrix.needsUpdate = true;
-  glyphsGroup.add(instMesh);
+  instancedMesh.count = count;
+  instancedMesh.instanceMatrix.needsUpdate = true;
+  glyphsGroup.add(instancedMesh);
 }
 
-// Domain Bounding Box
-function buildDomainBoundingBox() {
-  const boxGeom = new THREE.BoxGeometry(4.0, 2.0, 1.2);
-  const wireGeom = new THREE.WireframeGeometry(boxGeom);
-  const wireMat = new THREE.LineBasicMaterial({
-    color: 0x475569,
-    transparent: true,
-    opacity: 0.32
-  });
-  const tunnelWire = new THREE.LineSegments(wireGeom, wireMat);
-  mainGroup.add(tunnelWire);
+function buildCutplanes() {
+  clearGroup(cutplanesGroup);
+  const dom = domain.value;
+  const W = dom?.W ?? VIEW_W;
+  const H = dom?.H ?? VIEW_H;
+  const segX = dom ? Math.min(dom.nx * 2, 256) : 80;
+  const segY = dom ? Math.min(dom.ny * 2, 256) : 50;
+
+  // Section plane (XY, z = 0): the simulated 2-D domain itself
+  const geomXY = new THREE.PlaneGeometry(W, H, segX, segY);
+  const colorsXY: number[] = [];
+  const posXY = geomXY.attributes.position;
+  for (let i = 0; i < posXY.count; i++) {
+    colorsXY.push(...cutplaneColor(posXY.getX(i), posXY.getY(i)));
+  }
+  geomXY.setAttribute('color', new THREE.Float32BufferAttribute(colorsXY, 3));
+  cutplaneXY = new THREE.Mesh(geomXY, new THREE.MeshBasicMaterial({
+    vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.92
+  }));
+  cutplanesGroup.add(cutplaneXY);
+
+  // Spanwise slice (XZ at mid-height): the extruded 2-D solution is
+  // z-invariant, so it shows the mid-height row across the span.
+  const geomXZ = new THREE.PlaneGeometry(W, SPAN, segX, 8);
+  const colorsXZ: number[] = [];
+  const posXZ = geomXZ.attributes.position;
+  for (let i = 0; i < posXZ.count; i++) {
+    colorsXZ.push(...cutplaneColor(posXZ.getX(i), 0));
+  }
+  geomXZ.setAttribute('color', new THREE.Float32BufferAttribute(colorsXZ, 3));
+  cutplaneXZ = new THREE.Mesh(geomXZ, new THREE.MeshBasicMaterial({
+    vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.55
+  }));
+  cutplaneXZ.rotation.x = -Math.PI / 2;
+  cutplanesGroup.add(cutplaneXZ);
+}
+
+function cutplaneColor(x: number, y: number): [number, number, number] {
+  const val = getScalarFieldValue(x, y);
+  if (val === null) return [0.22, 0.22, 0.26]; // solid body / no data
+  return getColormapRgb(val, activeColormap.value);
+}
+
+// Normalized [0, 1] value of the active field, or null for solid cells,
+// points outside the domain, fields this case does not compute, or no data.
+function getScalarFieldValue(x: number, y: number): number | null {
+  const field = derivedFields.value?.[activeField.value];
+  const range = fieldRange.value;
+  if (!field || !range || !inDomain(x, y) || isSolidAt(x, y)) return null;
+  return clamp((sampleField(field, x, y) - range.min) / ((range.max - range.min) || 1), 0, 1);
 }
 
 function buildProbeMarker() {
   const markerGeom = new THREE.SphereGeometry(0.04, 16, 16);
   const markerMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
   probeMarker = new THREE.Mesh(markerGeom, markerMat);
-  probeMarker.position.set(0, 0, 0);
+  probeMarker.position.set(0.6, 0.1, 0.2);
   scene.add(probeMarker);
 }
 
-// Engineering Triad
-function initEngineeringTriad() {
-  if (!triadCanvasRef.value) return;
-
-  triadScene = new THREE.Scene();
-  triadCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 10);
-  triadCamera.position.set(0, 0, 2.8);
-
-  triadRenderer = new THREE.WebGLRenderer({
-    canvas: triadCanvasRef.value,
-    alpha: true,
-    antialias: true
-  });
-  triadRenderer.setSize(100, 100);
-  triadRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-  triadGroup = new THREE.Group();
-
-  const dirX = new THREE.Vector3(1, 0, 0);
-  const arrowX = new THREE.ArrowHelper(dirX, new THREE.Vector3(0, 0, 0), 0.8, 0xef4444, 0.25, 0.15);
-  triadGroup.add(arrowX);
-
-  const dirY = new THREE.Vector3(0, 1, 0);
-  const arrowY = new THREE.ArrowHelper(dirY, new THREE.Vector3(0, 0, 0), 0.8, 0x10b981, 0.25, 0.15);
-  triadGroup.add(arrowY);
-
-  const dirZ = new THREE.Vector3(0, 0, 1);
-  const arrowZ = new THREE.ArrowHelper(dirZ, new THREE.Vector3(0, 0, 0), 0.8, 0x3b82f6, 0.25, 0.15);
-  triadGroup.add(arrowZ);
-
-  triadScene.add(triadGroup);
+function getColormapRgb(val: number, scheme: ColormapScheme): [number, number, number] {
+  const v = Math.max(0, Math.min(1, val));
+  if (scheme === 'coolwarm') {
+    return [v, 0.2 + 0.3 * (1 - Math.abs(v - 0.5)), 1 - v];
+  } else if (scheme === 'inferno') {
+    return [Math.pow(v, 0.7), Math.pow(v, 2.0), Math.pow(v, 4.0)];
+  } else if (scheme === 'viridis') {
+    return [0.267 + v * 0.6, 0.004 + v * 0.8, 0.329 + (1 - v) * 0.4];
+  }
+  // Turbo / Jet Palette
+  let r = 0, g = 0, b = 0;
+  if (v < 0.125) b = 0.5 + 4 * v;
+  else if (v < 0.375) { b = 1; g = 4 * (v - 0.125); }
+  else if (v < 0.625) { b = 1 - 4 * (v - 0.375); g = 1; r = 4 * (v - 0.375); }
+  else if (v < 0.875) { g = 1 - 4 * (v - 0.625); r = 1; }
+  else { r = 1 - 2 * (v - 0.875); }
+  return [r, g, b];
 }
 
-function updateEngineeringTriad() {
-  if (!triadGroup || !triadRenderer || !triadScene || !triadCamera) return;
-  triadGroup.quaternion.copy(mainGroup.quaternion);
-  triadRenderer.render(triadScene, triadCamera);
-}
-
-// Real-Time Step Watcher with requestAnimationFrame frame coalescing (prevents micro-stutters)
-let pendingStepData: SimulationStepData | null = null;
-let renderFrameScheduled = false;
-
-function applySimulationFrame(_stepData: SimulationStepData) {
-  updateSliceDataTexture();
-  if (showGeometry.value) {
-    updateObstacleSurfaceColors();
-  }
-  if (showStreamlines.value) {
-    updateRibbonStreamlinesGeometry();
-  }
-}
-
-function onSimulationStepReceived(stepData: SimulationStepData) {
-  pendingStepData = stepData;
-  if (!renderFrameScheduled) {
-    renderFrameScheduled = true;
-    requestAnimationFrame(() => {
-      renderFrameScheduled = false;
-      if (pendingStepData) {
-        applySimulationFrame(pendingStepData);
-        pendingStepData = null;
-      }
-    });
-  }
-}
-
-watch(() => props.data, (newData) => {
-  if (newData) {
-    onSimulationStepReceived(newData);
-  }
-});
-
-watch(() => [props.params.archetype, props.params.reynoldsNumber], () => {
-  buildActiveArchetype();
-  rebuildSlicePlane();
-  buildRibbonStreamlines();
-  buildVectorGlyphs();
-});
-
-// Animation Loop
 function animate() {
   animId = requestAnimationFrame(animate);
 
   if (isAutoRotate.value) {
-    targetRotationY += 0.003;
+    targetRotationY += 0.004;
   }
 
   if (mainGroup) {
@@ -1469,22 +977,17 @@ function animate() {
   }
 
   if (geometryGroup) geometryGroup.visible = showGeometry.value;
-  if (ribbonStreamlinesGroup) ribbonStreamlinesGroup.visible = showStreamlines.value;
-  if (pulsesGroup) pulsesGroup.visible = showStreamlines.value;
+  if (flowFieldGroup) flowFieldGroup.visible = showParticles.value;
   if (cutplanesGroup) cutplanesGroup.visible = showCutplanes.value;
   if (glyphsGroup) glyphsGroup.visible = showGlyphs.value;
-  if (floorGroup) floorGroup.visible = showFloorGrid.value;
-  if (rakeBarGroup) rakeBarGroup.visible = showStreamlines.value;
 
-  if (showStreamlines.value) {
-    updateTracerPulses();
+  if (showParticles.value) {
+    updateRK4Particles();
   }
 
   if (renderer && scene && camera) {
     renderer.render(scene, camera);
   }
-
-  updateEngineeringTriad();
 }
 
 function onMouseDown(e: MouseEvent) {
@@ -1507,8 +1010,7 @@ function onMouseMove(e: MouseEvent) {
     previousMousePosition = { x: e.clientX, y: e.clientY };
   } else {
     raycaster.setFromCamera(mouse, camera);
-    const targets = cutplaneMesh ? [cutplaneMesh, geometryGroup] : [geometryGroup];
-    const intersects = raycaster.intersectObjects(targets, true);
+    const intersects = raycaster.intersectObjects([cutplaneXY, cutplaneXZ, geometryGroup], true);
 
     if (intersects.length > 0) {
       const hit = intersects[0];
@@ -1516,24 +1018,28 @@ function onMouseMove(e: MouseEvent) {
       probe.value.screenX = e.clientX - rect.left;
       probe.value.screenY = e.clientY - rect.top;
 
-      const { p, speed, omega } = sampleFluidField(hit.point.x, hit.point.y);
-      const f = activeField.value;
-
-      if (f === 'p') {
-        probe.value.value = p;
-        probe.value.unit = 'Pa';
-        probe.value.label = 'Pressure (p)';
-      } else if (f === 'omega') {
-        probe.value.value = omega;
-        probe.value.unit = 's⁻¹';
-        probe.value.label = 'Vorticity (ω)';
+      // Hit point in the domain's frame (mainGroup is rotated by the user)
+      const local = mainGroup.worldToLocal(hit.point.clone());
+      const meta = colorbarData.value;
+      const field = derivedFields.value?.[activeField.value];
+      probe.value.label = meta.title;
+      probe.value.unit = meta.unit.replace(/[\[\]]/g, '');
+      if (!props.data || !domain.value) {
+        probe.value.value = null;
+        probe.value.subtext = 'No solver data yet';
+      } else if (!inDomain(local.x, local.y)) {
+        probe.value.value = null;
+        probe.value.subtext = 'Outside the simulated domain';
+      } else if (isSolidAt(local.x, local.y)) {
+        probe.value.value = null;
+        probe.value.subtext = 'Solid body';
+      } else if (!field) {
+        probe.value.value = null;
+        probe.value.subtext = 'Field not computed for this case';
       } else {
-        probe.value.value = speed;
-        probe.value.unit = 'm/s';
-        probe.value.label = 'Velocity |U|';
+        probe.value.value = sampleField(field, local.x, local.y);
+        probe.value.subtext = `${props.params.archetype.toUpperCase()} probe · iteration ${props.data.iteration}`;
       }
-
-      probe.value.subtext = `Pos: (${hit.point.x.toFixed(2)}, ${hit.point.y.toFixed(2)}) | Real Python CFD`;
 
       if (probeMarker) {
         probeMarker.position.copy(hit.point);
@@ -1551,33 +1057,103 @@ function onMouseUp() {
 }
 
 function onWheel(e: WheelEvent) {
-  camera.position.z = Math.max(1.8, Math.min(9, camera.position.z + e.deltaY * 0.003));
+  camera.position.z = Math.max(2, Math.min(10, camera.position.z + e.deltaY * 0.003));
 }
 
 function resetCamera() {
-  targetRotationX = 0.32;
-  targetRotationY = -0.68;
-  camera.position.set(3.6, -4.0, 3.0);
+  targetRotationX = 0.35;
+  targetRotationY = -0.65;
+  camera.position.set(4.5, -4.8, 3.8);
   camera.lookAt(0, 0, 0);
 }
+
+function capturePng(): boolean {
+  if (!renderer || !scene || !camera) return false;
+  try {
+    // Render one fresh frame so toDataURL does not read a cleared buffer
+    renderer.render(scene, camera);
+    const url = renderer.domElement.toDataURL('image/png');
+    const safeName = (props.params.caseName || 'openzess_snapshot').replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${safeName}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  } catch (err) {
+    console.warn('Viewport snapshot capture failed:', err);
+    return false;
+  }
+}
+
+defineExpose({ capturePng });
 
 function handleResize() {
   if (!canvasMountRef.value || !renderer || !camera) return;
   const width = canvasMountRef.value.clientWidth;
   const height = canvasMountRef.value.clientHeight;
+  if (!width || !height || width < 20 || height < 20 || !isFinite(width) || !isFinite(height)) return;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
 }
 
+// A new case invalidates the previous run's geometry
+watch(() => props.params.archetype, () => {
+  lastMask = null;
+});
+
+watch(() => [props.params.archetype, props.params.studioParams, activeColormap.value], () => {
+  buildActiveArchetype();
+  buildCutplanes();
+  buildVectorGlyphs();
+}, { deep: true });
+
+// New solver frames: refresh the geometry when a mask arrives (first/last
+// frame only) and the cut-planes/glyphs (throttled so a fast WebSocket
+// stream does not thrash geometry allocation).
+let lastCutplaneRebuild = 0;
+watch(() => props.data, (frame) => {
+  if (frame?.obstacleMask) {
+    lastMask = frame.obstacleMask;
+    buildActiveArchetype();
+  } else if (!frame) {
+    lastMask = null;
+  }
+  const now = performance.now();
+  if (now - lastCutplaneRebuild > 100 || frame?.converged) {
+    lastCutplaneRebuild = now;
+    buildCutplanes();
+    buildVectorGlyphs();
+  }
+});
+
+let resizeObserver: ResizeObserver | null = null;
+
 onMounted(() => {
   initThree();
   window.addEventListener('resize', handleResize);
+  if (canvasMountRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(canvasMountRef.value);
+  }
 });
 
 onUnmounted(() => {
   if (animId) cancelAnimationFrame(animId);
   window.removeEventListener('resize', handleResize);
+  window.removeEventListener('mouseup', onMouseUp);
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
+  if (renderer) {
+    renderer.dispose();
+    renderer = undefined;
+  }
 });
 </script>
 
@@ -1588,7 +1164,7 @@ onUnmounted(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  background: #09060c;
+  background: var(--bg-canvas);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -1600,11 +1176,9 @@ onUnmounted(() => {
   right: 14px;
   z-index: 25;
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  background: rgba(14, 10, 18, 0.92);
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(19, 15, 22, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border-subtle);
@@ -1632,64 +1206,63 @@ onUnmounted(() => {
 .viewport-title {
   font-size: 13px;
   font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: 0.3px;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
 }
 
 .archetype-badge {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  color: var(--color-cyan);
-  background: rgba(0, 210, 255, 0.12);
-  border: 1px solid rgba(0, 210, 255, 0.28);
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 2px 7px;
   border-radius: 4px;
-  padding: 2px 8px;
+  white-space: nowrap;
 }
 
-.live-tag {
+.case-tag-badge {
+  font-family: var(--font-mono, monospace);
   font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  padding: 2px 7px;
   border-radius: 4px;
-  padding: 2px 6px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.live-tag.live-active {
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.pulse-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
 }
 
 .status-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .telemetry-pill {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.06);
-  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: #f1f5f9;
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 6px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
 }
 
 .telemetry-pill.forces {
+  color: #f1f5f9;
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+}
+
+.telemetry-pill.forces.special {
   color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
 }
 
 .header-tools-line {
@@ -1697,6 +1270,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .tools-left {
@@ -1709,21 +1283,28 @@ onUnmounted(() => {
 .colormap-select-wrapper {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 11px;
-  color: var(--text-secondary);
+  color: #cbd5e1;
+  font-weight: 600;
 }
 
 .field-dropdown,
 .colormap-dropdown {
-  background: var(--bg-card);
+  background: var(--btn-surface);
+  color: #f1f5f9;
   border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  border-radius: 4px;
-  padding: 3px 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
   font-size: 11px;
-  outline: none;
+  font-weight: 600;
   cursor: pointer;
+  outline: none;
+}
+
+.field-dropdown:focus,
+.colormap-dropdown:focus {
+  border-color: var(--accent-border);
 }
 
 .tools-right {
@@ -1735,341 +1316,180 @@ onUnmounted(() => {
 .tool-btn-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .hud-tool-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--text-secondary);
-  border-radius: 4px;
+  background: transparent;
+  color: #cbd5e1;
+  border: 1px solid transparent;
   padding: 4px 8px;
+  border-radius: 5px;
   font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.hud-tool-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--text-primary);
-}
-
-.hud-tool-btn.active {
-  background: rgba(56, 189, 248, 0.2);
-  border-color: #38bdf8;
-  color: #38bdf8;
-}
-
-/* Interactive Slice & Rake Panel */
-.interactive-controls-hud {
-  position: absolute;
-  top: 56px;
-  right: 14px;
-  width: 320px;
-  z-index: 24;
-  background: rgba(14, 10, 18, 0.94);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: 8px;
-  padding: 10px 14px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.hud-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 6px;
-}
-
-.hud-stats-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.45);
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(56, 189, 248, 0.2);
-  margin-top: 4px;
-}
-
-.stat-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.stat-lbl {
-  font-size: 8px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.stat-val {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  color: #38bdf8;
-}
-
-.hud-panel-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: #38bdf8;
-  letter-spacing: 0.3px;
-}
-
-.hud-close-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.hud-close-btn:hover {
-  color: #fff;
-}
-
-.hud-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.hud-section-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 10px;
   font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.hud-param-badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: #00d2ff;
-  background: rgba(0, 210, 255, 0.1);
-  padding: 1px 5px;
-  border-radius: 3px;
-}
-
-.axis-pill-group,
-.preset-pill-group {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.axis-pill-btn,
-.preset-pill-btn {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-muted);
-  font-size: 10px;
-  padding: 3px 6px;
-  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
 }
 
-.axis-pill-btn:hover,
-.preset-pill-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+.hud-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
-.axis-pill-btn.active {
-  background: rgba(56, 189, 248, 0.25);
-  border-color: #38bdf8;
-  color: #38bdf8;
-  font-weight: 600;
-}
-
-.slider-control-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.slider-label {
-  width: 50px;
-}
-
-.hud-slider {
-  flex: 1;
-  accent-color: #38bdf8;
-  height: 4px;
-  cursor: pointer;
-}
-
-.slider-val {
-  width: 44px;
-  text-align: right;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  font-size: 9px;
+.hud-tool-btn.active {
+  background: var(--btn-surface);
+  border-color: var(--accent-border);
+  color: #ffffff;
 }
 
 .webgl-canvas-mount {
+  flex: 1;
   width: 100%;
   height: 100%;
-  cursor: grab;
 }
 
-.webgl-canvas-mount:active {
-  cursor: grabbing;
-}
-
-/* Engineering Triad HUD Dock (Bottom Left) */
-.engineering-triad-dock {
+/* ParaView Vertical Colorbar Legend HUD */
+.paraview-colorbar-card {
   position: absolute;
-  bottom: 16px;
-  left: 16px;
-  z-index: 20;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.triad-canvas {
-  width: 70px;
-  height: 70px;
-  background: rgba(14, 10, 18, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  right: 18px;
+  top: 96px;
+  background: rgba(15, 20, 30, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
-  backdrop-filter: blur(8px);
-}
-
-.triad-labels {
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-}
-
-.axis-badge {
-  font-size: 9px;
-  font-family: var(--font-mono);
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(14, 10, 18, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.axis-badge.x { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
-.axis-badge.y { color: #10b981; border-color: rgba(16, 185, 129, 0.3); }
-.axis-badge.z { color: #3b82f6; border-color: rgba(59, 130, 246, 0.3); }
-
-.scientific-colorbar-dock {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
+  gap: 6px;
   z-index: 20;
-  pointer-events: none;
-}
-
-.colorbar-card {
-  background: rgba(14, 10, 18, 0.88);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 8px 12px;
-  min-width: 180px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  user-select: none;
 }
 
 .colorbar-header {
   display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 5px;
+  flex-direction: column;
 }
 
-.colorbar-gradient-track {
-  width: 100%;
-  height: 10px;
+.colorbar-field-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.colorbar-field-unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: #94a3b8;
+}
+
+.colorbar-body {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.colorbar-gradient {
+  width: 14px;
+  height: 120px;
   border-radius: 3px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
 }
 
-.colorbar-gradient-fill {
-  width: 100%;
-  height: 100%;
+.colorbar-gradient.turbo,
+.colorbar-gradient.jet {
+  background: linear-gradient(to top, #00008f, #0000ff, #00ffff, #ffff00, #ff0000, #800000);
+}
+
+.colorbar-gradient.coolwarm {
+  background: linear-gradient(to top, #3b4cc0, #8cb2e9, #dddcdc, #f49a7b, #b40426);
+}
+
+.colorbar-gradient.inferno {
+  background: linear-gradient(to top, #000004, #57106e, #bb3754, #f98e09, #fcffa4);
+}
+
+.colorbar-gradient.viridis {
+  background: linear-gradient(to top, #440154, #3b528b, #21918c, #5ec962, #fde725);
+}
+
+.colorbar-probe-marker {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 3px;
+  background: #ffffff;
+  box-shadow: 0 0 6px #ffffff;
 }
 
 .colorbar-ticks {
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
+  height: 120px;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 9px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
+  color: #cbd5e1;
 }
 
+/* Hover Flow Probe Tooltip HUD */
 .hover-flow-probe-hud {
   position: absolute;
   pointer-events: none;
-  z-index: 30;
-  transform: translate(12px, -36px);
+  transform: translate(-50%, -120%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.05s ease-out;
 }
 
 .probe-hud-card {
-  background: rgba(14, 10, 18, 0.92);
-  backdrop-filter: blur(8px);
-  border: 1px solid #38bdf8;
+  background: rgba(20, 26, 36, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   padding: 6px 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .probe-val-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .probe-val-title {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: #94a3b8;
 }
 
 .probe-val-num {
-  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
   font-weight: 700;
-  font-family: var(--font-mono);
-  color: #38bdf8;
+  color: #ffffff;
 }
 
 .probe-hud-tag {
-  font-size: 9px;
-  color: var(--text-muted);
-  margin-top: 2px;
+  font-size: 9.5px;
+  color: #cbd5e1;
+  opacity: 0.85;
 }
 
-.hud-fade-enter-active,
-.hud-fade-leave-active {
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.hud-fade-enter-from,
-.hud-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-8px) scale(0.98);
+.probe-pointer-line {
+  width: 2px;
+  height: 16px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.8), transparent);
 }
 </style>
