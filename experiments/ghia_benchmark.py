@@ -35,7 +35,15 @@ GHIA_V_RE100 = np.array([
     0.05454, 0.17527, 0.17507, 0.16077, 0.12317, 0.10890, 0.10091, 0.09233, 0.00000
 ])
 
+# Values exactly as printed in Table II. The entry at x = 0.9063 (-0.23827)
+# is widely suspected to be a typo in the original paper (it breaks the
+# otherwise smooth profile), so it is excluded from error metrics via
+# GHIA_V_RE400_SUSPECT below rather than silently "corrected". A previous
+# version of this file had altered 7 of these 17 values.
 GHIA_V_RE400 = np.array([
-    0.00000, -0.12146, -0.15663, -0.19254, -0.22847, -0.38598, -0.44993, -0.38598,
-    0.05186, 0.30203, 0.30872, 0.30562, 0.22965, 0.20199, 0.18360, 0.16367, 0.00000
+    0.00000, -0.12146, -0.15663, -0.19254, -0.22847, -0.23827, -0.44993, -0.38598,
+    0.05186, 0.30174, 0.30203, 0.28124, 0.22965, 0.20920, 0.19713, 0.18360, 0.00000
 ])
+
+# Boolean mask over GHIA_X marking the suspected-typo point (x = 0.9063)
+GHIA_V_RE400_SUSPECT = GHIA_X == 0.9063

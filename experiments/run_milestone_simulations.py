@@ -1,253 +1,222 @@
 """
-Milestone 30% — Experimentation and Simulation Benchmark Suite
-Project: UR2627GEN317 (OpenZess Platform)
+Milestone experiments — validation and benchmark suite (UR2627GEN317).
 
-Runs automated simulations:
-1. Lid-Driven Cavity Validation against Ghia et al. (1982)
-2. Grid Independence & Residual Convergence Study (21x21, 41x41, 61x61)
-3. Instant PINN AI Surrogate vs Numerical CFD Comparison (Accuracy & Latency)
-4. Exports publication-grade figures and metrics JSON to artifact directory.
+1. Lid-driven cavity at Re = 100 vs Ghia, Ghia & Shin (1982): centreline
+   u(y) and v(x) of the *converged steady state*.
+2. Grid convergence: the same comparison on 21^2, 41^2, 61^2 grids, with the
+   observed order of accuracy.
+3. The "ai" mode's cavity preview — the Stokes (Re -> 0) solution from one
+   sparse biharmonic solve, not a trained model — vs the CFD solution:
+   error map and latency.
+
+Usage:
+    python experiments/run_milestone_simulations.py [output_dir]
+
+Figures and results JSON go to experiments/output/ by default.
 """
 
-import sys
-import os
-import time
 import json
-import numpy as np
+import os
+import sys
+import time
+
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 
-# Ensure parent directory is in path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
-if hasattr(sys.stdout, 'reconfigure'):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
-
-from backend.mesh import Mesh2D
-from backend.solver import AcceleratedSolver
-from backend.ai_predictor import predict_pinn_flow
-from experiments.ghia_benchmark import (
-    GHIA_Y, GHIA_U_RE100, GHIA_U_RE400,
-    GHIA_X, GHIA_V_RE100, GHIA_V_RE400
+from backend.ai_predictor import predict_cavity_stokes  # noqa: E402
+from backend.mesh import Mesh2D  # noqa: E402
+from backend.solver import AcceleratedSolver, CasePhysics  # noqa: E402
+from experiments.ghia_benchmark import (  # noqa: E402
+    GHIA_U_RE100, GHIA_V_RE100, GHIA_X, GHIA_Y,
 )
 
-# Output directory for figures
-ARTIFACTS_DIR = r"C:\Users\ROSHNI\.gemini\antigravity-ide\brain\f1a151dd-f4e0-4edc-bb86-5ec12a165fd9"
-FIG_DIR = os.path.join(ARTIFACTS_DIR, "figures")
-os.makedirs(FIG_DIR, exist_ok=True)
-RESULTS_FILE = os.path.join(ARTIFACTS_DIR, "simulation_results.json")
+STEADY_TOL = 1e-6  # max |du| per step; Ghia's data is a steady solution
+MAX_STEPS = 50_000
 
 
-def run_cfd_simulation(nx=41, ny=41, Re=100.0, max_iter=600, tol=5e-4, dt=0.005):
-    """Run fractional-step CFD simulation and record convergence."""
-    mesh = Mesh2D(nx=nx, ny=ny)
-    solver = AcceleratedSolver(mesh=mesh, Re=Re, lid_velocity=1.0)
-    
+def run_cavity(n: int, Re: float = 100.0, dt: float = 0.005) -> dict:
+    """March the cavity to steady state and return the solver + history."""
+    mesh = Mesh2D(nx=n, ny=n)
+    solver = AcceleratedSolver(
+        mesh, CasePhysics(reynolds=Re, inlet_velocity=1.0), archetype="cavity"
+    )
     residuals = []
-    t_start = time.perf_counter()
-    
-    for it in range(1, max_iter + 1):
-        res = solver.step(dt=dt)
-        residuals.append(float(res))
-        if res < tol:
+    t0 = time.perf_counter()
+    for _ in range(MAX_STEPS):
+        residuals.append(float(solver.step(dt)))
+        if residuals[-1] < STEADY_TOL or solver.diverged:
             break
-            
-    wall_time = time.perf_counter() - t_start
     return {
         "mesh": mesh,
         "solver": solver,
         "residuals": residuals,
-        "iterations": len(residuals),
-        "wall_time": wall_time,
-        "converged": bool(residuals[-1] < tol)
+        "wall_time": time.perf_counter() - t0,
+        "converged": residuals[-1] < STEADY_TOL and not solver.diverged,
     }
 
 
-def main():
+def centrelines(mesh: Mesh2D, u: np.ndarray, v: np.ndarray):
+    """u(y) on x = 0.5 and v(x) on y = 0.5, wall values included."""
+    u_c = np.array([np.interp(0.5, mesh.xc, u[:, j]) for j in range(mesh.ny)])
+    v_c = np.array([np.interp(0.5, mesh.yc, v[i, :]) for i in range(mesh.nx)])
+    y = np.r_[0.0, mesh.yc, 1.0]
+    x = np.r_[0.0, mesh.xc, 1.0]
+    return y, np.r_[0.0, u_c, 1.0], x, np.r_[0.0, v_c, 0.0]
+
+
+def ghia_rmse(mesh, u, v):
+    y, u_c, x, v_c = centrelines(mesh, u, v)
+    rmse_u = float(np.sqrt(np.mean((np.interp(GHIA_Y, y, u_c) - GHIA_U_RE100) ** 2)))
+    rmse_v = float(np.sqrt(np.mean((np.interp(GHIA_X, x, v_c) - GHIA_V_RE100) ** 2)))
+    return rmse_u, rmse_v
+
+
+def main(out_dir: str) -> None:
+    fig_dir = os.path.join(out_dir, "figures")
+    os.makedirs(fig_dir, exist_ok=True)
     print("=" * 70)
-    print(" 🚀 RUNNING 30% MILESTONE EXPERIMENTS & BENCHMARKS (UR2627GEN317)")
+    print(" Milestone experiments (UR2627GEN317)")
     print("=" * 70)
-    
-    # -------------------------------------------------------------
-    # Experiment 1: Validation Against Ghia et al. (1982) at Re=100
-    # -------------------------------------------------------------
-    print("\n[1/3] Running Validation Benchmark at Re = 100 (41x41)...")
-    exp1 = run_cfd_simulation(nx=41, ny=41, Re=100.0, max_iter=500, tol=5e-4, dt=0.005)
-    solver1 = exp1["solver"]
-    mesh1 = exp1["mesh"]
-    print(f"      -> Iterations: {exp1['iterations']} | Wall Time: {exp1['wall_time']:.2f}s | Final Residual: {exp1['residuals'][-1]:.2e}")
-    
-    # Centerline extractions
-    mid_i = mesh1.nx // 2
-    mid_j = mesh1.ny // 2
-    u_center_cfd = solver1.u[mid_i, :]
-    y_coords = mesh1.yc
-    
-    v_center_cfd = solver1.v[:, mid_j]
-    x_coords = mesh1.xc
-    
-    # PINN Surrogate evaluation
-    t_ai_start = time.perf_counter()
-    u_pinn, v_pinn, p_pinn = predict_pinn_flow(mesh1, Re=100.0)
-    ai_time = (time.perf_counter() - t_ai_start) * 1000.0  # ms
-    u_center_pinn = u_pinn[mid_i, :]
-    v_center_pinn = v_pinn[:, mid_j]
-    print(f"      -> PINN AI Surrogate Inference Time: {ai_time:.2f} ms")
-    
-    # Interpolate CFD onto Ghia points to compute RMSE
-    u_interp = np.interp(GHIA_Y, y_coords, u_center_cfd)
-    rmse_u = np.sqrt(np.mean((u_interp - GHIA_U_RE100)**2))
-    print(f"      -> Centerline u-velocity RMSE vs Ghia (1982): {rmse_u:.4f}")
-    
-    # Plot Figure 1: Ghia Validation
-    plt.figure(figsize=(10, 4.5), dpi=300)
+
+    # 1. Validation at Re = 100, 41 x 41
+    print("\n[1/3] Lid-driven cavity, Re = 100, 41x41, marching to steady state...")
+    exp1 = run_cavity(41)
+    s1, m1 = exp1["solver"], exp1["mesh"]
+    rmse_u, rmse_v = ghia_rmse(m1, s1.u, s1.v)
+    print(f"      steps={len(exp1['residuals'])} converged={exp1['converged']} "
+          f"wall={exp1['wall_time']:.2f}s")
+    print(f"      RMSE vs Ghia (1982): u = {rmse_u:.4f}, v = {rmse_v:.4f}")
+
+    t0 = time.perf_counter()
+    u_a, v_a, p_a = predict_cavity_stokes(m1, lid_velocity=1.0, nu=0.01)
+    analytic_ms = (time.perf_counter() - t0) * 1000.0
+    rmse_u_a, rmse_v_a = ghia_rmse(m1, u_a, v_a)
+    print(f"      Stokes (Re->0) approximation: {analytic_ms:.2f} ms, "
+          f"RMSE u = {rmse_u_a:.4f}, v = {rmse_v_a:.4f}")
+
+    y, u_c, x, v_c = centrelines(m1, s1.u, s1.v)
+    ya, u_ca, xa, v_ca = centrelines(m1, u_a, v_a)
+    plt.figure(figsize=(10, 4.5), dpi=200)
     plt.subplot(1, 2, 1)
-    plt.plot(GHIA_U_RE100, GHIA_Y, 'ro', markersize=6, label='Ghia et al. (1982)')
-    plt.plot(u_center_cfd, y_coords, 'b-', linewidth=2, label='OpenZess Numerical CFD')
-    plt.plot(u_center_pinn, y_coords, 'g--', linewidth=1.5, label='OpenZess PINN Surrogate')
-    plt.xlabel('u-velocity ($u / U_{lid}$)', fontsize=10)
-    plt.ylabel('Normalized Height ($y / L$)', fontsize=10)
-    plt.title('Vertical Centerline ($x = 0.5$, Re=100)', fontsize=11, fontweight='bold')
-    plt.grid(True, linestyle=':', alpha=0.6)
-    plt.legend(frameon=True, facecolor='white', framealpha=0.9)
-    
+    plt.plot(GHIA_U_RE100, GHIA_Y, "ro", label="Ghia et al. (1982)")
+    plt.plot(u_c, y, "b-", lw=2, label="OpenZess CFD (41x41)")
+    plt.plot(u_ca, ya, "g--", lw=1.5, label="Stokes (Re$\\to$0) solution")
+    plt.xlabel("$u / U_{lid}$"); plt.ylabel("$y / L$")
+    plt.title("Vertical centreline ($x = 0.5$, Re = 100)")
+    plt.grid(True, ls=":", alpha=0.6); plt.legend()
     plt.subplot(1, 2, 2)
-    plt.plot(GHIA_X, GHIA_V_RE100, 'ro', markersize=6, label='Ghia et al. (1982)')
-    plt.plot(x_coords, v_center_cfd, 'b-', linewidth=2, label='OpenZess Numerical CFD')
-    plt.plot(x_coords, v_center_pinn, 'g--', linewidth=1.5, label='OpenZess PINN Surrogate')
-    plt.xlabel('Normalized Width ($x / L$)', fontsize=10)
-    plt.ylabel('v-velocity ($v / U_{lid}$)', fontsize=10)
-    plt.title('Horizontal Centerline ($y = 0.5$, Re=100)', fontsize=11, fontweight='bold')
-    plt.grid(True, linestyle=':', alpha=0.6)
-    plt.legend(frameon=True, facecolor='white', framealpha=0.9)
-    
+    plt.plot(GHIA_X, GHIA_V_RE100, "ro", label="Ghia et al. (1982)")
+    plt.plot(x, v_c, "b-", lw=2, label="OpenZess CFD (41x41)")
+    plt.plot(xa, v_ca, "g--", lw=1.5, label="Closed-form approximation")
+    plt.xlabel("$x / L$"); plt.ylabel("$v / U_{lid}$")
+    plt.title("Horizontal centreline ($y = 0.5$, Re = 100)")
+    plt.grid(True, ls=":", alpha=0.6); plt.legend()
     plt.tight_layout()
-    fig1_path = os.path.join(FIG_DIR, "fig1_ghia_validation.png")
-    plt.savefig(fig1_path)
+    plt.savefig(os.path.join(fig_dir, "fig1_ghia_validation.png"))
     plt.close()
-    print(f"      -> Saved: {fig1_path}")
-    
-    # -------------------------------------------------------------
-    # Experiment 2: Grid Independence & Residual Convergence Study
-    # -------------------------------------------------------------
-    print("\n[2/3] Running Grid Independence Study (21x21, 41x41, 61x61)...")
-    grid_tests = [21, 41, 61]
+
+    # 2. Grid convergence against the benchmark
+    print("\n[2/3] Grid convergence (21x21, 41x41, 61x61)...")
+    grids = [21, 41, 61]
     grid_results = {}
-    
-    plt.figure(figsize=(7, 4.5), dpi=300)
-    for n in grid_tests:
-        print(f"      -> Solving on {n}x{n} grid...")
-        out = run_cfd_simulation(nx=n, ny=n, Re=100.0, max_iter=300, tol=5e-4, dt=0.005)
+    plt.figure(figsize=(7, 4.5), dpi=200)
+    for n in grids:
+        out = exp1 if n == 41 else run_cavity(n)
+        ru, rv = ghia_rmse(out["mesh"], out["solver"].u, out["solver"].v)
         grid_results[f"{n}x{n}"] = {
-            "iterations": out["iterations"],
-            "wall_time": out["wall_time"],
-            "final_res": out["residuals"][-1]
+            "h": 1.0 / n,
+            "rmse_u_vs_ghia": ru,
+            "rmse_v_vs_ghia": rv,
+            "steps": len(out["residuals"]),
+            "wall_time_s": out["wall_time"],
+            "converged": out["converged"],
         }
-        plt.semilogy(out["residuals"], label=f'{n}x{n} Grid (Time: {out["wall_time"]:.2f}s)')
-        
-    plt.xlabel('Iteration Number', fontsize=10)
-    plt.ylabel('Max Residual ($L_\\infty$ norm)', fontsize=10)
-    plt.title('Logarithmic Residual Convergence vs. Grid Resolution', fontsize=11, fontweight='bold')
-    plt.grid(True, which='both', linestyle=':', alpha=0.6)
-    plt.legend(frameon=True, facecolor='white', framealpha=0.9)
+        print(f"      {n}x{n}: RMSE u = {ru:.4f}, v = {rv:.4f}, "
+              f"{len(out['residuals'])} steps, {out['wall_time']:.2f}s")
+        plt.semilogy(out["residuals"], label=f"{n}x{n}")
+    plt.xlabel("Time step"); plt.ylabel("max |du| per step")
+    plt.title("Transient decay to steady state")
+    plt.grid(True, which="both", ls=":", alpha=0.6); plt.legend()
     plt.tight_layout()
-    fig2_path = os.path.join(FIG_DIR, "fig2_residual_convergence.png")
-    plt.savefig(fig2_path)
+    plt.savefig(os.path.join(fig_dir, "fig2_residual_convergence.png"))
     plt.close()
-    print(f"      -> Saved: {fig2_path}")
-    
-    # -------------------------------------------------------------
-    # Experiment 3: CFD vs PINN Surrogate Flowfield & Error Map
-    # -------------------------------------------------------------
-    print("\n[3/3] Generating CFD vs PINN Contour & Absolute Error Field...")
-    speed_cfd = np.sqrt(solver1.u**2 + solver1.v**2).T
-    speed_pinn = np.sqrt(u_pinn**2 + v_pinn**2).T
-    abs_diff = np.abs(speed_cfd - speed_pinn)
-    
-    mae = np.mean(abs_diff)
-    max_err = np.max(abs_diff)
-    print(f"      -> Mean Absolute Error (MAE): {mae:.4f} | Max Error: {max_err:.4f}")
-    
-    fig, axes = plt.subplots(1, 3, figsize=(13, 3.8), dpi=300)
-    im0 = axes[0].contourf(mesh1.X.T, mesh1.Y.T, speed_cfd, levels=25, cmap='turbo')
-    axes[0].set_title('Numerical CFD Field |U|', fontsize=10, fontweight='bold')
-    axes[0].set_aspect('equal')
-    plt.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)
-    
-    im1 = axes[1].contourf(mesh1.X.T, mesh1.Y.T, speed_pinn, levels=25, cmap='turbo')
-    axes[1].set_title('AI PINN Surrogate Field |U|', fontsize=10, fontweight='bold')
-    axes[1].set_aspect('equal')
-    plt.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)
-    
-    im2 = axes[2].contourf(mesh1.X.T, mesh1.Y.T, abs_diff, levels=25, cmap='inferno')
-    axes[2].set_title(f'Absolute Difference Map (MAE: {mae:.3f})', fontsize=10, fontweight='bold')
-    axes[2].set_aspect('equal')
-    plt.colorbar(im2, ax=axes[2], fraction=0.046, pad=0.04)
-    
+
+    # Observed order p from the two finest grids: e ~ C h^p
+    e = [grid_results[f"{n}x{n}"]["rmse_u_vs_ghia"] for n in grids]
+    h = [1.0 / n for n in grids]
+    order = float(np.log(e[1] / e[2]) / np.log(h[1] / h[2]))
+    print(f"      observed order of accuracy (u, 41->61): {order:.2f} "
+          "(first-order upwind advection => ~1 expected)")
+
+    # 3. Closed-form approximation vs CFD
+    print("\n[3/3] Stokes approximation vs CFD error map...")
+    speed_cfd = np.sqrt(s1.u**2 + s1.v**2).T
+    speed_ana = np.sqrt(u_a**2 + v_a**2).T
+    abs_diff = np.abs(speed_cfd - speed_ana)
+    mae, max_err = float(np.mean(abs_diff)), float(np.max(abs_diff))
+    print(f"      speed MAE = {mae:.4f}, max error = {max_err:.4f}")
+
+    fig, axes = plt.subplots(1, 3, figsize=(13, 3.8), dpi=200)
+    for ax, field, title, cmap in (
+        (axes[0], speed_cfd, "CFD |U|", "turbo"),
+        (axes[1], speed_ana, "Stokes (Re->0) |U|", "turbo"),
+        (axes[2], abs_diff, f"|difference| (MAE {mae:.3f})", "inferno"),
+    ):
+        im = ax.contourf(m1.X.T, m1.Y.T, field, levels=25, cmap=cmap)
+        ax.set_title(title, fontsize=10); ax.set_aspect("equal")
+        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     plt.tight_layout()
-    fig3_path = os.path.join(FIG_DIR, "fig3_cfd_vs_pinn_contours.png")
-    plt.savefig(fig3_path)
+    plt.savefig(os.path.join(fig_dir, "fig3_cfd_vs_stokes.png"))
     plt.close()
-    print(f"      -> Saved: {fig3_path}")
-    
-    # -------------------------------------------------------------
-    # Performance Speedup Bar Chart
-    # -------------------------------------------------------------
-    cfd_sec = exp1["wall_time"]
-    ai_sec = ai_time / 1000.0
-    speedup = cfd_sec / max(ai_sec, 1e-6)
-    
-    plt.figure(figsize=(6, 4), dpi=300)
-    categories = ['Numerical CFD\n(SciPy Sparse)', 'AI PINN Surrogate\n(Instant Inference)']
-    times = [cfd_sec, ai_sec]
-    colors = ['#1967d2', '#34a853']
-    bars = plt.bar(categories, times, color=colors, width=0.5)
-    plt.yscale('log')
-    plt.ylabel('Execution Time (seconds, log-scale)', fontsize=10)
-    plt.title(f'Computational Latency & Speedup ({speedup:.1f}x Faster)', fontsize=11, fontweight='bold')
-    for bar, t_val in zip(bars, times):
-        plt.text(bar.get_x() + bar.get_width()/2.0, t_val * 1.3, f"{t_val:.4f} s", ha='center', fontweight='bold')
-    plt.grid(True, axis='y', linestyle=':', alpha=0.6)
+
+    plt.figure(figsize=(6, 4), dpi=200)
+    times = [exp1["wall_time"], analytic_ms / 1000.0]
+    bars = plt.bar(["Navier-Stokes CFD\n(41x41, steady)", "Stokes solve\n(one sparse LU)"],
+                   times, color=["#1967d2", "#9aa0a6"], width=0.5)
+    plt.yscale("log"); plt.ylabel("Wall time [s] (log)")
+    plt.title(f"Latency (Stokes vs CFD speed MAE {mae:.3f})")
+    for bar, t in zip(bars, times):
+        plt.text(bar.get_x() + bar.get_width() / 2, t * 1.3, f"{t:.4f} s", ha="center")
+    plt.grid(True, axis="y", ls=":", alpha=0.6)
     plt.tight_layout()
-    fig4_path = os.path.join(FIG_DIR, "fig4_computational_latency.png")
-    plt.savefig(fig4_path)
+    plt.savefig(os.path.join(fig_dir, "fig4_computational_latency.png"))
     plt.close()
-    print(f"      -> Saved: {fig4_path}")
-    
-    # Save structured results
+
     results = {
         "project": "UR2627GEN317",
-        "milestone": "30% Experimentation & Simulation",
         "date": time.strftime("%Y-%m-%d %H:%M:%S"),
         "validation_benchmark": {
-            "test_case": "2D Lid-Driven Cavity",
+            "test_case": "2D lid-driven cavity",
             "Re": 100.0,
-            "cfd_grid": "41x41",
-            "iterations": exp1["iterations"],
+            "grid": "41x41",
+            "steady_tolerance": STEADY_TOL,
+            "steps": len(exp1["residuals"]),
+            "converged": exp1["converged"],
             "wall_time_seconds": exp1["wall_time"],
-            "rmse_vs_ghia_1982": float(rmse_u),
-            "pinn_inference_ms": float(ai_time),
-            "speedup_factor": float(speedup)
+            "rmse_u_vs_ghia_1982": rmse_u,
+            "rmse_v_vs_ghia_1982": rmse_v,
         },
-        "grid_independence": grid_results,
-        "error_metrics": {
-            "mae": float(mae),
-            "max_error": float(max_err)
-        }
+        "grid_convergence": grid_results,
+        "observed_order_u": order,
+        "stokes_approximation": {
+            "note": "Re -> 0 biharmonic streamfunction solve, not a trained model",
+            "latency_ms": analytic_ms,
+            "rmse_u_vs_ghia_1982": rmse_u_a,
+            "rmse_v_vs_ghia_1982": rmse_v_a,
+            "speed_mae_vs_cfd": mae,
+            "speed_max_error_vs_cfd": max_err,
+        },
     }
-    
-    with open(RESULTS_FILE, "w") as f:
-        json.dump(results, f, indent=2)
-        
-    print(f"\n✅ All simulation experiments completed successfully!")
-    print(f"   Results data written to: {RESULTS_FILE}")
-    print(f"   Figures generated in: {FIG_DIR}")
-    print("=" * 70)
+    with open(os.path.join(out_dir, "simulation_results.json"), "w") as fh:
+        json.dump(results, fh, indent=2)
+    print(f"\nResults: {os.path.join(out_dir, 'simulation_results.json')}")
+    print(f"Figures: {fig_dir}")
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "experiments", "output"))

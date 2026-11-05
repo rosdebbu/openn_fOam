@@ -1,18 +1,25 @@
 """
-OpenZess Solver Engine — Accelerated Navier-Stokes Solver
-Uses SciPy sparse matrix routines (spsolve / CG) for ultra-fast Pressure Poisson solution.
+OpenZess Solver Engine — 2-D incompressible Navier-Stokes (projection method)
+The pressure Poisson matrix is LU-factorized once (SciPy SuperLU) and reused
+every time step.
 
-Fractional-step incompressible Navier-Stokes with:
+Fractional-step incompressible Navier-Stokes on a uniform collocated grid:
+  * explicit predictor: first-order upwind advection, central diffusion
+  * approximate projection: Neumann walls, Dirichlet p = 0 outlet for open
+    channels, compatible RHS + gauge cell for sealed boxes
   * substance-aware SI physics via `CasePhysics` (nu, rho, beta, gravity, temps)
   * Boussinesq thermal buoyancy + passive heavy-fluid (dam-break) transport
-  * automatic CFL + diffusion limited timestep with stability diagnostics
-  * aerodynamic Cd/Cl integrated from the ACTUAL flow field (never hardcoded)
-  * all scenario archetypes supported (venturi, plume, dam, custom CAD geometry)
+  * automatic CFL + diffusion limited timestep; divergence is detected and
+    reported instead of being clipped away
+  * Cd/Cl integrated from the computed pressure and wall shear
+  * staircase immersed boundaries for every archetype (venturi, airfoil,
+    custom CAD primitives, ...)
+
+Accuracy: first-order in space (upwind), validated against Ghia et al.
+(1982) — see experiments/run_milestone_simulations.py and tests/.
 """
 
-import math
 import re
-import time
 
 import numpy as np
 import scipy.sparse as sp
@@ -40,6 +47,16 @@ ARCHETYPES = (
 
 # Flows partly driven by gravity / buoyancy
 BUOYANT_ARCHETYPES = frozenset({"plume", "weather_plume", "water_dam"})
+
+# Sealed boxes (no inflow/outflow): pressure is Neumann on every wall, so it is
+# only defined up to a constant and the Poisson RHS must be made compatible.
+# Every other archetype is an inlet(left) -> outlet(right) channel/tunnel with a
+# Dirichlet p = 0 outlet, which is what makes the open-flow projection well posed.
+CLOSED_ARCHETYPES = frozenset({"cavity", "water_dam"})
+
+# Bodies whose force coefficients are conventionally referenced to the chord
+# (x-extent); bluff bodies use the frontal height (y-extent) instead.
+CHORD_REFERENCED_ARCHETYPES = frozenset({"airfoil", "f1"})
 
 
 class CasePhysics:
@@ -111,8 +128,13 @@ class CasePhysics:
 
     @property
     def delta_t_ref(self) -> float:
-        """Reference temperature difference driving the buoyant plume."""
-        return max(self.hot_temp - self.ambient_temp, 10.0)
+        """Signed temperature difference (K) driving the plume.
+
+        Both temperatures are Kelvin. A negative value is a cold, sinking
+        plume — no artificial floor (a former max(.., 10 K) floor silently
+        masked a frontend that sent Celsius).
+        """
+        return self.hot_temp - self.ambient_temp
 
     def to_dict(self) -> dict:
         return {
@@ -126,6 +148,26 @@ class CasePhysics:
             "ambientTemp": self.ambient_temp,
             "hotTemp": self.hot_temp,
         }
+
+
+def _naca_symmetric_mask(X, Y, xc, yc, chord, aoa_deg, thickness):
+    """Solid mask of a symmetric NACA 00xx section.
+
+    (xc, yc) is the mid-chord point. Positive `aoa_deg` is nose-UP relative
+    to the +x freestream (leading edge raised), the standard aerodynamic
+    convention. World -> body coordinates rotate by +aoa, which is the same
+    as the body being rotated clockwise by aoa.
+    """
+    a = np.radians(aoa_deg)
+    dx_c, dy_c = X - xc, Y - yc
+    x_rot = dx_c * np.cos(a) - dy_c * np.sin(a) + 0.5 * chord
+    y_rot = dx_c * np.sin(a) + dy_c * np.cos(a)
+    xn = np.clip(x_rot / chord, 0.0, 1.0)
+    yt = 5.0 * thickness * chord * (
+        0.2969 * np.sqrt(xn) - 0.1260 * xn - 0.3516 * xn**2
+        + 0.2843 * xn**3 - 0.1015 * xn**4
+    )
+    return (x_rot >= 0.0) & (x_rot <= chord) & (np.abs(y_rot) <= yt)
 
 
 def build_obstacle_mask(
@@ -148,35 +190,13 @@ def build_obstacle_mask(
     mask = np.zeros((nx, ny), dtype=bool)
 
     if arch == "airfoil":
-        chord = 0.45 * lx
-        alpha = np.radians(aoa_deg)
-        dx_c = X - 0.30 * lx
-        dy_c = Y - 0.50 * ly
-        x_rot = dx_c * np.cos(-alpha) - dy_c * np.sin(-alpha) + 0.5 * chord
-        y_rot = dx_c * np.sin(-alpha) + dy_c * np.cos(-alpha)
-        valid_chord = (x_rot >= 0.0) & (x_rot <= chord)
-        xn = np.clip(x_rot / chord, 0.0, 1.0)
-        yt = 0.60 * chord * (
-            0.2969 * np.sqrt(xn) - 0.1260 * xn - 0.3516 * xn**2
-            + 0.2843 * xn**3 - 0.1015 * xn**4
-        )
-        mask = valid_chord & (np.abs(y_rot) <= yt)
+        # NACA 0012 at mid-chord (0.30 lx, 0.50 ly)
+        mask = _naca_symmetric_mask(X, Y, 0.30 * lx, 0.50 * ly, 0.45 * lx, aoa_deg, 0.12)
 
     elif arch == "f1":
-        # Inverted ground-effect front wing near the bottom floor
-        chord = 0.50 * lx
-        alpha = np.radians(aoa_deg)
-        dx_c = X - 0.35 * lx
-        dy_c = Y - 0.22 * ly
-        x_rot = dx_c * np.cos(-alpha) - dy_c * np.sin(-alpha) + 0.5 * chord
-        y_rot = dx_c * np.sin(-alpha) + dy_c * np.cos(-alpha)
-        valid_chord = (x_rot >= 0.0) & (x_rot <= chord)
-        xn = np.clip(x_rot / chord, 0.0, 1.0)
-        yt = 0.55 * chord * (
-            0.2969 * np.sqrt(xn) - 0.1260 * xn - 0.3516 * xn**2
-            + 0.2843 * xn**3 - 0.1015 * xn**4
-        )
-        mask = valid_chord & (np.abs(y_rot) <= yt)
+        # Ground-effect front-wing section near the floor (NACA 0011). A
+        # negative AoA (nose down) produces downforce.
+        mask = _naca_symmetric_mask(X, Y, 0.35 * lx, 0.22 * ly, 0.50 * lx, aoa_deg, 0.11)
 
     elif arch == "drone":
         y_rotor = 0.55 * ly
@@ -235,19 +255,7 @@ def build_obstacle_mask(
             elif shape == "rectangle":
                 mask = (np.abs(X - cx) <= 1.6 * size * lx) & (np.abs(Y - cy) <= 0.6 * size * ly)
             elif shape == "airfoil":
-                chord = 3.0 * size * lx
-                alpha = np.radians(spec_aoa)
-                dx_c = X - cx
-                dy_c = Y - cy
-                x_rot = dx_c * np.cos(-alpha) - dy_c * np.sin(-alpha) + 0.5 * chord
-                y_rot = dx_c * np.sin(-alpha) + dy_c * np.cos(-alpha)
-                valid_chord = (x_rot >= 0.0) & (x_rot <= chord)
-                xn = np.clip(x_rot / chord, 0.0, 1.0)
-                yt = 0.60 * chord * (
-                    0.2969 * np.sqrt(xn) - 0.1260 * xn - 0.3516 * xn**2
-                    + 0.2843 * xn**3 - 0.1015 * xn**4
-                )
-                mask = valid_chord & (np.abs(y_rot) <= yt)
+                mask = _naca_symmetric_mask(X, Y, cx, cy, 3.0 * size * lx, spec_aoa, 0.12)
         # No spec yet -> no geometry (user has not chosen a shape)
 
     # plume / weather_plume / cavity -> no solid obstacle (thermal or lid driven)
@@ -287,6 +295,16 @@ class AcceleratedSolver:
         self.s = np.zeros((mesh.nx, mesh.ny))
         self.time = 0.0
         self.cfl = 0.0
+        self.last_dt = 0.0
+        # dt * mean|div u| over interior fluid cells after the projection
+        # (the quantity OpenFOAM prints as "time step continuity errors").
+        self.continuity_error = 0.0
+        # Set when the explicit march blows up (non-finite values or the
+        # velocity safety clamp engaging) — the run must not be reported
+        # as a valid solution after that.
+        self.diverged = False
+        self.closed_domain = self.archetype in CLOSED_ARCHETYPES
+        self.obstacle_shape = str((obstacle_spec or {}).get("shape", "")).lower()
 
         self.obstacle_mask = build_obstacle_mask(
             mesh, self.archetype, self.aoa_deg, obstacle_spec
@@ -317,85 +335,104 @@ class AcceleratedSolver:
         self.s[self.obstacle_mask] = 0.0
 
     def _build_poisson_matrix(self):
-        """Build 5-point discrete Laplacian sparse matrix for Pressure Poisson equation."""
+        """Assemble and LU-factorize the 5-point pressure Laplacian once.
+
+        Neumann (dp/dn = 0) is applied by boundary reflection on every wall.
+        Open channel/tunnel archetypes then pin the outlet column to p = 0
+        (Dirichlet), so mass imbalance leaves through the outlet. Closed
+        boxes pin a single gauge cell instead and get a compatible RHS in
+        step(). (The previous all-Neumann + corner pin for *open* flows was
+        ill-posed: the incompatible RHS piled up into a singularity at the
+        pinned corner, giving p ~ 260 and |div u| ~ 255 at U = 1.)
+
+        The matrix never changes during a run, so it is factorized here and
+        reused every step instead of re-running spsolve's factorization.
+        """
         nx, ny = self.mesh.nx, self.mesh.ny
         dx, dy = self.mesh.dx, self.mesh.dy
-        
-        N = nx * ny
-        diag_c = -2.0 / dx**2 - 2.0 / dy**2
-        diag_x = 1.0 / dx**2
-        diag_y = 1.0 / dy**2
-        
-        A = sp.dok_matrix((N, N), dtype=np.float64)
-        
-        for i in range(nx):
-            for j in range(ny):
-                k = i * ny + j
-                
-                # Boundary nodes (Neumann dp/dn = 0 or reference cell)
-                if i == 0 and j == 0:
-                    A[k, k] = 1.0 # Reference pressure cell
-                    continue
-                    
-                A[k, k] = diag_c
-                
-                # Left / Right
-                if i > 0:
-                    A[k, (i - 1) * ny + j] += diag_x
-                else:
-                    A[k, k] += diag_x # Neumann boundary reflection
-                    
-                if i < nx - 1:
-                    A[k, (i + 1) * ny + j] += diag_x
-                else:
-                    A[k, k] += diag_x
-                    
-                # Bottom / Top
-                if j > 0:
-                    A[k, i * ny + (j - 1)] += diag_y
-                else:
-                    A[k, k] += diag_y
-                    
-                if j < ny - 1:
-                    A[k, i * ny + (j + 1)] += diag_y
-                else:
-                    A[k, k] += diag_y
 
-        self.A_poisson = A.tocsr()
+        def neumann_1d(n: int, h: float) -> sp.spmatrix:
+            main = np.full(n, -2.0)
+            main[0] = main[-1] = -1.0  # ghost cell mirrors the boundary cell
+            off = np.ones(n - 1)
+            return sp.diags([off, main, off], [-1, 0, 1]) / h**2
+
+        # Row-major (i, j) -> k = i*ny + j ordering, matching ndarray.ravel()
+        lap = (
+            sp.kron(neumann_1d(nx, dx), sp.identity(ny))
+            + sp.kron(sp.identity(nx), neumann_1d(ny, dy))
+        )
+
+        pinned = np.zeros(nx * ny, dtype=bool)
+        if self.closed_domain:
+            pinned[0] = True                   # gauge: p = 0 at one cell
+        else:
+            pinned[(nx - 1) * ny:] = True      # Dirichlet outlet column
+        self._pinned = pinned
+
+        keep = sp.diags((~pinned).astype(float))
+        self.A_poisson = (keep @ lap + sp.diags(pinned.astype(float))).tocsc()
+        self._poisson_lu = spla.splu(self.A_poisson)
+
+    def _apply_velocity_bc(self, u: np.ndarray, v: np.ndarray) -> None:
+        """Apply the archetype's velocity BCs in place.
+
+        Used for BOTH the predictor (u*, v*) and the corrected field, so the
+        two can never disagree (they previously did for the plume cases).
+        """
+        U = self.lid_velocity
+        if self.archetype == "cavity":
+            u[:, 0] = 0.0;  v[:, 0] = 0.0    # bottom wall
+            u[0, :] = 0.0;  v[0, :] = 0.0    # left wall
+            u[-1, :] = 0.0; v[-1, :] = 0.0   # right wall
+            u[:, -1] = U;   v[:, -1] = 0.0   # moving lid
+        elif self.archetype == "water_dam":
+            # Sealed tank: no-slip on all four walls, flow is purely
+            # gravity-driven (no inlet "wind" blowing through a dam break).
+            u[:, 0] = 0.0;  v[:, 0] = 0.0
+            u[:, -1] = 0.0; v[:, -1] = 0.0
+            u[0, :] = 0.0;  v[0, :] = 0.0
+            u[-1, :] = 0.0; v[-1, :] = 0.0
+        else:
+            # Channel / wind tunnel: inlet left, zero-gradient outlet right
+            u[0, :] = U;       v[0, :] = 0.0
+            u[-1, :] = u[-2, :]; v[-1, :] = v[-2, :]
+            if self.archetype in ("plume", "weather_plume"):
+                # Free-slip (impermeable, shear-free) floor and lid
+                u[:, 0] = u[:, 1];   v[:, 0] = 0.0
+                u[:, -1] = u[:, -2]; v[:, -1] = 0.0
+            else:
+                # Freestream far-field top/bottom (moving ground for f1)
+                u[:, 0] = U;  v[:, 0] = 0.0
+                u[:, -1] = U; v[:, -1] = 0.0
+
+        # Immersed body no-slip (staircase mask)
+        if np.any(self.obstacle_mask):
+            u[self.obstacle_mask] = 0.0
+            v[self.obstacle_mask] = 0.0
 
     def apply_bc(self):
-        """Apply velocity boundary conditions depending on flow archetype."""
-        if self.archetype == "cavity":
-            self.u[:, 0] = 0.0;  self.v[:, 0] = 0.0   # Bottom
-            self.u[0, :] = 0.0;  self.v[0, :] = 0.0   # Left
-            self.u[-1, :] = 0.0; self.v[-1, :] = 0.0  # Right
-            self.u[:, -1] = self.lid_velocity; self.v[:, -1] = 0.0 # Top (Moving Lid)
-        else:
-            # External Aerodynamic / Tunnel Flow
-            self.u[0, :] = self.lid_velocity; self.v[0, :] = 0.0 # Inlet
-            self.u[-1, :] = self.u[-2, :]; self.v[-1, :] = self.v[-2, :] # Convective Outlet
-            if self.archetype in ("plume", "weather_plume"):
-                # Open boundaries: entrainment allowed from above/below
-                self.u[:, 0] = self.u[:, 1];   self.v[:, 0] = 0.0
-                self.u[:, -1] = self.u[:, -2]; self.v[:, -1] = 0.0
-            else:
-                self.u[:, 0] = self.lid_velocity; self.v[:, 0] = 0.0 # Bottom Farfield
-                self.u[:, -1] = self.lid_velocity; self.v[:, -1] = 0.0 # Top Farfield
+        """Apply velocity boundary conditions to the current solution."""
+        self._apply_velocity_bc(self.u, self.v)
 
-        # Immersed Body No-Slip Boundary
-        if np.any(self.obstacle_mask):
-            self.u[self.obstacle_mask] = 0.0
-            self.v[self.obstacle_mask] = 0.0
+    def compute_forces(self, include_viscous: bool = True):
+        """Integrate pressure + viscous forces on the immersed body.
 
-    def compute_forces(self):
-        """Integrate aerodynamic forces from the ACTUAL flow field.
+        Staircase immersed boundary: every solid-cell face that touches a
+        fluid cell is a surface element. Pressure is read on the fluid side
+        of the face; wall shear uses the one-cell gradient to the no-slip
+        solid cell (u = 0), tau/rho = nu * u_fluid / h, consistent with the
+        solver's viscous stencil.
 
-        Pressure drag: sum of (p_ref - p) over body-facing cell faces.
-        Skin friction: surface tangential velocity gradients.
-        Coefficients use the frontal projected area / chord per unit depth.
-        Vehicle telemetry (downforce / thrust / cavitation index) is derived
-        from real dynamic pressure with SI fluid density and the declared
-        operating point — never hardcoded constants.
+        Force on the body per unit depth (kinematic, rho = 1 as in the
+        solver):  F = -sum (p - p_ref) n dA + sum tau dA.
+        Coefficients divide by 0.5 U^2 L_ref, with L_ref = chord (x-extent)
+        for airfoil-type bodies and frontal height (y-extent) otherwise.
+
+        Returns (cd, cl, extra). Signs are physical: drag is +x, lift is +y,
+        and nothing is clamped (a negative Cd is reported as such).
+        Pass include_viscous=False for inviscid (slip-wall) fields such as
+        the potential-flow preview, where a no-slip shear estimate is wrong.
         """
         extra = {}
         mask = self.obstacle_mask
@@ -403,63 +440,84 @@ class AcceleratedSolver:
             return 0.0, 0.0, extra
 
         dx, dy = self.mesh.dx, self.mesh.dy
-        X = self.mesh.X
         rho = self.physics.rho
         U_ref = max(self.lid_velocity, 1e-6)
-        p_ref = float(np.mean(self.p[~mask]))
+        p, u, v = self.p, self.u, self.v
+        fluid = ~mask
 
-        # Venturi: report the throat pressure drop instead of body forces
+        # Venturi: report the inlet -> throat pressure drop (Pa) instead of
+        # body forces (the "body" is the nozzle wall).
         if self.archetype == "venturi":
-            throat = np.abs(X - 0.5 * self.mesh.lx) <= 0.06 * self.mesh.lx
-            p_in = float(np.mean(self.p[:3, :]))
-            p_th = float(np.mean(self.p[throat, :]))
-            extra["pressureDrop"] = float(np.round(p_in - p_th, 4))
+            i_th = int(np.argmin(np.abs(self.mesh.xc - 0.5 * self.mesh.lx)))
+            p_in = float(np.mean(p[1, fluid[1]]))
+            p_th = float(np.mean(p[i_th, fluid[i_th]]))
+            extra["pressureDrop"] = float(np.round((p_in - p_th) * rho, 4))
             return 0.0, 0.0, extra
 
-        # --- Pressure integration over body-facing faces (interior cells) ---
-        interior = mask[1:-1, 1:-1]
-        p_int = self.p[1:-1, 1:-1]
-        front = interior & ~mask[:-2, 1:-1]   # flow-facing (-x normal)
-        rear = interior & ~mask[2:, 1:-1]     # leeward (+x normal)
-        bot = interior & ~mask[1:-1, :-2]     # underside (-y normal)
-        top = interior & ~mask[1:-1, 2:]      # upper side (+y normal)
+        def shifted(f, axis, step):
+            """Value of f at the neighbour (i-1 / i+1 / j-1 / j+1), aligned."""
+            out = np.zeros_like(f)
+            if axis == 0 and step == -1:
+                out[1:, :] = f[:-1, :]
+            elif axis == 0:
+                out[:-1, :] = f[1:, :]
+            elif step == -1:
+                out[:, 1:] = f[:, :-1]
+            else:
+                out[:, :-1] = f[:, 1:]
+            return out
 
-        fpx = float(np.sum((p_ref - p_int)[front]) * dy)   # drag direction
-        fpx -= float(np.sum((p_ref - p_int)[rear]) * dy)
-        fpy = float(np.sum((p_ref - p_int)[bot]) * dx)     # lift direction
-        fpy -= float(np.sum((p_ref - p_int)[top]) * dx)
+        # Body faces, flagged on the solid cell (domain edges are not faces)
+        front = mask & shifted(fluid, 0, -1)   # -x face, fluid at i-1
+        rear = mask & shifted(fluid, 0, +1)    # +x face, fluid at i+1
+        bot = mask & shifted(fluid, 1, -1)     # -y face, fluid at j-1
+        top = mask & shifted(fluid, 1, +1)     # +y face, fluid at j+1
 
-        # --- Skin friction from surface velocity gradients ---
-        visc = 0.0
-        if np.any(front):
-            visc += float(np.sum(np.abs(self.v[1:-1, 1:-1][front] - self.v[:-2, 1:-1][front]) * dy))
-        if np.any(top):
-            visc += float(np.sum(np.abs(self.u[1:-1, 1:-1][top] - self.u[1:-1, 2:][top]) * dx))
+        p_ref = float(np.mean(p[fluid]))
+        fx = (np.sum(shifted(p, 0, -1)[front] - p_ref)
+              - np.sum(shifted(p, 0, +1)[rear] - p_ref)) * dy
+        fy = (np.sum(shifted(p, 1, -1)[bot] - p_ref)
+              - np.sum(shifted(p, 1, +1)[top] - p_ref)) * dx
 
-        # --- Nondimensional coefficients (per unit depth) ---
+        # Viscous wall shear: x-friction on top/bottom faces, y on front/rear
+        if include_viscous:
+            fx += self.nu * (np.sum(shifted(u, 1, +1)[top])
+                             + np.sum(shifted(u, 1, -1)[bot])) / dy * dx
+            fy += self.nu * (np.sum(shifted(v, 0, -1)[front])
+                             + np.sum(shifted(v, 0, +1)[rear])) / dx * dy
+
+        chord = max(np.count_nonzero(np.any(mask, axis=1)) * dx, dx)   # x-extent
+        height = max(np.count_nonzero(np.any(mask, axis=0)) * dy, dy)  # y-extent
+        chord_based = (
+            self.archetype in CHORD_REFERENCED_ARCHETYPES
+            or (self.archetype == "cad" and self.obstacle_shape == "airfoil")
+        )
         q_ref = 0.5 * U_ref**2
-        # Frontal silhouette height (y-extent of the body), per unit depth
-        front_height = max(float(np.sum(np.any(mask, axis=1))) * dy, dy)
-        chord = 0.45 * self.mesh.lx
-        cd = (fpx + visc) / (q_ref * front_height)
-        cl = fpy / (q_ref * chord)
-        cd = max(cd, 0.0)
+        L_ref = chord if chord_based else height
+        cd = float(fx) / (q_ref * L_ref)
+        cl = float(fy) / (q_ref * L_ref)
 
-        # --- Real-world operating-point telemetry (SI) ---
+        # --- Illustrative full-scale conversions (SI) -----------------------
+        # These map the 2-D coefficients onto an ASSUMED operating point
+        # (speed scale, reference area, depth). They are presentation
+        # helpers, not independent predictions.
         if self.archetype == "f1":
-            v_real = 80.0 * U_ref                          # F1 speed at U = 1
-            planform = 1.2 * self.mesh.lx                  # m^2 wing area
-            downforce = 0.5 * rho * v_real**2 * planform * abs(cl)
+            v_real = 80.0 * U_ref                  # assume 80 m/s at U = 1
+            planform = 1.2 * self.mesh.lx          # assumed wing area [m^2]
+            # Positive = downforce (Cl < 0); negative means the wing lifts.
+            downforce = -cl * 0.5 * rho * v_real**2 * planform
             extra["downforce"] = float(np.round(downforce, 1))
         elif self.archetype == "drone":
-            v_real = 15.0 * U_ref
-            rotor_area = 0.05                              # m^2 rotor disks
-            thrust = 0.5 * rho * v_real**2 * rotor_area * max(abs(cl), 0.2)
+            v_real = 15.0 * U_ref                  # assume 15 m/s at U = 1
+            rotor_area = 0.05                      # assumed disk area [m^2]
+            # Vertical force on the 2-D rotor-arm section in cross-flow
+            thrust = cl * 0.5 * rho * v_real**2 * rotor_area
             extra["thrust"] = float(np.round(thrust, 2))
         elif self.archetype == "submarine":
-            v_real = 10.0 * U_ref
-            p_amb = 101325.0 + rho * 9.81 * 10.0           # 10 m operating depth
-            sigma = (p_amb - 2340.0) / max(0.5 * rho * v_real**2, 1.0)
+            v_real = 10.0 * U_ref                  # assume 10 m/s at U = 1
+            p_amb = 101325.0 + rho * 9.81 * 10.0   # assumed 10 m depth
+            p_vapour = 2340.0                      # water at ~20 C [Pa]
+            sigma = (p_amb - p_vapour) / max(0.5 * rho * v_real**2, 1.0)
             extra["cavitationIndex"] = float(np.round(sigma, 2))
 
         return float(np.round(cd, 4)), float(np.round(cl, 4)), extra
@@ -545,26 +603,18 @@ class AcceleratedSolver:
         )
         s_star = np.clip(np.nan_to_num(s_star, nan=0.0), 0.0, 1.5)
 
-        # Stability clamping to prevent overflow divergence (physical scale)
+        # Safety clamp against overflow. A healthy run never comes near 10x
+        # the reference speed; if it does, the march has diverged and is
+        # flagged instead of being silently clipped into plausible numbers.
         u_cap = 10.0 * max(abs(self.lid_velocity), 1.0)
+        for field in (u_star, v_star):
+            if not np.all(np.isfinite(field)) or np.max(np.abs(field)) >= u_cap:
+                self.diverged = True
         u_star = np.clip(np.nan_to_num(u_star, nan=0.0, posinf=u_cap, neginf=-u_cap), -u_cap, u_cap)
         v_star = np.clip(np.nan_to_num(v_star, nan=0.0, posinf=u_cap, neginf=-u_cap), -u_cap, u_cap)
 
-        # Apply BC to star velocity
-        if self.archetype == "cavity":
-            u_star[:, 0] = 0.0; v_star[:, 0] = 0.0
-            u_star[0, :] = 0.0; v_star[0, :] = 0.0
-            u_star[-1, :] = 0.0; v_star[-1, :] = 0.0
-            u_star[:, -1] = self.lid_velocity; v_star[:, -1] = 0.0
-        else:
-            u_star[0, :] = self.lid_velocity; v_star[0, :] = 0.0
-            u_star[-1, :] = u_star[-2, :]; v_star[-1, :] = v_star[-2, :]
-            u_star[:, 0] = self.lid_velocity; v_star[:, 0] = 0.0
-            u_star[:, -1] = self.lid_velocity; v_star[:, -1] = 0.0
-
-        if np.any(self.obstacle_mask):
-            u_star[self.obstacle_mask] = 0.0
-            v_star[self.obstacle_mask] = 0.0
+        # Same BCs as the corrected field (single source of truth)
+        self._apply_velocity_bc(u_star, v_star)
 
         # Scalar boundary conditions: keep steady sources alive
         if self.archetype in ("plume", "weather_plume"):
@@ -589,33 +639,59 @@ class AcceleratedSolver:
             (u_star[2:, 1:-1] - u_star[:-2, 1:-1]) / (2 * dx) +
             (v_star[1:-1, 2:] - v_star[1:-1, :-2]) / (2 * dy)
         )
-        rhs = (div_ustar / dt).flatten()
-        rhs[0] = 0.0 # Reference pressure cell
-        
-        # Fast Sparse Matrix Solve!
-        p_flat = spla.spsolve(self.A_poisson, rhs)
+        rhs = (div_ustar / dt).ravel()
+        if self.closed_domain:
+            # Pure-Neumann box: the Laplacian's range is the mean-zero
+            # vectors, so remove the discretization's net divergence before
+            # pinning the gauge cell (otherwise it piles up at that cell).
+            free = ~self._pinned
+            rhs[free] -= rhs[free].mean()
+        rhs[self._pinned] = 0.0
+
+        # Sparse solve, reusing the LU factorization built once in __init__
+        p_flat = self._poisson_lu.solve(rhs)
         self.p = np.clip(np.nan_to_num(p_flat.reshape((nx, ny)), nan=0.0), -1e4, 1e4)
-        
+
         # 3. Correct velocity
         dp_dx = np.zeros_like(self.p)
         dp_dy = np.zeros_like(self.p)
         dp_dx[1:-1, :] = (self.p[2:, :] - self.p[:-2, :]) / (2 * dx)
         dp_dy[:, 1:-1] = (self.p[:, 2:] - self.p[:, :-2]) / (2 * dy)
-        
-        u_cap = 10.0 * max(abs(self.lid_velocity), 1.0)
+
         self.u[1:-1, 1:-1] = np.clip(np.nan_to_num(u_star[1:-1, 1:-1] - dt * dp_dx[1:-1, 1:-1]), -u_cap, u_cap)
         self.v[1:-1, 1:-1] = np.clip(np.nan_to_num(v_star[1:-1, 1:-1] - dt * dp_dy[1:-1, 1:-1]), -u_cap, u_cap)
         self.s = s_star
 
         self.apply_bc()
         self.time += dt
+        self.last_dt = dt
         u_max = float(np.max(np.abs(self.u)))
         self.cfl = u_max * dt / self.mesh.dx
-        
+        self.continuity_error = self._continuity_error(dt)
+
         # Residual
         res_u = float(np.max(np.nan_to_num(np.abs(self.u - u_old), nan=0.0)))
         res_v = float(np.max(np.nan_to_num(np.abs(self.v - v_old), nan=0.0)))
         return max(res_u, res_v)
+
+    def divergence(self) -> np.ndarray:
+        """Central-difference div(u) on interior nodes (zero on the boundary)."""
+        dx, dy = self.mesh.dx, self.mesh.dy
+        div = np.zeros_like(self.u)
+        div[1:-1, 1:-1] = (
+            (self.u[2:, 1:-1] - self.u[:-2, 1:-1]) / (2 * dx)
+            + (self.v[1:-1, 2:] - self.v[1:-1, :-2]) / (2 * dy)
+        )
+        return div
+
+    def _continuity_error(self, dt: float) -> float:
+        """dt * mean |div u| over interior fluid cells (measured, not assumed)."""
+        interior = ~self.obstacle_mask
+        interior[[0, -1], :] = False
+        interior[:, [0, -1]] = False
+        if not np.any(interior):
+            return 0.0
+        return float(dt * np.mean(np.abs(self.divergence()[interior])))
 
 
 # ---------------------------------------------------------------------------

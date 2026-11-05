@@ -348,7 +348,7 @@ boundaryField
 """
         zf.writestr(f"{case_name}/0/p", zero_p)
 
-        # Allrun script
+        # Allrun script — stored with mode 0755 so `./Allrun` works after unzip
         allrun = """#!/bin/sh
 cd "${0%/*}" || exit
 
@@ -357,7 +357,10 @@ cd "${0%/*}" || exit
 runApplication blockMesh
 runApplication icoFoam
 """
-        zf.writestr(f"{case_name}/Allrun", allrun)
+        allrun_info = zipfile.ZipInfo(f"{case_name}/Allrun")
+        allrun_info.external_attr = 0o100755 << 16  # regular file, rwxr-xr-x
+        allrun_info.compress_type = zipfile.ZIP_DEFLATED
+        zf.writestr(allrun_info, allrun)
 
     buf.seek(0)
     return buf.getvalue()

@@ -11,7 +11,6 @@ Features:
 import json
 import urllib.request
 import urllib.error
-import numpy as np
 from typing import Optional, Dict, Any
 
 RUST_SIDECAR_URL = "http://127.0.0.1:8081"
@@ -30,27 +29,35 @@ def is_rust_engine_online(timeout: float = 0.25) -> bool:
 def solve_with_rust(
     nx: int = 41,
     ny: int = 41,
-    re: float = 100.0,
+    lx: float = 1.0,
+    ly: float = 1.0,
+    nu: float = 0.01,
     dt: float = 0.005,
     steps: int = 25,
     lid_u: float = 1.0,
-    archetype: str = "airfoil",
-    aoa_deg: float = 0.0,
-    timeout: float = 5.0,
+    archetype: str = "cavity",
+    obstacle_mask: Optional[list] = None,
+    timeout: float = 30.0,
 ) -> Optional[Dict[str, Any]]:
     """
-    Offload Navier-Stokes iteration steps to the bare-metal Rust engine.
-    Returns dictionary with velocity, pressure, vorticity, forces, and CFL metrics.
+    Offload Navier-Stokes time steps to the Rust engine.
+
+    The geometry (domain size, cell-centred grid, solid mask) and viscosity
+    come from the Python side so both engines solve the same problem; Rust
+    returns u, v, p (+ speed, vorticity, residual, CFL). Forces are then
+    integrated in Python with the same routine as the SciPy solver.
     """
     payload = json.dumps({
         "nx": nx,
         "ny": ny,
-        "re": re,
+        "lx": lx,
+        "ly": ly,
+        "nu": nu,
         "dt": dt,
         "steps": steps,
         "lid_u": lid_u,
         "archetype": archetype,
-        "aoa_deg": aoa_deg,
+        "obstacle_mask": obstacle_mask,
     }).encode("utf-8")
 
     try:
@@ -80,10 +87,11 @@ def benchmark_with_rust(
     payload = json.dumps({
         "nx": nx,
         "ny": ny,
-        "re": 100.0,
+        "nu": 0.01,
         "dt": 0.005,
         "steps": steps,
         "lid_u": 1.0,
+        "archetype": "cavity",
     }).encode("utf-8")
 
     try:

@@ -21,7 +21,8 @@ def generate_vtk_bytes(mesh, u: np.ndarray, v: np.ndarray, p: np.ndarray) -> byt
     out.write("ASCII\n")
     out.write("DATASET STRUCTURED_POINTS\n")
     out.write(f"DIMENSIONS {nx} {ny} 1\n")
-    out.write("ORIGIN 0.0 0.0 0.0\n")
+    # Field values live at cell centres (dx/2, dy/2, ...), not at the corner
+    out.write(f"ORIGIN {dx / 2} {dy / 2} 0.0\n")
     out.write(f"SPACING {dx} {dy} 1.0\n\n")
     
     out.write(f"POINT_DATA {n_points}\n")

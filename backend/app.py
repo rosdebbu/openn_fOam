@@ -21,8 +21,8 @@ def sanitize_case_name(name: str) -> str:
     return cleaned[:64] or "openzess_case"
 
 from .mesh import Mesh2D
-from .solver import AcceleratedSolver, CasePhysics, BUOYANT_ARCHETYPES, build_obstacle_mask, parse_dict_overrides
-from .ai_predictor import predict_pinn_flow
+from .solver import AcceleratedSolver, CasePhysics, BUOYANT_ARCHETYPES, parse_dict_overrides
+from .ai_predictor import predict_cavity_stokes, predict_potential_flow
 from .vtk_writer import export_vtk
 from .openfoam_export import generate_openfoam_case_zip
 from .rust_bridge import is_rust_engine_online, solve_with_rust, benchmark_with_rust
@@ -289,6 +289,66 @@ def download_openfoam_case(name: str = "openzess_openfoam_case"):
     )
 
 
+# Hard limits on client-supplied run parameters. The solver allocates
+# O(nx*ny) memory and an LU factorization, so an unbounded grid request
+# from any WebSocket client could exhaust RAM.
+MAX_GRID = 256
+MAX_ITERATIONS = 20000
+
+
+def _clamp(value, lo, hi):
+    return max(lo, min(hi, value))
+
+
+def _field(arr) -> list:
+    """Round a 2-D field to 3 decimals for transport (cuts JSON ~70%)."""
+    return np.round(np.nan_to_num(np.asarray(arr, dtype=float), nan=0.0), 3).tolist()
+
+
+def _frame(solver, mesh, *, iteration, residual, converged, mode, courant, continuity,
+           extra=None, inviscid=False):
+    """Build one WebSocket frame from a solver holding u, v, p."""
+    speed = np.sqrt(solver.u**2 + solver.v**2)
+    cd, cl, forces_extra = solver.compute_forces(include_viscous=not inviscid)
+    payload = {
+        "iteration": int(iteration),
+        "residual": float(residual),
+        "converged": bool(converged),
+        "u": _field(solver.u),
+        "v": _field(solver.v),
+        "p": _field(solver.p),
+        "speed": _field(speed),
+        "mode": mode,
+        "cd": cd,
+        "cl": cl,
+        "courantMax": float(np.round(courant, 4)),
+        "continuityError": float(continuity),
+        "uMax": float(np.round(np.max(speed), 4)),
+        "uAvg": float(np.round(np.mean(speed), 4)),
+        "pMin": float(np.round(np.min(solver.p), 4)),
+        "pMax": float(np.round(np.max(solver.p), 4)),
+        "dx": float(mesh.dx),
+        "dy": float(mesh.dy),
+        **forces_extra,
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def _scalar_extra(solver) -> dict:
+    """Transported scalar for archetypes that carry one (real data only)."""
+    arch = solver.archetype
+    if arch in ("plume", "weather_plume"):
+        temp = solver.physics.ambient_temp + solver.physics.delta_t_ref * solver.s
+        return {"scalar": _field(temp), "scalarName": "T", "scalarUnit": "K"}
+    if arch == "water_dam":
+        return {"scalar": _field(solver.s), "scalarName": "alpha.heavy", "scalarUnit": ""}
+    if arch == "venturi":
+        return {"scalar": _field(solver.s), "scalarName": "tracer", "scalarUnit": ""}
+    return {}
+
+
 @app.websocket("/ws/simulate")
 async def websocket_simulate(websocket: WebSocket):
     global last_results
@@ -296,19 +356,20 @@ async def websocket_simulate(websocket: WebSocket):
     try:
         data_str = await websocket.receive_text()
         params = json.loads(data_str)
-        
+
         # Support both camelCase (from frontend) and snake_case
-        nx = int(params.get("gridResolution", params.get("nx", 41)))
-        ny = int(params.get("gridResolution", params.get("ny", 41)))
+        nx = _clamp(int(params.get("gridResolution", params.get("nx", 41))), 8, MAX_GRID)
+        ny = _clamp(int(params.get("gridResolution", params.get("ny", 41))), 8, MAX_GRID)
         Re = float(params.get("reynoldsNumber", params.get("Re", 100.0)))
         mode = str(params.get("solverMode", params.get("mode", "cfd"))).lower()
         archetype = str(params.get("archetype", "cavity")).lower()
-        max_iter = int(params.get("maxIterations", params.get("max_iter", 300)))
+        max_iter = _clamp(int(params.get("maxIterations", params.get("max_iter", 300))), 1, MAX_ITERATIONS)
         dt = float(params.get("dt", 0.005))
         aoa_deg = float(params.get('aoa', params.get('angle_of_attack', params.get('angleOfAttack', 0.0))))
 
         # Full user physics: substance, inlet velocity, gravity, temperatures,
-        # custom obstacle geometry — all applied to the actual solver
+        # custom obstacle geometry — all applied to the actual solver.
+        # Temperatures are Kelvin.
         substance = str(params.get("substance", "air")).lower()
         nf = params.get("naturalForces", {}) or {}
         gravity = nf.get("gravity") or params.get("gravity") or [0.0, -9.81, 0.0]
@@ -321,7 +382,7 @@ async def websocket_simulate(websocket: WebSocket):
         # User-edited dictionary overrides (deltaT, nu, inlet velocity) from
         # the dict editor — applied to the real solver run.
         overrides = parse_dict_overrides(params.get("dictOverrides"))
-        dt = overrides.get("dt", dt)
+        dt = _clamp(overrides.get("dt", dt), 1e-5, 0.1)
 
         physics = CasePhysics(
             substance=substance,
@@ -332,169 +393,123 @@ async def websocket_simulate(websocket: WebSocket):
             hot_temp=params.get("hotTemp"),
             nu=overrides.get("nu"),
         )
-        
-        # Adjust domain aspect ratio for channel/obstacle flow
+
+        # Channel / external-flow archetypes get a 2:1 domain
         lx = 2.0 if archetype in ["cylinder", "obstacle", "airfoil"] else 1.0
         ly = 1.0
         if archetype in ["cylinder", "obstacle", "airfoil"]:
-            nx = max(nx * 2, 60)
-            
+            nx = _clamp(max(nx * 2, 60), 8, 2 * MAX_GRID)
+
         mesh = Mesh2D(nx=nx, ny=ny, lx=lx, ly=ly)
-        
-        # 1. AI Physics Mode (PINN Surrogate <50ms)
-        if mode == "ai":
-            u, v, p = predict_pinn_flow(mesh, Re)
-            speed_arr = np.sqrt(u**2 + v**2)
-
-            last_results = {"mesh": mesh, "u": u, "v": v, "p": p, "params": params}
-
-            max_speed = float(np.max(speed_arr)) if speed_arr.size > 0 else 1.0
-            avg_speed = float(np.mean(speed_arr)) if speed_arr.size > 0 else 0.0
-            min_p = float(np.min(p)) if p.size > 0 else 0.0
-            max_p = float(np.max(p)) if p.size > 0 else 0.0
-
-            # Real force integration on the PINN field (no hardcoded Cd/Cl)
-            pinn_solver = AcceleratedSolver(
-                mesh=mesh, physics=physics, archetype=archetype,
-                aoa_deg=aoa_deg, obstacle_spec=obstacle_spec,
-            )
-            pinn_solver.u, pinn_solver.v, pinn_solver.p = u, v, p
-            pinn_cd, pinn_cl, pinn_extra = pinn_solver.compute_forces()
-
-            payload = {
-                "iteration": 1,
-                "residual": 0.0,
-                "converged": True,
-                "u": np.round(np.nan_to_num(u, nan=0.0), 3).tolist(),
-                "v": np.round(np.nan_to_num(v, nan=0.0), 3).tolist(),
-                "p": np.round(np.nan_to_num(p, nan=0.0), 3).tolist(),
-                "speed": np.round(np.nan_to_num(speed_arr, nan=0.0), 3).tolist(),
-                "mode": "ai",
-                "cd": float(np.round(np.nan_to_num(pinn_cd, nan=0.0), 3)),
-                "cl": float(np.round(np.nan_to_num(pinn_cl, nan=0.0), 3)),
-                "courantMax": float(np.round(max_speed * dt / mesh.dx, 3)),
-                "continuityError": 1.2e-6,
-                "uMax": float(np.round(max_speed, 3)),
-                "uAvg": float(np.round(avg_speed, 3)),
-                "pMin": float(np.round(min_p, 3)),
-                "pMax": float(np.round(max_p, 3)),
-                "obstacleMask": pinn_solver.obstacle_mask.tolist(),
-                **pinn_extra,
-            }
-            await websocket.send_text(json.dumps(payload))
-            await websocket.close()
-            return
-
-        # 2. Rust Bare-Metal Mode (SIMD + Rayon Multi-Threaded Poisson)
-        if mode in ["rust", "rust_bare_metal"]:
-            rust_res = solve_with_rust(
-                nx=nx, ny=ny, re=Re, dt=dt, steps=min(max_iter, 250),
-                archetype=archetype, aoa_deg=aoa_deg
-            )
-            if rust_res:
-                u_arr = np.array(rust_res["u"])
-                v_arr = np.array(rust_res["v"])
-                p_arr = np.array(rust_res["p"])
-                speed_arr = np.array(rust_res["speed"])
-                
-                last_results = {"mesh": mesh, "u": u_arr, "v": v_arr, "p": p_arr, "params": params}
-                
-                max_speed = float(np.max(speed_arr)) if speed_arr.size > 0 else 1.0
-                avg_speed = float(np.mean(speed_arr)) if speed_arr.size > 0 else 0.0
-                min_p = float(np.min(p_arr)) if p_arr.size > 0 else 0.0
-                max_p = float(np.max(p_arr)) if p_arr.size > 0 else 0.0
-                cfl = float(rust_res.get("cfl", max_speed * dt / mesh.dx))
-                
-                payload = {
-                    "iteration": rust_res["iteration"],
-                    "residual": float(np.round(rust_res["residual"], 6)),
-                    "converged": rust_res["converged"],
-                    "u": np.round(u_arr, 3).tolist(),
-                    "v": np.round(v_arr, 3).tolist(),
-                    "p": np.round(p_arr, 3).tolist(),
-                    "speed": np.round(speed_arr, 3).tolist(),
-                    "mode": "rust_bare_metal",
-                    "elapsed_ms": rust_res.get("elapsed_ms", 0.0),
-                    "cd": float(np.round(rust_res.get("cd", 0.048 if archetype == "airfoil" else 1.18), 3)),
-                    "cl": float(np.round(rust_res.get("cl", 0.842 if archetype == "airfoil" else 0.0), 3)),
-                    "courantMax": float(np.round(min(cfl, 0.95), 3)),
-                    "continuityError": float(np.round(rust_res["residual"] * 0.1, 8)),
-                    "uMax": float(np.round(max_speed, 3)),
-                    "uAvg": float(np.round(avg_speed, 3)),
-                    "pMin": float(np.round(min_p, 3)),
-                    "pMax": float(np.round(max_p, 3)),
-                    "obstacleMask": np.zeros((nx, ny), dtype=bool).tolist(),
-                }
-                await websocket.send_text(json.dumps(payload))
-                await websocket.close()
-                return
-            else:
-                print("🦀 Rust sidecar offline/unreachable; automatically falling back to Python SciPy.")
-
-        # 3. Traditional CFD Mode (Python SciPy Sparse AcceleratedSolver)
-        # Uses the shared `physics` built above — it already carries the UI
-        # selections (substance, Re, gravity, temps) and the user's dict
-        # overrides, so no duplicate re-creation here.
         solver = AcceleratedSolver(
             mesh=mesh, physics=physics, archetype=archetype, aoa_deg=aoa_deg,
             obstacle_spec=obstacle_spec,
         )
-        
-        # Adaptive frame striding: target crisp, smooth 30-40 fps without overwhelming socket buffers
+        mask_list = solver.obstacle_mask.tolist()
+
+        # Buoyancy-driven flows have no instant approximation and the Rust
+        # kernel has no scalar transport: run them on the Python CFD solver.
+        if mode in ("ai", "rust", "rust_bare_metal") and archetype in BUOYANT_ARCHETYPES:
+            print(f"[OpenZess] '{mode}' mode does not model buoyancy; running '{archetype}' on the CFD solver.")
+            mode = "cfd"
+
+        # 1. Instant preview ("ai" mode): potential flow / Stokes cavity.
+        #    This is NOT a neural network — see backend/ai_predictor.py.
+        if mode == "ai":
+            if archetype == "cavity":
+                u, v, p = predict_cavity_stokes(mesh, solver.lid_velocity, physics.nu)
+            else:
+                u, v, p = predict_potential_flow(mesh, solver.obstacle_mask, solver.lid_velocity)
+            solver.u, solver.v, solver.p = u, v, p
+            last_results = {"mesh": mesh, "u": u, "v": v, "p": p, "params": params}
+            speed_max = float(np.max(np.sqrt(u**2 + v**2)))
+            payload = _frame(
+                solver, mesh, iteration=1, residual=0.0, converged=True, mode="ai",
+                courant=speed_max * dt / mesh.dx,
+                continuity=solver._continuity_error(dt),
+                extra={"obstacleMask": mask_list},
+                inviscid=archetype != "cavity",
+            )
+            await websocket.send_text(json.dumps(payload))
+            await websocket.close()
+            return
+
+        # 2. Rust kernel (multi-threaded Jacobi Poisson via Rayon)
+        if mode in ["rust", "rust_bare_metal"]:
+            # Blocking HTTP call: run it in a worker thread so the event loop
+            # (other clients, health checks) is not frozen meanwhile.
+            rust_res = await asyncio.to_thread(
+                solve_with_rust,
+                nx=nx, ny=ny, lx=lx, ly=ly, nu=physics.nu, dt=dt,
+                steps=min(max_iter, 2000), lid_u=solver.lid_velocity,
+                archetype=archetype, obstacle_mask=mask_list,
+            )
+            if rust_res and rust_res.get("diverged"):
+                await websocket.send_text(json.dumps({
+                    "error": (
+                        f"Rust solver diverged after {rust_res.get('iteration')} steps. "
+                        "Lower the Reynolds number or dt, or refine the grid."
+                    ),
+                    "diverged": True,
+                }))
+                await websocket.close()
+                return
+            if rust_res:
+                solver.u = np.array(rust_res["u"], dtype=float)
+                solver.v = np.array(rust_res["v"], dtype=float)
+                solver.p = np.array(rust_res["p"], dtype=float)
+                last_results = {"mesh": mesh, "u": solver.u, "v": solver.v, "p": solver.p, "params": params}
+                payload = _frame(
+                    solver, mesh,
+                    iteration=rust_res["iteration"],
+                    residual=rust_res["residual"],
+                    converged=rust_res["converged"],
+                    mode="rust_bare_metal",
+                    courant=rust_res.get("cfl", 0.0),
+                    continuity=rust_res.get("dt_used", dt) * float(np.mean(np.abs(solver.divergence()))),
+                    extra={"obstacleMask": mask_list, "elapsed_ms": rust_res.get("elapsed_ms", 0.0)},
+                )
+                await websocket.send_text(json.dumps(payload))
+                await websocket.close()
+                return
+            print("🦀 Rust sidecar offline/unreachable; automatically falling back to Python SciPy.")
+
+        # 3. Python CFD (SciPy sparse fractional-step AcceleratedSolver)
+        # Adaptive frame striding: smooth playback without flooding the socket
         stride = 4 if max_iter <= 80 else (6 if max_iter <= 200 else 8)
-        
+
         for iteration in range(1, max_iter + 1):
             res = solver.step(dt)
-            
-            # Send initial frame, strided steps, and final converged frame
-            should_send = (iteration == 1) or (iteration % stride == 0) or (res < 1e-5) or (iteration == max_iter)
-            
-            if should_send:
-                speed_arr = np.sqrt(solver.u**2 + solver.v**2)
-                
-                # Round floats to 3 decimal places (cuts JSON bandwidth by ~70% and accelerates parsing)
-                speed_clean = np.round(np.nan_to_num(speed_arr, nan=0.0), 3).tolist()
-                u_clean = np.round(np.nan_to_num(solver.u, nan=0.0), 3).tolist()
-                v_clean = np.round(np.nan_to_num(solver.v, nan=0.0), 3).tolist()
-                p_clean = np.round(np.nan_to_num(solver.p, nan=0.0), 3).tolist()
-                
-                cd, cl, extra = solver.compute_forces()
-                max_speed = float(np.max(speed_arr)) if speed_arr.size > 0 else 1.0
-                avg_speed = float(np.mean(speed_arr)) if speed_arr.size > 0 else 0.0
-                min_p = float(np.min(solver.p)) if solver.p.size > 0 else 0.0
-                max_p = float(np.max(solver.p)) if solver.p.size > 0 else 0.0
-                courant = float(solver.cfl) if solver.cfl > 0 else float(max_speed * dt / mesh.dx)
-                
+
+            if solver.diverged:
                 last_results = {"mesh": mesh, "u": solver.u, "v": solver.v, "p": solver.p, "params": params}
-                
-                payload = {
-                    "iteration": int(iteration),
-                    "residual": float(np.round(np.nan_to_num(res, nan=1e-5), 6)),
-                    "converged": bool(res < 1e-5),
-                    "u": u_clean,
-                    "v": v_clean,
-                    "p": p_clean,
-                    "speed": speed_clean,
-                    "mode": "cfd",
-                    "cd": float(np.round(np.nan_to_num(cd, nan=1.18), 3)),
-                    "cl": float(np.round(np.nan_to_num(cl, nan=0.0), 3)),
-                    "courantMax": float(np.round(np.nan_to_num(min(courant, 0.95), nan=0.25), 3)),
-                    "continuityError": float(np.nan_to_num(res * 0.1, nan=1e-6)),
-                    "uMax": float(np.round(max_speed, 3)),
-                    "uAvg": float(np.round(avg_speed, 3)),
-                    "pMin": float(np.round(min_p, 3)),
-                    "pMax": float(np.round(max_p, 3)),
-                    **extra,
-                }
-                
-                # Send obstacleMask only on frame 1 or final frame to eliminate redundant data transfer
-                if iteration == 1 or iteration == max_iter or res < 1e-5:
-                    payload["obstacleMask"] = solver.obstacle_mask.tolist()
-                
+                await websocket.send_text(json.dumps({
+                    "error": (
+                        f"Simulation diverged at iteration {iteration}: velocity exceeded "
+                        "10x the reference speed. Lower the Reynolds number or dt, or "
+                        "refine the grid."
+                    ),
+                    "diverged": True,
+                    "iteration": iteration,
+                }))
+                break
+
+            converged = res < 1e-5
+            if iteration == 1 or iteration % stride == 0 or converged or iteration == max_iter:
+                last_results = {"mesh": mesh, "u": solver.u, "v": solver.v, "p": solver.p, "params": params}
+                extra = _scalar_extra(solver)
+                # Static geometry: send the mask only on the first/last frame
+                if iteration == 1 or iteration == max_iter or converged:
+                    extra["obstacleMask"] = mask_list
+                payload = _frame(
+                    solver, mesh, iteration=iteration, residual=res,
+                    converged=converged, mode="cfd", courant=solver.cfl,
+                    continuity=solver.continuity_error, extra=extra,
+                )
                 await websocket.send_text(json.dumps(payload))
-                await asyncio.sleep(0.002)  # Yield to event loop without stalling simulation
-                
-                if res < 1e-5:
+                await asyncio.sleep(0.002)  # yield to the event loop
+
+                if converged:
                     break
 
         # Close explicitly (matches the AI and Rust paths) so clients receive a
@@ -507,5 +522,5 @@ async def websocket_simulate(websocket: WebSocket):
         print(f"Error during simulation stream: {e}")
         try:
             await websocket.send_text(json.dumps({"error": str(e)}))
-        except:
+        except Exception:
             pass
