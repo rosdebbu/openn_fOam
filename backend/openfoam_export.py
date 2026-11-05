@@ -357,6 +357,14 @@ cd "${0%/*}" || exit
 runApplication blockMesh
 runApplication icoFoam
 """
+        zf.writestr(f"{case_name}/README.txt", (
+            "OpenZess export: 2-D lid-driven cavity case for icoFoam (laminar).\n"
+            f"Re = {re:g} (nu = 1/Re with U = 1 m/s, L = 1 m), deltaT = {dt}, grid {nx} x {ny}.\n"
+            "Only the cavity geometry is exported at present; obstacles and other\n"
+            "studio cases are not included.\n\n"
+            "Run:  ./Allrun   (needs a sourced OpenFOAM environment)\n"
+        ))
+
         allrun_info = zipfile.ZipInfo(f"{case_name}/Allrun")
         allrun_info.external_attr = 0o100755 << 16  # regular file, rwxr-xr-x
         allrun_info.compress_type = zipfile.ZIP_DEFLATED

@@ -643,6 +643,9 @@ function handleExportCase(type: 'zip' | 'vtk' | 'png') {
   if (type === 'vtk') {
     window.open(`${apiHost}/api/export/vtk?name=${safeCaseName}`, '_blank');
   } else if (type === 'zip') {
+    if (params.archetype !== 'cavity') {
+      pushLog(`OpenFOAM export writes a lid-driven cavity case (icoFoam); the ${params.archetype} geometry is not exported yet.`, 'info');
+    }
     window.open(`${apiHost}/api/export/openfoam?name=${safeCaseName}`, '_blank');
   } else {
     alert(`Viewport snapshot captured successfully for case [${params.caseName || 'openzess_simulation'}]!`);

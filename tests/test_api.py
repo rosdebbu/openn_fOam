@@ -110,8 +110,9 @@ def test_openfoam_zip_is_a_complete_runnable_case():
     names = set(zf.namelist())
     for required in ("system/controlDict", "system/fvSchemes", "system/fvSolution",
                      "system/blockMeshDict", "constant/transportProperties",
-                     "0/U", "0/p", "Allrun"):
+                     "0/U", "0/p", "Allrun", "README.txt"):
         assert f"demo/{required}" in names, required
+    assert "lid-driven cavity" in zf.read("demo/README.txt").decode()
     allrun = zf.getinfo("demo/Allrun")
     assert (allrun.external_attr >> 16) & 0o111, "Allrun must be executable"
 
