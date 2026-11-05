@@ -1,5 +1,17 @@
-# Vue 3 + TypeScript + Vite
+# OpenZess Studio — frontend
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Vue 3 + TypeScript + Vite + Three.js. See the repository root `README.md` for
+the full project.
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+```bash
+npm ci            # install exact locked dependencies
+npm run dev       # dev server on :5173 (talks to the backend on 127.0.0.1:8000)
+npm run build     # type-check (vue-tsc) + production bundle in dist/
+```
+
+`python main.py` in the repository root rebuilds `dist/` automatically when
+the sources are newer, then serves it at `http://localhost:8000/studio/`.
+
+Everything the viewport, solver log, residual chart and telemetry show comes
+from solver frames streamed over `/ws/simulate`; nothing is synthesized in the
+browser.

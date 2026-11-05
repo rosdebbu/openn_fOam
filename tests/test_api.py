@@ -131,3 +131,11 @@ def test_snapshot_names_cannot_escape_the_snapshot_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(projects, "SNAPSHOT_DIR", str(tmp_path))
     client.post("/api/projects/save", json={"name": "../../evil", "state": {}})
     assert [p.name for p in tmp_path.iterdir()] == ["______evil.json"]
+
+
+def test_system_endpoint_reports_real_host_figures():
+    info = client.get("/api/system").json()
+    assert info["cpu_count"] and info["cpu_count"] > 0
+    assert 0 < info["disk_used"] <= info["disk_total"]
+    if info["mem_total"] is not None:  # stdlib cannot read RAM everywhere
+        assert info["mem_total"] > 0

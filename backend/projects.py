@@ -61,7 +61,8 @@ def list_projects() -> list:
                 "displayName": payload.get("displayName", fname[:-5]),
                 "savedAt": payload.get("savedAt", ""),
                 "savedAtEpoch": payload.get("savedAtEpoch", 0),
-                "archetype": (payload.get("state") or {}).get("archetype", ""),
+                "archetype": (payload.get("state") or {}).get("archetype")
+                or ((payload.get("state") or {}).get("params") or {}).get("archetype", ""),
             })
         except Exception:
             continue

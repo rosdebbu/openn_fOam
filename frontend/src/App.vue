@@ -35,6 +35,9 @@
           @update:params="updateParams"
           @update:customGeometry="handleCustomGeometry"
           @applyDict="handleApplyDict"
+          @saveProject="handleSaveProject"
+          @loadProject="handleLoadProject"
+          :projectsVersion="projectsVersion"
           @fileUploaded="handleFileUploaded"
           @startSimulation="runNow"
           @closeSidebar="isSidebarOpen = false"
@@ -69,7 +72,7 @@
           <div class="dock-slide-bar" @click="isBottomDockOpen = !isBottomDockOpen">
             <div class="slide-bar-left">
               <span class="slide-icon">{{ isBottomDockOpen ? '▼' : '▲' }}</span>
-              <span class="slide-title">📟 OpenFOAM Solver Log & Telemetry</span>
+              <span class="slide-title">📟 Solver Log & Telemetry</span>
               <div class="mini-metrics" v-if="!isBottomDockOpen">
                 <span class="mini-tag res">Res: {{ latestResidualFormatted }}</span>
                 <span class="mini-tag force">Cd: {{ telemetry.cd.toFixed(3) }}</span>
@@ -108,10 +111,11 @@
             <div v-show="isBottomDockOpen" class="dock-drawer-body">
               <!-- Live OpenFOAM Terminal View -->
               <div v-show="activeDockTab === 'terminal'" class="dock-panel terminal-panel">
-                <OpenFoamTerminal
-                  :archetype="params.archetype"
+                <SolverLog
+                  :entries="solverLog"
                   :isPlaying="isPlaying"
-                  :telemetry="telemetry"
+                  :mode="lastMode"
+                  @clear="solverLog = []"
                 />
               </div>
 
@@ -142,12 +146,13 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import type { SimulationParams, SimulationStepData, SimulationArchetype, SolverMode, AiProviderConfig, AerodynamicTelemetry } from './types/cfd';
 import { getStoredAiConfig } from './utils/aiCopilot';
+import { saveProject, loadProjectState } from './utils/projectStore';
 
 import HeaderNavbar from './components/HeaderNavbar.vue';
 import SidebarControls from './components/SidebarControls.vue';
 import CfdThree3D from './components/CfdThree3D.vue';
 import ResidualChart from './components/ResidualChart.vue';
-import OpenFoamTerminal from './components/OpenFoamTerminal.vue';
+import SolverLog, { type SolverLogEntry } from './components/SolverLog.vue';
 import SettingsModal from './components/SettingsModal.vue';
 
 // Studio Simulation Parameters matching Mockup
@@ -198,22 +203,38 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 const isPlaying = ref(true);
-const isConnected = ref(true);
+const isConnected = ref(false);
 const status = ref<'ready' | 'computing' | 'converged' | 'error'>('computing');
 
-// Real OpenFOAM Telemetry
+// Solver telemetry: zero until the solver reports real values
 const telemetry = reactive<AerodynamicTelemetry>({
-  cd: 0.048,
-  cl: 0.842,
-  l_d: 17.54,
-  courantMax: 0.42,
-  courantMean: 0.08,
-  continuityError: 1.2e-6
+  cd: 0,
+  cl: 0,
+  l_d: 0,
+  courantMax: 0,
+  courantMean: 0,
+  continuityError: 0
 });
 
+function resetTelemetry() {
+  Object.assign(telemetry, { cd: 0, cl: 0, l_d: 0, courantMax: 0, courantMean: 0, continuityError: 0 });
+  delete telemetry.downforce;
+  delete telemetry.thrust;
+  delete telemetry.cavitationIndex;
+}
+
+// Real solver events for the Solver Log panel
+const solverLog = ref<SolverLogEntry[]>([]);
+const lastMode = ref<SolverMode | 'rust_bare_metal'>('cfd');
+
+function pushLog(text: string, type: SolverLogEntry['type'] = 'info') {
+  solverLog.value.push({ time: new Date().toLocaleTimeString(), text, type });
+  if (solverLog.value.length > 300) solverLog.value.splice(0, solverLog.value.length - 300);
+}
+
 const simulationData = ref<SimulationStepData | null>(null);
-const iterations = ref<number[]>([0]);
-const residuals = ref<number[]>([1.0]);
+const iterations = ref<number[]>([]);
+const residuals = ref<number[]>([]);
 
 // Custom Geometry Builder — user-defined obstacle shape/size/position that is
 // sent to the real solver as `obstacleSpec` (the "build your own simulation" path)
@@ -228,7 +249,6 @@ const frameIndex = ref(-1);
 const isScrubbing = ref(false);
 
 let socket: any = null;
-let simInterval: any = null;
 const viewportRef = ref<{ capturePng?: () => boolean } | null>(null);
 
 const latestResidual = computed(() => {
@@ -238,7 +258,7 @@ const latestResidual = computed(() => {
 
 const latestResidualFormatted = computed(() => {
   const res = latestResidual.value;
-  return res !== null ? res.toExponential(2) : '1.0e-5';
+  return res !== null ? res.toExponential(2) : '—';
 });
 
 function setArchetype(arch: SimulationArchetype) {
@@ -263,61 +283,39 @@ function setArchetype(arch: SimulationArchetype) {
     params.studioParams.vorticityAngle = 0.209;
     params.studioParams.vorticityCore = 50;
     params.studioParams.butterscotchCore = 100;
-    telemetry.cd = 0.048;
-    telemetry.cl = 0.842;
-    telemetry.l_d = 17.54;
   } else if (arch === 'cylinder') {
     params.studioParams.irisPurple = 0.35;
     params.studioParams.vorticityAngle = 0.1;
     params.studioParams.vorticityCore = 40;
     params.studioParams.butterscotchCore = 60;
-    telemetry.cd = 1.182;
-    telemetry.cl = 0.421;
-    telemetry.l_d = 0.36;
   } else if (arch === 'venturi') {
     params.studioParams.irisPurple = 0.25;
     params.studioParams.vorticityAngle = 0.0;
     params.studioParams.vorticityCore = 30;
     params.studioParams.butterscotchCore = 50;
-    telemetry.cd = 0.21;
-    telemetry.cl = 0.0;
-    telemetry.l_d = 0.0;
   } else if (arch === 'f1') {
     params.studioParams.irisPurple = 0.85;
     params.studioParams.vorticityAngle = -0.12;
     params.studioParams.vorticityCore = 75;
     params.studioParams.butterscotchCore = 110;
-    telemetry.cd = 0.92;
-    telemetry.cl = -2.85;
-    telemetry.l_d = 3.10;
-    telemetry.downforce = 2450;
   } else if (arch === 'drone') {
     params.studioParams.irisPurple = 0.40;
     params.studioParams.vorticityAngle = -0.45;
     params.studioParams.vorticityCore = 80;
     params.studioParams.butterscotchCore = 70;
-    telemetry.cd = 0.32;
-    telemetry.cl = 1.20;
-    telemetry.l_d = 3.75;
-    telemetry.thrust = 17.65;
   } else if (arch === 'submarine') {
     params.studioParams.irisPurple = 0.38;
     params.studioParams.vorticityAngle = 0.05;
     params.studioParams.vorticityCore = 35;
     params.studioParams.butterscotchCore = 40;
-    telemetry.cd = 0.082;
-    telemetry.cl = 0.015;
-    telemetry.l_d = 0.18;
-    telemetry.cavitationIndex = 11.8;
   } else {
     params.studioParams.irisPurple = 0.182;
     params.studioParams.vorticityAngle = 0.152;
     params.studioParams.vorticityCore = 30;
     params.studioParams.butterscotchCore = 84.899;
-    telemetry.cd = 0.82;
-    telemetry.cl = 0.15;
-    telemetry.l_d = 0.18;
   }
+  // Results come from the solver; never show preset numbers as results
+  resetTelemetry();
 }
 
 function updateParams(newParams: SimulationParams) {
@@ -343,13 +341,51 @@ function handleApplyDict(file: { name: string; path?: string; category?: string;
   restartSimulation();
 }
 
+// Project snapshots: the complete case, so a reload restores it exactly
+const projectsVersion = ref(0);
+
+async function handleSaveProject(name: string) {
+  const result = await saveProject(name, {
+    archetype: params.archetype,
+    params: JSON.parse(JSON.stringify(params)),
+    customGeometry: customGeometry.value,
+    dictOverrides: dictOverrides.value
+  });
+  pushLog(
+    result.backend
+      ? `Saved snapshot "${name}" on the server.`
+      : `Saved snapshot "${name}" in this browser only (server unreachable: ${result.error}).`,
+    result.backend ? 'info' : 'error'
+  );
+  projectsVersion.value++;
+}
+
+async function handleLoadProject(name: string) {
+  const state = await loadProjectState(name) as {
+    params?: Partial<SimulationParams>;
+    customGeometry?: typeof customGeometry.value;
+    dictOverrides?: typeof dictOverrides.value;
+  } | null;
+  if (!state?.params) {
+    pushLog(`Snapshot "${name}" could not be loaded.`, 'error');
+    return;
+  }
+  Object.assign(params, state.params);
+  customGeometry.value = state.customGeometry ?? null;
+  dictOverrides.value = state.dictOverrides ?? {};
+  pushLog(`Loaded snapshot "${name}".`, 'info');
+  restartSimulation();
+}
+
 function handleAiConfigSaved(newConfig: AiProviderConfig) {
   Object.assign(aiConfig, newConfig);
 }
 
 function handleFileUploaded(file: File) {
-  params.archetype = 'cad';
-  console.log('Geometry uploaded:', file.name);
+  // The file is never parsed: say so instead of switching to an empty case
+  pushLog(`CAD import is not implemented: "${file.name}" was not used. Use the Geometry Builder for custom shapes.`, 'error');
+  isBottomDockOpen.value = true;
+  activeDockTab.value = 'terminal';
 }
 
 function triggerLiveSimulation() {
@@ -371,6 +407,7 @@ function triggerLiveSimulation() {
     
     socket.onopen = () => {
       isConnected.value = true;
+      pushLog(`Run started: ${params.archetype}, ${params.solverMode} mode, grid ${params.gridResolution}, Re ${params.reynoldsNumber}`, 'header');
       // Full user physics: everything the user sets in the Case Hub is sent to
       // the real solver — substance, inlet velocity, gravity, temperatures and
       // custom geometry (obstacleSpec) all change the actual computation.
@@ -384,7 +421,8 @@ function triggerLiveSimulation() {
         dt: params.dt,
         substance: params.substance,
         inletVelocity: params.studioParams.irisPurple,
-        hotTemp: params.studioParams.butterscotchCore,
+        // Slider is degrees Celsius; the backend works in Kelvin
+        hotTemp: params.studioParams.butterscotchCore + 273.15,
         naturalForces: params.naturalForces,
         obstacleSpec: customGeometry.value,
         dictOverrides: dictOverrides.value
@@ -395,8 +433,13 @@ function triggerLiveSimulation() {
       try {
         const payload = JSON.parse(event.data);
         if (payload.error) {
-          console.warn('Simulation backend warning:', payload.error);
+          status.value = 'error';
+          pushLog(payload.error, 'error');
           return;
+        }
+        if (payload.mode) lastMode.value = payload.mode;
+        if (payload.mode && payload.mode !== params.solverMode && payload.iteration === 1) {
+          pushLog(`'${params.solverMode}' mode cannot model ${params.archetype}; ran the ${payload.mode} solver instead.`, 'info');
         }
 
         if (payload.iteration !== undefined) {
@@ -411,9 +454,21 @@ function triggerLiveSimulation() {
         if (payload.cavitationIndex !== undefined) telemetry.cavitationIndex = payload.cavitationIndex;
         if (payload.courantMax !== undefined) telemetry.courantMax = payload.courantMax;
         if (payload.continuityError !== undefined) telemetry.continuityError = payload.continuityError;
+        if (payload.cd !== undefined && payload.cl !== undefined) {
+          telemetry.l_d = Math.abs(payload.cd) > 1e-9 ? payload.cl / payload.cd : 0;
+        }
+        if (payload.iteration !== undefined) {
+          pushLog(
+            `iter ${payload.iteration}  residual ${Number(payload.residual).toExponential(2)}  ` +
+            `Co ${Number(payload.courantMax).toFixed(3)}  continuity ${Number(payload.continuityError).toExponential(2)}  ` +
+            `Cd ${Number(payload.cd).toFixed(4)}  Cl ${Number(payload.cl).toFixed(4)}`,
+            'solver'
+          );
+        }
 
         if (payload.u && payload.v && payload.speed) {
           const frame: SimulationStepData = {
+            ...payload,
             iteration: payload.iteration || 1,
             residual: payload.residual || 0.0,
             converged: !!payload.converged,
@@ -436,6 +491,7 @@ function triggerLiveSimulation() {
 
         if (payload.converged) {
           status.value = 'converged';
+          pushLog(`Converged at iteration ${payload.iteration} (residual < 1e-5).`, 'force');
         }
       } catch (err) {
         console.error('WebSocket parse error:', err);
@@ -444,6 +500,8 @@ function triggerLiveSimulation() {
 
     socket.onerror = () => {
       isConnected.value = false;
+      status.value = 'error';
+      pushLog(`Cannot reach the solver at ${wsUrl}. Is the backend running (python main.py)?`, 'error');
     };
 
     socket.onclose = () => {
@@ -490,8 +548,8 @@ function restartSimulation() {
   // Reset convergence history and restart the live stream regardless of the
   // play/pause state. Calling resetSimulation() here would set isPlaying=false
   // and stall triggerLiveSimulation(), so the stream would never restart.
-  iterations.value = [0];
-  residuals.value = [1.0];
+  iterations.value = [];
+  residuals.value = [];
   simulationData.value = null;
   frameHistory.value = [];
   frameIndex.value = -1;
@@ -565,8 +623,8 @@ function fastForward() {
 function resetSimulation() {
   isPlaying.value = false;
   status.value = 'ready';
-  iterations.value = [0];
-  residuals.value = [1.0];
+  iterations.value = [];
+  residuals.value = [];
 }
 
 function takeSnapshot() {
@@ -596,33 +654,13 @@ onMounted(() => {
   // but nothing connected the WebSocket without this call).
   triggerLiveSimulation();
 
-  // Offline fallback ticker — ONLY active when the backend is unreachable.
-  // When the real solver streams data (isConnected), the backend telemetry
-  // wins and this ticker stays quiet so real results are never overridden.
-  simInterval = setInterval(() => {
-    if (isPlaying.value && !isConnected.value) {
-      const lastIter = iterations.value[iterations.value.length - 1] || 0;
-      if (lastIter < 200) {
-        iterations.value.push(lastIter + 5);
-        const lastRes = residuals.value[residuals.value.length - 1] || 1e-3;
-        residuals.value.push(Math.max(1e-13, lastRes * 0.85 * (1 + (Math.random() - 0.5) * 0.1)));
-      }
-
-      // Offline demo force variations with vortex shedding
-      if (params.archetype === 'cylinder') {
-        const t = performance.now() * 0.003;
-        telemetry.cl = Math.sin(t * 2.5) * 0.55;
-        telemetry.cd = 1.18 + Math.abs(Math.sin(t * 5.0)) * 0.08;
-      }
-    }
-  }, 1000);
-
+  // No offline "demo" ticker: when the backend is unreachable the UI says
+  // so (Solver Log) instead of fabricating residuals and forces.
   window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
   if (socket) socket.close();
-  if (simInterval) clearInterval(simInterval);
   window.removeEventListener('keydown', handleKeydown);
 });
 </script>

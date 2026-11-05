@@ -154,7 +154,7 @@
       <div class="probe-hud-card">
         <div class="probe-val-row">
           <span class="probe-val-title">{{ probe.label }}</span>
-          <span class="probe-val-num">{{ probe.value.toFixed(3) }} {{ probe.unit }}</span>
+          <span class="probe-val-num">{{ probe.value === null ? '—' : fmtTick(probe.value) }} {{ probe.value === null ? '' : probe.unit }}</span>
         </div>
         <div class="probe-hud-tag">
           <span>{{ probe.subtext }}</span>
@@ -197,10 +197,10 @@ const probe = ref({
   active: false,
   screenX: 0,
   screenY: 0,
-  value: 0.452,
-  unit: 'm/s',
-  label: 'Velocity |U|',
-  subtext: 'OpenFOAM Point Probe HUD'
+  value: null as number | null,
+  unit: '',
+  label: '',
+  subtext: ''
 });
 
 let scene: THREE.Scene;
@@ -240,49 +240,171 @@ const archetypeBadgeTitle = computed(() => {
     case 'f1': return '🏎️ F1 Front Wing & Ground Effect';
     case 'drone': return '🚁 Quadcopter Rotor Downwash';
     case 'submarine': return '🌊 Submarine Hydrodynamic Hull';
-    case 'cylinder': return '🔴 Von Kármán Vortex Shedding';
-    case 'venturi': return '🚿 Venturi Nozzle Compressible Flow';
-    case 'cavity': return '🌀 3D Lid-Driven Cavity Shear';
+    case 'cylinder': return '🔴 Cylinder in Cross-Flow';
+    case 'venturi': return '🚿 Venturi Nozzle (Incompressible)';
+    case 'cavity': return '🌀 Lid-Driven Cavity (2-D)';
     case 'cad': return '📤 Custom CAD Wind Tunnel';
     case 'plume':
     default: return '💨 Buoyant Thermal Plume';
   }
 });
 
+const FIELD_META: Record<FieldVariable, { title: string; unit: string }> = {
+  U: { title: 'Velocity |U|', unit: '[m/s]' },
+  p: { title: 'Pressure (p - p_ref)', unit: '[Pa]' },
+  T: { title: 'Temperature (T)', unit: '[K]' },
+  omega: { title: 'Vorticity (ω)', unit: '[s⁻¹]' },
+  q_crit: { title: 'Q-Criterion', unit: '[s⁻²]' }
+};
+
+function fmtTick(v: number): string {
+  const a = Math.abs(v);
+  return a !== 0 && (a < 1e-2 || a >= 1e4) ? v.toExponential(2) : v.toFixed(3);
+}
+
+// Colorbar ticks are the actual min / mid / max of the displayed field
 const colorbarData = computed(() => {
-  const f = activeField.value;
-  if (f === 'p') {
-    return { title: 'Pressure (p)', unit: '[Pa]', maxVal: '+1.42e+02', midVal: '0.00e+00', minVal: '-8.50e+01' };
-  } else if (f === 'T') {
-    return { title: 'Temperature (T)', unit: '[K]', maxVal: '358.15', midVal: '325.65', minVal: '293.15' };
-  } else if (f === 'omega') {
-    return { title: 'Vorticity (ω)', unit: '[s⁻¹]', maxVal: '45.0', midVal: '22.5', minVal: '0.0' };
-  } else if (f === 'q_crit') {
-    return { title: 'Q-Criterion', unit: '[s⁻²]', maxVal: '+8.0e+02', midVal: '0.0', minVal: '-2.0e+02' };
+  const meta = { ...FIELD_META[activeField.value] };
+  if (activeField.value === 'T' && props.data?.scalarName && props.data.scalarName !== 'T') {
+    meta.title = props.data.scalarName === 'alpha.heavy' ? 'Heavy-fluid fraction (α)' : 'Passive tracer';
+    meta.unit = '[-]';
   }
-  return { title: 'Velocity |U|', unit: '[m/s]', maxVal: '1.820', midVal: '0.910', minVal: '0.000' };
+  const range = fieldRange.value;
+  if (!range) {
+    const why = props.data ? 'not computed for this case' : 'waiting for solver data';
+    return { ...meta, maxVal: '—', midVal: why, minVal: '—' };
+  }
+  return {
+    ...meta,
+    maxVal: fmtTick(range.max),
+    midVal: fmtTick((range.min + range.max) / 2),
+    minVal: fmtTick(range.min)
+  };
 });
 
 const probeNormalizedPos = computed(() => {
   const val = probe.value.value;
-  return Math.max(0, Math.min(100, (val / 1.82) * 100));
+  const range = fieldRange.value;
+  if (val === null || !range) return 0;
+  return Math.max(0, Math.min(100, ((val - range.min) / ((range.max - range.min) || 1)) * 100));
 });
 
 // Min/max of the active scalar field from the live CFD solution, used to
 // normalize colormap values on the cutplanes.
+// ---------------------------------------------------------------------------
+// Live solver data on the viewport
+// The 2-D domain [0,lx] x [0,ly] is drawn in the XY plane (z = 0), centred on
+// the origin with ONE uniform scale (no distortion); bodies are extruded
+// along z (span). Everything sampled below is real solver output.
+// ---------------------------------------------------------------------------
+const VIEW_W = 3.6;
+const VIEW_H = 2.2;
+const SPAN = 1.6;
+let lastMask: boolean[][] | null = null;
+
+const domain = computed(() => {
+  const d = props.data;
+  if (!d || !d.u?.length || !d.u[0]?.length) return null;
+  const nx = d.u.length;
+  const ny = d.u[0].length;
+  const lx = (d.dx ?? 1 / nx) * nx;
+  const ly = (d.dy ?? 1 / ny) * ny;
+  const scale = Math.min(VIEW_W / lx, VIEW_H / ly);
+  return { nx, ny, W: lx * scale, H: ly * scale };
+});
+
+const isClosedCase = computed(() => ['cavity', 'water_dam'].includes(props.params.archetype));
+
+function clamp(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+// Continuous cell-index coordinates (cell centres sit at k + 0.5)
+function toCell(x: number, y: number) {
+  const dom = domain.value!;
+  return {
+    ci: ((x + dom.W / 2) / dom.W) * dom.nx - 0.5,
+    cj: ((y + dom.H / 2) / dom.H) * dom.ny - 0.5
+  };
+}
+
+function inDomain(x: number, y: number): boolean {
+  const dom = domain.value;
+  return !!dom && Math.abs(x) <= dom.W / 2 && Math.abs(y) <= dom.H / 2;
+}
+
+function isSolidAt(x: number, y: number): boolean {
+  if (!lastMask || !domain.value) return false;
+  const { ci, cj } = toCell(x, y);
+  const i = clamp(Math.round(ci), 0, domain.value.nx - 1);
+  const j = clamp(Math.round(cj), 0, domain.value.ny - 1);
+  return !!lastMask[i]?.[j];
+}
+
+// Bilinear interpolation between cell centres
+function sampleField(field: number[][], x: number, y: number): number {
+  const dom = domain.value!;
+  const { ci, cj } = toCell(x, y);
+  const i0 = clamp(Math.floor(ci), 0, dom.nx - 1);
+  const j0 = clamp(Math.floor(cj), 0, dom.ny - 1);
+  const i1 = Math.min(i0 + 1, dom.nx - 1);
+  const j1 = Math.min(j0 + 1, dom.ny - 1);
+  const ti = clamp(ci - i0, 0, 1);
+  const tj = clamp(cj - j0, 0, 1);
+  const a = field[i0][j0] * (1 - ti) + field[i1][j0] * ti;
+  const b = field[i0][j1] * (1 - ti) + field[i1][j1] * ti;
+  return a * (1 - tj) + b * tj;
+}
+
+// Fields derived from the live frame: pressure in Pa (solver p is kinematic),
+// vorticity and Q-criterion from central differences of (u, v).
+const derivedFields = computed(() => {
+  const d = props.data;
+  const dom = domain.value;
+  if (!d || !dom) return null;
+  const { nx, ny } = dom;
+  const dx = d.dx ?? 1 / nx;
+  const dy = d.dy ?? 1 / ny;
+  const u = d.u;
+  const v = d.v;
+  const omega: number[][] = Array.from({ length: nx }, () => new Array(ny).fill(0));
+  const q: number[][] = Array.from({ length: nx }, () => new Array(ny).fill(0));
+  for (let i = 1; i < nx - 1; i++) {
+    for (let j = 1; j < ny - 1; j++) {
+      const ux = (u[i + 1][j] - u[i - 1][j]) / (2 * dx);
+      const uy = (u[i][j + 1] - u[i][j - 1]) / (2 * dy);
+      const vx = (v[i + 1][j] - v[i - 1][j]) / (2 * dx);
+      const vy = (v[i][j + 1] - v[i][j - 1]) / (2 * dy);
+      omega[i][j] = vx - uy;
+      q[i][j] = -0.5 * (ux * ux + vy * vy) - uy * vx; // Q = (|Ω|² - |S|²) / 2
+    }
+  }
+  const rho = d.rho ?? 1;
+  return {
+    U: d.speed,
+    p: d.p.map(row => row.map(val => val * rho)),
+    T: d.scalar ?? null,
+    omega,
+    q_crit: q
+  } as Record<FieldVariable, number[][] | null>;
+});
+
+// Min/max of the active field over FLUID cells only
 const fieldRange = computed(() => {
-  const data = props.data;
-  if (!data || !data.speed || !data.p || !data.speed.length) return null;
-  const field = activeField.value === 'p' ? data.p : data.speed;
+  const fields = derivedFields.value;
+  const field = fields?.[activeField.value];
+  if (!field) return null;
   let minVal = Infinity;
   let maxVal = -Infinity;
-  for (const row of field) {
-    for (const val of row) {
+  for (let i = 0; i < field.length; i++) {
+    for (let j = 0; j < field[i].length; j++) {
+      if (lastMask?.[i]?.[j]) continue;
+      const val = field[i][j];
       if (val < minVal) minVal = val;
       if (val > maxVal) maxVal = val;
     }
   }
-  return { min: minVal, max: maxVal };
+  return Number.isFinite(minVal) ? { min: minVal, max: maxVal } : null;
 });
 
 function onFieldChange(field: FieldVariable) {
@@ -368,8 +490,41 @@ function clearGroup(g: THREE.Group) {
   }
 }
 
+// The body the solver actually simulated: every solid cell of the obstacle
+// mask, extruded along the span. Exact position, size and angle of attack.
+function buildSimulatedGeometry(): boolean {
+  const dom = domain.value;
+  if (!lastMask || !dom) return false;
+  const cells: Array<[number, number]> = [];
+  for (let i = 0; i < dom.nx; i++) {
+    for (let j = 0; j < dom.ny; j++) {
+      if (lastMask[i]?.[j]) cells.push([i, j]);
+    }
+  }
+  if (cells.length === 0) return true; // no solid body in this case
+  const cw = dom.W / dom.nx;
+  const ch = dom.H / dom.ny;
+  const mesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(cw, ch, SPAN),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.6, roughness: 0.35 }),
+    cells.length
+  );
+  const dummy = new THREE.Object3D();
+  cells.forEach(([i, j], k) => {
+    dummy.position.set(-dom.W / 2 + (i + 0.5) * cw, -dom.H / 2 + (j + 0.5) * ch, 0);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(k, dummy.matrix);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  geometryGroup.add(mesh);
+  return true;
+}
+
 function buildActiveArchetype() {
   clearGroup(geometryGroup);
+  // Once the solver has sent its obstacle mask, show the real geometry; the
+  // stylised models below are only a placeholder before the first frame.
+  if (buildSimulatedGeometry()) return;
 
   const arch = props.params.archetype || 'plume';
   const vorticityAngle = props.params.studioParams?.vorticityAngle ?? 0.152;
@@ -581,78 +736,15 @@ function buildActiveArchetype() {
 }
 
 // 4th-Order Runge-Kutta (RK4) Velocity Field Vector Evaluation
-function evaluateVelocityField(x: number, y: number, z: number): [number, number, number] {
-  const arch = props.params.archetype || 'plume';
-  const iris = props.params.studioParams?.irisPurple ?? 0.182;
-  const vorticityAngle = props.params.studioParams?.vorticityAngle ?? 0.152;
-
-  let vx = 1.0;
-  let vy = 0.0;
-  let vz = 0.0;
-
-  if (arch === 'airfoil') {
-    const dist = Math.sqrt(x * x + y * y);
-    if (dist < 1.6) {
-      const circulation = vorticityAngle * 3.2;
-      vy = -(x / (dist * dist + 0.12)) * circulation * 0.45;
-      vx = 1.0 + (1.2 - Math.abs(y)) * 0.65;
-    }
-  } else if (arch === 'f1') {
-    // 🏎️ F1 Ground Effect Downforce & Upwash
-    const dist = Math.sqrt(x * x + Math.pow(y + 0.3, 2));
-    if (dist < 1.8) {
-      vy = 0.55 * Math.sin((x + 1.0) * 1.8) * Math.exp(-Math.abs(y + 0.3) * 2.0);
-      vx = (y < -0.3 ? 1.6 : 1.1) + 0.3 * Math.exp(-dist);
-    }
-  } else if (arch === 'drone') {
-    // 🚁 Quadcopter Rotor Downwash Jet
-    const rRotor = Math.sqrt(x * x + z * z);
-    if (rRotor < 1.3 && y < 0.2) {
-      vy = -1.8 * Math.exp(-Math.pow(rRotor / 0.85, 2));
-      vx = -x * 0.4 * Math.exp(-rRotor);
-      vz = -z * 0.4 * Math.exp(-rRotor);
-    }
-  } else if (arch === 'submarine') {
-    // 🌊 Submarine Axisymmetric Streamlines & Wake
-    const rHull = Math.sqrt(y * y + z * z);
-    if (rHull < 1.2 && Math.abs(x) < 2.0) {
-      vx = 1.0 + (x < 1.2 ? (0.45 - rHull) * 0.5 : -0.4 * Math.exp(-rHull * 3.0));
-      vy = (y / (rHull + 0.05)) * (0.35 - rHull) * 0.3;
-      vz = (z / (rHull + 0.05)) * (0.35 - rHull) * 0.3;
-    }
-  } else if (arch === 'cylinder') {
-    const dx = x - (-0.8);
-    const dy = y - 0.0;
-    const r2 = dx * dx + dy * dy;
-    const a2 = 0.35 * 0.35;
-    if (r2 > a2) {
-      vx = 1.0 - a2 * (dx * dx - dy * dy) / (r2 * r2);
-      vy = -a2 * (2 * dx * dy) / (r2 * r2) + (x > -0.4 ? Math.sin(x * 5 + performance.now() * 0.003) * 0.4 : 0);
-    }
-  } else if (arch === 'venturi') {
-    const throatFactor = Math.exp(-Math.pow(x, 2) / 0.6);
-    vx = 1.0 + throatFactor * 2.2;
-    vy = -x * throatFactor * 0.5 * (y / 0.85);
-  } else if (arch === 'cavity') {
-    vx = -y * 1.3;
-    vy = x * 1.3;
-  } else {
-    // Thermal Plume / Atmospheric Convection
-    const dist = Math.sqrt(y * y + z * z);
-    const spread = (0.2 + (x + 2.2) * 0.35) * (0.8 + iris * 1.5);
-    vx = 1.2 * Math.exp(-Math.pow(dist / spread, 2));
-    vz = 0.4 * Math.exp(-Math.pow(dist / spread, 2));
-  }
-
-  // Natural Forces Coupling (Gravity & Buoyancy)
-  const gy = props.params.naturalForces?.gravity?.[1] ?? -9.81;
-  const temp = props.params.naturalForces?.ambientTemp ?? 293.15;
-  const buoyancy = (temp - 293.15) * 0.008; // Thermal expansion lift
-  const gravityAcc = (gy / 9.81) * 0.12;     // Downward acceleration
-
-  vy += gravityAcc + buoyancy;
-
-  return [vx, vy, vz];
+// Velocity for particles/glyphs in viewport units: real (u, v) / U_ref.
+// Before any solver frame exists, particles simply drift with a uniform
+// placeholder stream — no invented per-archetype flow fields.
+function evaluateVelocityField(x: number, y: number, _z: number): [number, number, number] {
+  const d = props.data;
+  if (!d || !domain.value) return [1.0, 0.0, 0.0];
+  if (!inDomain(x, y) || isSolidAt(x, y)) return [0.0, 0.0, 0.0];
+  const uRef = Math.max(props.params.studioParams?.irisPurple ?? 1, 1e-3);
+  return [sampleField(d.u, x, y) / uRef, sampleField(d.v, x, y) / uRef, 0.0];
 }
 
 function initRK4Particles() {
@@ -684,9 +776,13 @@ function initRK4Particles() {
 }
 
 function respawnParticle(i: number, randomX = false) {
-  const x = randomX ? -2.2 + Math.random() * 4.4 : -2.2;
-  const y = (Math.random() - 0.5) * 2.2;
-  const z = (Math.random() - 0.5) * 1.6;
+  const dom = domain.value;
+  const W = dom?.W ?? 4.4;
+  const H = dom?.H ?? 2.2;
+  // Open channels are seeded at the inlet; sealed boxes anywhere inside
+  const x = randomX || isClosedCase.value ? (Math.random() - 0.5) * W : -W / 2;
+  const y = (Math.random() - 0.5) * H;
+  const z = (Math.random() - 0.5) * SPAN;
 
   particlePositions[i * 3] = x;
   particlePositions[i * 3 + 1] = y;
@@ -699,11 +795,17 @@ function respawnParticle(i: number, randomX = false) {
   particleVelocities[i * 3 + 1] = vy;
   particleVelocities[i * 3 + 2] = vz;
 
-  const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-  const [r, g, b] = getColormapRgb(speed / 2.2, activeColormap.value);
+  const [r, g, b] = getColormapRgb(particleColorValue(vx, vy, vz), activeColormap.value);
   particleColors[i * 3] = r;
   particleColors[i * 3 + 1] = g;
   particleColors[i * 3 + 2] = b;
+}
+
+// Colour particles by |U| relative to the fastest fluid cell of the frame
+function particleColorValue(vx: number, vy: number, vz: number): number {
+  const uRef = Math.max(props.params.studioParams?.irisPurple ?? 1, 1e-3);
+  const uMax = Math.max(props.data?.uMax ?? uRef, 1e-6);
+  return (Math.sqrt(vx * vx + vy * vy + vz * vz) * uRef) / uMax;
 }
 
 function updateRK4Particles(dt = 0.02) {
@@ -730,15 +832,16 @@ function updateRK4Particles(dt = 0.02) {
     particleLifespans[i] -= 1;
 
     // Check bounds or lifespan expiry
-    if (px > 2.4 || px < -2.4 || py > 1.8 || py < -1.8 || pz > 1.8 || pz < -1.8 || particleLifespans[i] <= 0) {
+    const halfW = (domain.value?.W ?? 4.4) / 2 + 0.05;
+    const halfH = (domain.value?.H ?? 2.2) / 2 + 0.05;
+    if (Math.abs(px) > halfW || Math.abs(py) > halfH || Math.abs(pz) > SPAN || particleLifespans[i] <= 0) {
       respawnParticle(i, false);
     } else {
       particlePositions[i * 3] = px;
       particlePositions[i * 3 + 1] = py;
       particlePositions[i * 3 + 2] = pz;
 
-      const speed = Math.sqrt(k1x * k1x + k1y * k1y + k1z * k1z);
-      const [r, g, b] = getColormapRgb(speed / 2.2, activeColormap.value);
+      const [r, g, b] = getColormapRgb(particleColorValue(k1x, k1y, k1z), activeColormap.value);
       particleColors[i * 3] = r;
       particleColors[i * 3 + 1] = g;
       particleColors[i * 3 + 2] = b;
@@ -751,130 +854,87 @@ function updateRK4Particles(dt = 0.02) {
 
 function buildVectorGlyphs() {
   clearGroup(glyphsGroup);
+  const dom = domain.value;
+  if (!dom) return;
 
   const coneGeom = new THREE.ConeGeometry(0.025, 0.1, 8);
   coneGeom.rotateX(Math.PI / 2);
-
   const coneMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-  const instancedMesh = new THREE.InstancedMesh(coneGeom, coneMat, 200);
-
+  const nGx = 14;
+  const nGy = Math.max(4, Math.round((nGx * dom.H) / dom.W));
+  const instancedMesh = new THREE.InstancedMesh(coneGeom, coneMat, nGx * nGy);
   const dummy = new THREE.Object3D();
   let count = 0;
 
-  for (let x = -2.0; x <= 2.0; x += 0.4) {
-    for (let y = -1.0; y <= 1.0; y += 0.4) {
-      if (count >= 200) break;
+  for (let a = 0; a < nGx; a++) {
+    for (let b = 0; b < nGy; b++) {
+      const x = -dom.W / 2 + ((a + 0.5) / nGx) * dom.W;
+      const y = -dom.H / 2 + ((b + 0.5) / nGy) * dom.H;
       const [vx, vy, vz] = evaluateVelocityField(x, y, 0);
       const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-
+      if (speed < 1e-6) continue; // solid cell or stagnant
       dummy.position.set(x, y, 0);
-      dummy.scale.set(speed * 0.8, speed * 0.8, speed * 0.8);
+      dummy.scale.setScalar(Math.min(speed, 2.5) * 0.8);
       dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(vx, vy, vz).normalize());
       dummy.updateMatrix();
-
-      instancedMesh.setMatrixAt(count, dummy.matrix);
-      count++;
+      instancedMesh.setMatrixAt(count++, dummy.matrix);
     }
   }
-
+  instancedMesh.count = count;
   instancedMesh.instanceMatrix.needsUpdate = true;
   glyphsGroup.add(instancedMesh);
 }
 
 function buildCutplanes() {
   clearGroup(cutplanesGroup);
+  const dom = domain.value;
+  const W = dom?.W ?? VIEW_W;
+  const H = dom?.H ?? VIEW_H;
+  const segX = dom ? Math.min(dom.nx * 2, 256) : 80;
+  const segY = dom ? Math.min(dom.ny * 2, 256) : 50;
 
-  // Horizontal Cutplane (XY)
-  const geomXY = new THREE.PlaneGeometry(3.6, 2.2, 80, 50);
+  // Section plane (XY, z = 0): the simulated 2-D domain itself
+  const geomXY = new THREE.PlaneGeometry(W, H, segX, segY);
   const colorsXY: number[] = [];
   const posXY = geomXY.attributes.position;
-
   for (let i = 0; i < posXY.count; i++) {
-    const x = posXY.getX(i);
-    const y = posXY.getY(i);
-    const [vx, vy, vz] = evaluateVelocityField(x, y, 0);
-    const val = getScalarFieldValue(x, y, 0, vx, vy, vz);
-    const [r, g, b] = getColormapRgb(val, activeColormap.value);
-    colorsXY.push(r, g, b);
+    colorsXY.push(...cutplaneColor(posXY.getX(i), posXY.getY(i)));
   }
   geomXY.setAttribute('color', new THREE.Float32BufferAttribute(colorsXY, 3));
-
-  const matXY = new THREE.MeshBasicMaterial({
-    vertexColors: true,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.92
-  });
-  cutplaneXY = new THREE.Mesh(geomXY, matXY);
-  cutplaneXY.position.set(0, 0, 0);
-  cutplaneXY.rotation.x = -Math.PI / 2;
+  cutplaneXY = new THREE.Mesh(geomXY, new THREE.MeshBasicMaterial({
+    vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.92
+  }));
   cutplanesGroup.add(cutplaneXY);
 
-  // Vertical Cutplane (XZ)
-  const geomXZ = new THREE.PlaneGeometry(3.6, 1.8, 80, 40);
+  // Spanwise slice (XZ at mid-height): the extruded 2-D solution is
+  // z-invariant, so it shows the mid-height row across the span.
+  const geomXZ = new THREE.PlaneGeometry(W, SPAN, segX, 8);
   const colorsXZ: number[] = [];
   const posXZ = geomXZ.attributes.position;
-
   for (let i = 0; i < posXZ.count; i++) {
-    const x = posXZ.getX(i);
-    const z = posXZ.getY(i);
-    const [vx, vy, vz] = evaluateVelocityField(x, 0, z);
-    const val = getScalarFieldValue(x, 0, z, vx, vy, vz);
-    const [r, g, b] = getColormapRgb(val, activeColormap.value);
-    colorsXZ.push(r, g, b);
+    colorsXZ.push(...cutplaneColor(posXZ.getX(i), 0));
   }
   geomXZ.setAttribute('color', new THREE.Float32BufferAttribute(colorsXZ, 3));
-
-  const matXZ = new THREE.MeshBasicMaterial({
-    vertexColors: true,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.92
-  });
-  cutplaneXZ = new THREE.Mesh(geomXZ, matXZ);
-  cutplaneXZ.position.set(0, 0, 0);
+  cutplaneXZ = new THREE.Mesh(geomXZ, new THREE.MeshBasicMaterial({
+    vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.55
+  }));
+  cutplaneXZ.rotation.x = -Math.PI / 2;
   cutplanesGroup.add(cutplaneXZ);
 }
 
-function getScalarFieldValue(x: number, y: number, z: number, vx: number, vy: number, vz: number): number {
-  const f = activeField.value;
-  const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+function cutplaneColor(x: number, y: number): [number, number, number] {
+  const val = getScalarFieldValue(x, y);
+  if (val === null) return [0.22, 0.22, 0.26]; // solid body / no data
+  return getColormapRgb(val, activeColormap.value);
+}
 
-  // Prefer the live CFD solution received via props.data when a simulation
-  // frame is available; fall back to the analytical approximation otherwise.
-  const data = props.data;
+// Normalized [0, 1] value of the active field, or null for solid cells,
+// points outside the domain, fields this case does not compute, or no data.
+function getScalarFieldValue(x: number, y: number): number | null {
+  const field = derivedFields.value?.[activeField.value];
   const range = fieldRange.value;
-  if (data && data.speed && data.p && data.speed.length && range) {
-    const nx = data.speed.length;
-    const ny = data.speed[0].length;
-    // Map viewport cutplane extents (x: -1.8..1.8, y: -1.1..1.1) to grid indices
-    const fx = (x + 1.8) / 3.6;
-    const fy = (y + 1.1) / 2.2;
-    if (fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1) {
-      const i = Math.min(nx - 1, Math.max(0, Math.round(fx * (nx - 1))));
-      const j = Math.min(ny - 1, Math.max(0, Math.round(fy * (ny - 1))));
-      const value = f === 'p' ? data.p[i][j] : data.speed[i][j];
-      return Math.max(0, Math.min(1, (value - range.min) / ((range.max - range.min) || 1)));
-    }
-  }
-
-  if (f === 'p') {
-    // Bernoulli pressure relation: p = p0 - 0.5 * rho * |U|^2
-    return Math.max(0, Math.min(1, 1.0 - (speed * speed) / 4.0));
-  } else if (f === 'T') {
-    const dist = Math.sqrt(y * y + z * z);
-    return Math.max(0, Math.min(1, Math.exp(-dist * 2.0) * Math.exp(-Math.pow(x + 0.8, 2) / 3.0)));
-  } else if (f === 'omega') {
-    // Vorticity magnitude
-    const dist = Math.sqrt(x * x + y * y);
-    return Math.max(0, Math.min(1, (1.2 / (dist + 0.2)) * 0.4));
-  } else if (f === 'q_crit') {
-    // Q-Criterion
-    return Math.max(0, Math.min(1, Math.sin(x * 4) * Math.cos(y * 4) * 0.5 + 0.5));
-  }
-
-  // Velocity Magnitude |U|
-  return Math.max(0, Math.min(1, speed / 2.2));
+  if (!field || !range || !inDomain(x, y) || isSolidAt(x, y)) return null;
+  return clamp((sampleField(field, x, y) - range.min) / ((range.max - range.min) || 1), 0, 1);
 }
 
 function buildProbeMarker() {
@@ -958,30 +1018,28 @@ function onMouseMove(e: MouseEvent) {
       probe.value.screenX = e.clientX - rect.left;
       probe.value.screenY = e.clientY - rect.top;
 
-      const [vx, vy, vz] = evaluateVelocityField(hit.point.x, hit.point.y, hit.point.z);
-      const f = activeField.value;
-
-      if (f === 'p') {
-        const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-        probe.value.value = (101325 - 0.5 * 1.225 * speed * speed * 100);
-        probe.value.unit = 'Pa';
-        probe.value.label = 'Pressure (p)';
-      } else if (f === 'T') {
-        probe.value.value = 293.15 + (hit.point.length() < 1.0 ? 64.9 : 5.0);
-        probe.value.unit = 'K';
-        probe.value.label = 'Temperature (T)';
-      } else if (f === 'omega') {
-        probe.value.value = 14.8;
-        probe.value.unit = 's⁻¹';
-        probe.value.label = 'Vorticity (ω)';
+      // Hit point in the domain's frame (mainGroup is rotated by the user)
+      const local = mainGroup.worldToLocal(hit.point.clone());
+      const meta = colorbarData.value;
+      const field = derivedFields.value?.[activeField.value];
+      probe.value.label = meta.title;
+      probe.value.unit = meta.unit.replace(/[\[\]]/g, '');
+      if (!props.data || !domain.value) {
+        probe.value.value = null;
+        probe.value.subtext = 'No solver data yet';
+      } else if (!inDomain(local.x, local.y)) {
+        probe.value.value = null;
+        probe.value.subtext = 'Outside the simulated domain';
+      } else if (isSolidAt(local.x, local.y)) {
+        probe.value.value = null;
+        probe.value.subtext = 'Solid body';
+      } else if (!field) {
+        probe.value.value = null;
+        probe.value.subtext = 'Field not computed for this case';
       } else {
-        const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-        probe.value.value = speed * (props.params.studioParams.irisPurple * 2.5);
-        probe.value.unit = 'm/s';
-        probe.value.label = 'Velocity |U|';
+        probe.value.value = sampleField(field, local.x, local.y);
+        probe.value.subtext = `${props.params.archetype.toUpperCase()} probe · iteration ${props.data.iteration}`;
       }
-
-      probe.value.subtext = `${props.params.archetype.toUpperCase()} point probe`;
 
       if (probeMarker) {
         probeMarker.position.copy(hit.point);
@@ -1041,20 +1099,33 @@ function handleResize() {
   renderer.setSize(width, height);
 }
 
+// A new case invalidates the previous run's geometry
+watch(() => props.params.archetype, () => {
+  lastMask = null;
+});
+
 watch(() => [props.params.archetype, props.params.studioParams, activeColormap.value], () => {
   buildActiveArchetype();
   buildCutplanes();
   buildVectorGlyphs();
 }, { deep: true });
 
-// Rebuild cutplanes when new live simulation frames arrive (throttled so a
-// fast WebSocket frame stream does not thrash geometry allocation).
+// New solver frames: refresh the geometry when a mask arrives (first/last
+// frame only) and the cut-planes/glyphs (throttled so a fast WebSocket
+// stream does not thrash geometry allocation).
 let lastCutplaneRebuild = 0;
-watch(() => props.data?.iteration, () => {
+watch(() => props.data, (frame) => {
+  if (frame?.obstacleMask) {
+    lastMask = frame.obstacleMask;
+    buildActiveArchetype();
+  } else if (!frame) {
+    lastMask = null;
+  }
   const now = performance.now();
-  if (now - lastCutplaneRebuild > 100) {
+  if (now - lastCutplaneRebuild > 100 || frame?.converged) {
     lastCutplaneRebuild = now;
     buildCutplanes();
+    buildVectorGlyphs();
   }
 });
 

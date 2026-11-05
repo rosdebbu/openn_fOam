@@ -327,7 +327,7 @@
           <div class="card-header">
             <div class="card-title-row">
               <span class="card-title">CAD / Mesh Upload</span>
-              <span class="token-tag">STL / OBJ / STEP</span>
+              <span class="token-tag">Not implemented</span>
             </div>
           </div>
 
@@ -355,9 +355,9 @@
                   <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
               </div>
-              <span class="dropzone-title">Upload Custom CAD Solid</span>
-              <span class="dropzone-sub">Drop .stl / .obj or click to browse</span>
-              <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }}</span>
+              <span class="dropzone-title">CAD import is not implemented yet</span>
+              <span class="dropzone-sub">The 2-D solver cannot read mesh files. Use the Geometry Builder above to place a custom shape.</span>
+              <span v-if="uploadedFileName" class="uploaded-badge">📎 {{ uploadedFileName }} — not used</span>
             </div>
           </div>
         </div>
@@ -478,10 +478,34 @@
                 v-model="caseNameInput"
                 class="case-name-input"
                 placeholder="e.g. Submarine_HighSpeed_Recon"
-                @blur="handleSaveCaseName"
                 @keyup.enter="handleSaveCaseName"
               />
               <button class="save-name-btn" @click="handleSaveCaseName">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Saved Snapshots Card -->
+        <div class="hub-card history-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <span class="card-title">Saved Snapshots</span>
+              <span class="token-tag">{{ savedProjects.length }} saved</span>
+            </div>
+          </div>
+          <div class="changelog-list">
+            <div v-if="savedProjects.length === 0" class="changelog-entry">
+              <div class="entry-desc">Nothing saved yet. "Save" stores the full case: physics, geometry and dictionary edits.</div>
+            </div>
+            <div v-for="proj in savedProjects" :key="proj.name" class="changelog-entry">
+              <div class="entry-header">
+                <span class="badge-source manual">{{ proj.archetype || 'case' }}</span>
+                <span class="entry-time">{{ proj.savedAt }}</span>
+              </div>
+              <div class="entry-desc">
+                {{ proj.displayName }}
+                <button class="save-name-btn" @click="emit('loadProject', proj.name)">Load</button>
+              </div>
             </div>
           </div>
         </div>
@@ -613,7 +637,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick } from 'vue';
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue';
 import type {
   SimulationParams,
   SimulationArchetype,
@@ -623,11 +647,13 @@ import type {
   FluidProperties
 } from '../types/cfd';
 import { queryAiCopilot } from '../utils/aiCopilot';
+import { fetchProjects, type SavedProjectMeta } from '../utils/projectStore';
 
 const props = defineProps<{
   params: SimulationParams;
   aiConfig: AiProviderConfig;
   isComputing?: boolean;
+  projectsVersion?: number;
 }>();
 
 const emit = defineEmits<{
@@ -637,7 +663,17 @@ const emit = defineEmits<{
   (e: 'closeSidebar'): void;
   (e: 'update:customGeometry', spec: { shape: string; cx: number; cy: number; size: number; aoa: number } | null): void;
   (e: 'applyDict', file: OpenFoamDictFile): void;
+  (e: 'saveProject', name: string): void;
+  (e: 'loadProject', name: string): void;
 }>();
+
+// Saved snapshots (backend/saved_projects, or localStorage when offline)
+const savedProjects = ref<SavedProjectMeta[]>([]);
+async function refreshSavedProjects() {
+  savedProjects.value = (await fetchProjects()).projects;
+}
+onMounted(refreshSavedProjects);
+watch(() => props.projectsVersion, refreshSavedProjects);
 
 const activeMode = ref<'manual' | 'ai'>('manual');
 const activeSubTab = ref<'physics' | 'geometry' | 'files' | 'changelog'>('physics');
@@ -726,7 +762,8 @@ function handleSaveCaseName() {
   caseNameInput.value = safe;
   const updated = { ...props.params, caseName: safe };
   emit('update:params', updated);
-  logChange('Manual', `Renamed simulation case to "${safe}"`);
+  emit('saveProject', safe);
+  logChange('Manual', `Saved snapshot "${safe}" (physics, geometry and dictionary edits)`);
 }
 
 function downloadCasePackage() {
@@ -800,12 +837,10 @@ const aiStatusBadge = computed(() => {
   return props.aiConfig.model;
 });
 
+// Switches the sidebar panel only. (It used to also change the solver
+// engine, so opening the chat silently swapped the physics for the preview.)
 function setMode(mode: 'manual' | 'ai') {
   activeMode.value = mode;
-  emit('update:params', {
-    ...props.params,
-    solverMode: mode === 'ai' ? 'ai' : 'cfd'
-  });
 }
 
 function selectSubstance(sub: FluidProperties) {
@@ -839,17 +874,20 @@ function emitParamsChange() {
   });
 }
 
+// Reports only what is actually computed here: the inlet-based Courant
+// number of the requested dt. (The solver also enforces CFL <= 0.4 and the
+// explicit-diffusion limit on every step, whatever dt is requested.)
 function runCaseDiagnostics() {
   const courant = (studioParams.irisPurple * props.params.dt) / (1.0 / props.params.gridResolution);
-  if (courant > 1.0) {
+  if (courant > 0.4) {
     diagReport.value = {
       type: 'warn',
-      message: `⚠️ Courant number Co = ${courant.toFixed(2)} > 1.0! Auto-reduced dt to prevent numerical divergence.`
+      message: `⚠️ Requested dt gives Co = ${courant.toFixed(2)} at the inlet speed; the solver will cap each step at Co = 0.4, so it runs with a smaller dt than requested.`
     };
   } else {
     diagReport.value = {
       type: 'success',
-      message: `✅ All OpenFOAM checks passed: Co = ${courant.toFixed(2)} ≤ 1.0, Poisson matrix symmetric positive definite, boundary flux conservative.`
+      message: `✅ Requested dt gives Co = ${courant.toFixed(2)} ≤ 0.4 at the inlet speed. (Only the Courant number is checked here.)`
     };
   }
 }

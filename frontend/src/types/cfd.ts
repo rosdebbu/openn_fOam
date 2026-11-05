@@ -109,6 +109,12 @@ export interface SimulationStepData {
   courantMax?: number;
   continuityError?: number;
   obstacleMask?: boolean[][];
+  dx?: number;               // cell size [m]; domain = nx*dx by ny*dy
+  dy?: number;
+  rho?: number;              // fluid density [kg/m^3] (p is kinematic, p*rho = Pa)
+  scalar?: number[][];       // transported scalar (T [K], heavy fraction, tracer)
+  scalarName?: string;
+  scalarUnit?: string;
 }
 
 export interface OpenFoamDictFile {

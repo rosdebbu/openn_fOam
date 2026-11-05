@@ -12,6 +12,8 @@ import numpy as np
 import os
 import json
 import re
+import shutil
+import sys
 
 def sanitize_case_name(name: str) -> str:
     """Sanitize custom simulation name to ensure valid filesystem and OpenFOAM directory conventions."""
@@ -129,6 +131,52 @@ def health_check():
             "rust": f"Rust Rayon sidecar ({'online' if rust_live else 'offline - Python fallback'})"
         },
         "features": ["Hybrid Rust+Python", "VTK Export", "OpenFOAM case export", "Three.js 3D", "Instant potential-flow preview"]
+    }
+
+
+def _memory_bytes():
+    """(total, available) physical memory in bytes, stdlib only; None if unknown."""
+    try:
+        if sys.platform.startswith("linux"):
+            info = {}
+            with open("/proc/meminfo") as fh:
+                for line in fh:
+                    key, value = line.split(":", 1)
+                    info[key] = int(value.split()[0]) * 1024
+            return info.get("MemTotal"), info.get("MemAvailable")
+        if os.name == "nt":
+            import ctypes
+
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(stat)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+            return stat.ullTotalPhys, stat.ullAvailPhys
+        # macOS / BSD: total only
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES"), None
+    except (OSError, ValueError, AttributeError):
+        return None, None
+
+
+@app.get("/api/system")
+def system_info():
+    """Real host figures for the studio header (replaces hardcoded numbers)."""
+    disk = shutil.disk_usage(os.path.dirname(os.path.abspath(__file__)))
+    mem_total, mem_available = _memory_bytes()
+    return {
+        "cpu_count": os.cpu_count(),
+        "disk_total": disk.total,
+        "disk_used": disk.used,
+        "mem_total": mem_total,
+        "mem_available": mem_available,
     }
 
 
@@ -275,6 +323,7 @@ def _frame(solver, mesh, *, iteration, residual, converged, mode, courant, conti
         "pMax": float(np.round(np.max(solver.p), 4)),
         "dx": float(mesh.dx),
         "dy": float(mesh.dy),
+        "rho": float(solver.physics.rho),
         **forces_extra,
     }
     if extra:
