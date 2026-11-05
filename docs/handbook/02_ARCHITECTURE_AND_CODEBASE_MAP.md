@@ -48,7 +48,7 @@ flowchart TD
 ```text
 openn_fOam/
 ├── backend/                  # Python FastAPI Backend & Simulation Engines
-│   ├── app.py                # Main HTTP/WebSocket router, anti-cache middleware, PINN integration
+│   ├── app.py                # Main HTTP/WebSocket router, anti-cache middleware, instant-preview integration
 │   ├── solver.py             # 2D/3D Navier-Stokes numerical solver, fluid database, geometry masks
 │   ├── projects.py           # Simulation project save/load REST endpoints
 │   ├── openfoam_export.py    # OpenFOAM case file synthesizer (controlDict, fvSchemes, 0/U, etc.)

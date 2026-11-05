@@ -1,5 +1,9 @@
 # 💻 Local Hardware Runtime Architecture (Colab-Style Local Bridge)
 
+> **Status (Nov 2026):** design document. There is no GPU code and no native-OpenFOAM
+> bridge in this repository; every solver runs on the CPU. The studio header shows real
+> CPU/RAM/disk figures from `GET /api/system`.
+
 A comprehensive architectural guide explaining why **3D Computational Fluid Dynamics (CFD)** requires direct local hardware access and how **OpenZess 3D Studio** implements a **Google Colab-style Local Hardware Bridge** connecting web browser tabs directly to local CPUs, GPUs, and native OpenFOAM installations.
 
 ---

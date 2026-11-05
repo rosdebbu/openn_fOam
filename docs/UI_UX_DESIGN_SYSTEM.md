@@ -46,7 +46,7 @@ The design system is engineered with a **4-tier OKLCH surface and typography hie
 
 Below is the approved visual design target for **OpenZess 3D Studio** with the **Brand Logo Gradient**, **Google Colab Runtime Widget**, **`oklch(26.9% 0 none)` Buttons**, and **OpenFOAM Case Hub**:
 
-![OpenZess 3D Studio Final Approved Mockup](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/docs/assets/openzess_studio_ui.jpg)
+![OpenZess 3D Studio Final Approved Mockup](assets/openzess_studio_ui.jpg)
 
 ---
 

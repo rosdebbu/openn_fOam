@@ -9,7 +9,7 @@ A quickstart developer guide for collaborators to get OpenZess Studio running on
 Make sure the following tools are installed on your machine:
 * **Python 3.10+**: With `pip`
 * **Node.js 18+**: With `npm`
-* *(Optional)* **Rust toolchain (`cargo`)**: Only needed if compiling the Rust SIMD inner loop. If absent, the Python SciPy sparse solver runs automatically!
+* *(Optional)* **Rust toolchain (`cargo`)**: Only needed for the optional Rust engine (`cd rust-sidecar && cargo build --release`). If absent, the Python SciPy sparse solver runs automatically!
 
 ---
 
@@ -86,9 +86,10 @@ npm run build
      ```bash
      cd frontend && npm run build
      ```
-   * Make sure backend starts cleanly without syntax errors:
+   * Run the test suites (CI runs the same on every push):
      ```bash
-     python -c "import main; print('Backend syntax OK')"
+     pip install -r requirements-dev.txt && python -m pytest
+     cd rust-sidecar && cargo test
      ```
 3. **Commit Messages:**
    * Use conventional commit headers:

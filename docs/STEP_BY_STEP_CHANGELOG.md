@@ -26,7 +26,7 @@ This document records all architectural updates, bug fixes, simulation upgrades,
 
 ### A. Backend Architecture
 
-#### 1. [`backend/app.py`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/backend/app.py)
+#### 1. [`backend/app.py`](../backend/app.py)
 * **Frontend Auto-Build Validation (`_ensure_fresh_frontend_build`):**
   * Automatically detects if files in `frontend/src` have been modified more recently than `frontend/dist`.
   * Runs `npm run build` synchronously at startup if stale to ensure the latest bundle is always served.
@@ -46,7 +46,7 @@ This document records all architectural updates, bug fixes, simulation upgrades,
 * **Dictionary Override Ingestion:**
   * Integrated `parse_dict_overrides()` to apply user-edited OpenFOAM dictionary parameters directly to active simulation states.
 
-#### 2. [`backend/solver.py`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/backend/solver.py)
+#### 2. [`backend/solver.py`](../backend/solver.py)
 * **Fluid Database Expansion:**
   * Added `seawater`: Density $\rho = 1025.0\ \text{kg/m}^3$, Kinematic Viscosity $\nu = 1.05 \times 10^{-6}\ \text{m}^2/\text{s}$.
 * **Submarine & Ocean Hydrodynamics:**
@@ -67,7 +67,7 @@ This document records all architectural updates, bug fixes, simulation upgrades,
     * `internalField uniform (<ux> <uy> <uz>);`
   * Overrides the solver's internal timestep, viscosity, and inflow conditions in real time.
 
-#### 3. [`backend/projects.py`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/backend/projects.py) *(New File)*
+#### 3. [`backend/projects.py`](../backend/projects.py) *(New File)*
 * **Persistent Storage Architecture:**
   * Disk-backed JSON case files stored in `backend/saved_projects/`.
 * **REST Endpoints:**
@@ -75,17 +75,17 @@ This document records all architectural updates, bug fixes, simulation upgrades,
   * `GET /api/projects/load/{project_id}`: Loads and validates a saved simulation snapshot.
   * `GET /api/projects`: Lists all saved projects sorted by modification date.
 
-#### 4. [`backend/rust_bridge.py`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/backend/rust_bridge.py) *(New File)*
+#### 4. [`backend/rust_bridge.py`](../backend/rust_bridge.py) *(New File)*
 * **Subprocess Management & Fallback:**
   * Manages IPC communication with the compiled Rust SIMD binary (`rust-sidecar/target/release/cfd_core.exe`).
   * Features an automatic fallback to Python's SciPy sparse linear solver (`scipy.sparse.linalg.spsolve`) if the Rust binary is missing or blocked by host policy.
 
-#### 5. [`backend/vtk_writer.py`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/backend/vtk_writer.py)
+#### 5. [`backend/vtk_writer.py`](../backend/vtk_writer.py)
 * **Export Standards:**
   * Generates structured legacy VTK files for velocity ($U$), pressure ($p$), and vorticity ($\omega$).
   * Fully compatible with ParaView and OpenFOAM post-processing pipelines.
 
-#### 6. [`main.py`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/main.py)
+#### 6. [`main.py`](../main.py)
 * **Hot Reloading:**
   * Enabled `reload=True` for Uvicorn during local development so backend updates take effect immediately without manual server restarts.
 
@@ -93,7 +93,7 @@ This document records all architectural updates, bug fixes, simulation upgrades,
 
 ### B. Frontend Architecture
 
-#### 1. [`frontend/src/components/SidebarControls.vue`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/frontend/src/components/SidebarControls.vue)
+#### 1. [`frontend/src/components/SidebarControls.vue`](../frontend/src/components/SidebarControls.vue)
 * **Full Sidebar Redesign:**
   * Replaced the previous 2-column sidebar layout with 4 full-width dedicated tabs:
     1. **`🌊 Physics & Water`:**
@@ -119,22 +119,22 @@ This document records all architectural updates, bug fixes, simulation upgrades,
 * **Layout Isolation:**
   * Styled with scoped CSS and custom scrollbars to prevent any text clipping or horizontal layout overflow.
 
-#### 2. [`frontend/src/utils/projectStore.ts`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/frontend/src/utils/projectStore.ts) *(New File)*
+#### 2. [`frontend/src/utils/projectStore.ts`](../frontend/src/utils/projectStore.ts) *(New File)*
 * **Hybrid Storage Architecture:**
   * Communicates with `/api/projects` for cloud/disk storage.
   * Maintains an offline fallback in browser `localStorage` (`openzess_projects_backup`) so simulations are preserved even without network access.
 
-#### 3. [`frontend/src/types/cfd.ts`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/frontend/src/types/cfd.ts)
+#### 3. [`frontend/src/types/cfd.ts`](../frontend/src/types/cfd.ts)
 * **Type Safety Additions:**
   * Added `SolidObstacleSpec` interface (`shape`, `cx`, `cy`, `size`, `aoa`).
   * Added `FluidMedium` type union and database properties (`seawater`, `water`, `air`, `co2`, `oil`, `ethanol`).
   * Added `SavedProjectSnapshot` contract.
 
-#### 4. [`frontend/src/App.vue`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/frontend/src/App.vue)
+#### 4. [`frontend/src/App.vue`](../frontend/src/App.vue)
 * **HUD & Viewport Layout:**
   * Updated top-level container styles, responsive flexbox layout, and active tab state synchronization.
 
-#### 5. [`frontend/src/components/CfdThree3D.vue`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/frontend/src/components/CfdThree3D.vue)
+#### 5. [`frontend/src/components/CfdThree3D.vue`](../frontend/src/components/CfdThree3D.vue)
 * **Three.js WebGL Flow Canvas:**
   * Real-time 3D scalar colormap surfaces, streamline particles, vorticity isosurfaces, and camera orbit controls.
 
@@ -142,13 +142,13 @@ This document records all architectural updates, bug fixes, simulation upgrades,
 
 ### C. Build & Launch Tooling
 
-#### 1. [`sync_and_launch.py`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/sync_and_launch.py) *(New File)*
+#### 1. [`sync_and_launch.py`](../sync_and_launch.py) *(New File)*
 * Automatically synchronizes build artifacts between local folders and the server directory, eliminating manual file copies.
 
-#### 2. [`LAUNCH_STUDIO.bat`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/LAUNCH_STUDIO.bat) *(New File)*
+#### 2. [`LAUNCH_STUDIO.bat`](../LAUNCH_STUDIO.bat) *(New File)*
 * 1-click batch script for Windows users to launch backend, check dependencies, and open OpenZess Studio in the default browser.
 
-#### 3. [`docs/tasks/PRD.md`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/docs/tasks/PRD.md) & [`docs/tasks/progress.txt`](file:///c:/Users/ROSHNI/OneDrive/Documents/GitHub/openn_fOam/docs/tasks/progress.txt)
+#### 3. [`docs/tasks/PRD.md`](tasks/PRD.md) & [`docs/tasks/progress.txt`](tasks/progress.txt)
 * Comprehensive task tracker and inter-agent synchronization protocol.
 
 ---

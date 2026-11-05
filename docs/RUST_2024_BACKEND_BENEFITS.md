@@ -1,5 +1,12 @@
 # 🦀 Rust 2024 Edition Backend Blueprint & Low-Latency Benchmarks
 
+> **Status (Nov 2026):** this page is a design blueprint, not a measurement report. The
+> speedup and latency figures in the tables below were never measured, and the 3-D Rust
+> engine they describe does not exist. The real sidecar (`rust-sidecar/`) is a **2-D** explicit
+> solver, edition 2021, using Rayon for its Jacobi pressure sweeps. Measured on a 4-core
+> machine: 256 × 256 grid, 30 steps, 771 ms on 1 thread vs. 536 ms on 4 threads (≈ 1.4×);
+> grids under 16 384 cells run single-threaded because threading costs more than it saves.
+
 This document details the architectural blueprint, crate stack, and performance benchmarks for implementing the **OpenZess 3D CFD Engine** in **Rust 2024 Edition**.
 
 ---

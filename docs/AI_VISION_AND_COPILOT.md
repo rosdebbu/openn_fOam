@@ -1,5 +1,11 @@
 # 🧠 AI Vision & Conversational Co-Pilot Layer
 
+> **Status (Nov 2026):** the computer-vision part described here (photo → silhouette →
+> voxel geometry) is **not implemented**; the studio's upload box does not read files. What
+> exists is the chat co-pilot: it sends your question to the LLM provider you configure
+> (with your own API key, directly from the browser) and can switch the case preset based on
+> keywords in the answer.
+
 The **AI Layer** in OpenZess removes the barrier of manual CFD setup and dictionary coding by combining Computer Vision with an engineering-aware Natural Language Co-Pilot.
 
 ---

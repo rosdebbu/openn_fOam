@@ -1,5 +1,11 @@
 # 📦 OpenFOAM & ParaView 3D Data Export
 
+> **Status (Nov 2026):** the OpenFOAM ZIP export currently always contains a 2-D
+> **lid-driven cavity** case for `icoFoam` (`blockMesh` + `icoFoam`, laminar, `nu = 1/Re`),
+> with your Re, dt and grid size, whatever case is open in the studio. The buoyant
+> `p_rgh`/`T` case layout described below is not generated yet. The ParaView export (`.vtk`)
+> contains the last computed u, v, p fields of the current case.
+
 OpenZess ensures that all simulations can be transitioned seamlessly into industry-standard open-source CFD toolchains: **OpenFOAM** and **ParaView**.
 
 ---

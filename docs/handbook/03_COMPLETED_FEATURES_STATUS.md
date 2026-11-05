@@ -1,6 +1,6 @@
 # ✅ Completed Features & Current Status
 
-This document summarizes all modules, physical equations, and UI components that are fully implemented and verified in the current build.
+This document summarizes what is implemented and verified in the current build. Status was re-audited in November 2026; rows marked ❌/⚠️ are not (fully) implemented.
 
 ---
 
@@ -8,6 +8,25 @@ This document summarizes all modules, physical equations, and UI components that
 
 | Module | Sub-Feature | Status | Verification Detail |
 | :--- | :--- | :---: | :--- |
+| **Pipeline** | Fresh frontend build | ✅ | `backend/frontend_build.py` rebuilds `frontend/dist` when sources are newer (portable `npm`, no import-time side effects). Tested in `tests/test_launch.py`. |
+| **Pipeline** | Path resolution | ✅ | Only `frontend/dist` is served; without a build the server shows instructions (it used to serve raw TypeScript). |
+| **UI / UX** | 4-tab sidebar | ✅ | Physics, Geometry, Case Tree, History. |
+| **Physics** | Fluid medium database | ✅ | Air, water, seawater, CO₂, oil, ethanol (density, ν, β, cₚ). |
+| **Physics** | Pressure–velocity projection | ✅ | Dirichlet outlet for open channels, compatible Neumann for sealed boxes (fixed Nov 2026; open flows were previously ill-posed). |
+| **Physics** | Cavity validation | ✅ | RMSE vs. Ghia (1982) at Re = 100: 0.0385 (41²), observed order ≈ 1. `experiments/` + `tests/`. |
+| **Physics** | Force integration | ✅ | Pressure + wall shear on the immersed body; signs and AoA convention fixed Nov 2026 (both were inverted). |
+| **Physics** | Instant preview ("ai") | ✅ | Potential flow / Stokes solve. It is **not** a neural network or PINN. |
+| **Physics** | Cavitation index σ | ✅ | Computed for an assumed operating point (10 m depth, 10 m/s at U = 1); not from the local pressure field. |
+| **Geometry** | Archetype selector | ✅ | Submarine, drone, airfoil, F1, venturi, dam, cylinder, plume, cavity. |
+| **Geometry** | Custom obstacle builder | ✅ | Circle, square, rectangle, NACA airfoil with position, size and AoA. |
+| **Geometry** | CAD / STL import | ❌ | Not implemented (the upload box says so). |
+| **OpenFOAM** | Dictionary ingestion | ✅ | `parse_dict_overrides` applies edited `deltaT`, `nu`, inlet velocity to the solver. |
+| **OpenFOAM** | ZIP exporter | ⚠️ | Always exports an `icoFoam` lid-driven cavity case with your Re/dt/grid; other geometries are not exported. |
+| **Persistence** | Project save & load | ✅ | Wired up Nov 2026 (the frontend never called the API before): server snapshots + `localStorage` fallback, Load from the History tab. |
+| **Fallback** | Python solver when Rust is offline | ✅ | Tested with the sidecar mocked offline. |
+| **Rust** | Multi-threaded kernel | ✅ | Rayon used for grids ≥ 16 384 cells (Rayon was a dependency but unused before Nov 2026); parallel = sequential bit-for-bit (cargo test). |
+
+--- | :--- | :---: | :--- |
 | **Pipeline** | Stale Cache Prevention | ✅ 100% | Injected `no-cache, no-store, must-revalidate` HTTP headers + auto-build check on startup. |
 | **Pipeline** | Path Resolution | ✅ 100% | Local `frontend/dist` prioritised over any external folders. |
 | **UI / UX** | 4-Tab Sidebar Controls | ✅ 100% | Full-width tabs for Physics, Geometry, Case Tree, and History. |
