@@ -177,7 +177,6 @@ const params = reactive<SimulationParams>({
   studioParams: {
     irisPurple: 0.45,
     vorticityAngle: 0.209, // 12 deg AoA
-    vorticityCore: 50,
     butterscotchCore: 100
   }
 });
@@ -281,37 +280,31 @@ function setArchetype(arch: SimulationArchetype) {
   if (arch === 'airfoil') {
     params.studioParams.irisPurple = 0.45;
     params.studioParams.vorticityAngle = 0.209;
-    params.studioParams.vorticityCore = 50;
     params.studioParams.butterscotchCore = 100;
   } else if (arch === 'cylinder') {
     params.studioParams.irisPurple = 0.35;
     params.studioParams.vorticityAngle = 0.1;
-    params.studioParams.vorticityCore = 40;
     params.studioParams.butterscotchCore = 60;
   } else if (arch === 'venturi') {
     params.studioParams.irisPurple = 0.25;
     params.studioParams.vorticityAngle = 0.0;
-    params.studioParams.vorticityCore = 30;
     params.studioParams.butterscotchCore = 50;
   } else if (arch === 'f1') {
     params.studioParams.irisPurple = 0.85;
     params.studioParams.vorticityAngle = -0.12;
-    params.studioParams.vorticityCore = 75;
     params.studioParams.butterscotchCore = 110;
   } else if (arch === 'drone') {
     params.studioParams.irisPurple = 0.40;
     params.studioParams.vorticityAngle = -0.45;
-    params.studioParams.vorticityCore = 80;
     params.studioParams.butterscotchCore = 70;
   } else if (arch === 'submarine') {
     params.studioParams.irisPurple = 0.38;
     params.studioParams.vorticityAngle = 0.05;
-    params.studioParams.vorticityCore = 35;
     params.studioParams.butterscotchCore = 40;
   } else {
+    if (arch === 'cavity') params.reynoldsNumber = 100; // matches the case name & Ghia benchmark
     params.studioParams.irisPurple = 0.182;
     params.studioParams.vorticityAngle = 0.152;
-    params.studioParams.vorticityCore = 30;
     params.studioParams.butterscotchCore = 84.899;
   }
   // Results come from the solver; never show preset numbers as results

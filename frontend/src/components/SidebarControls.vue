@@ -120,19 +120,19 @@
               />
             </div>
 
-            <!-- Vorticity Core Shear -->
+            <!-- Reynolds number (log scale: 10 .. 100 000) -->
             <div class="slider-group">
               <div class="slider-labels">
-                <label>Vorticity Core / Re Intensity</label>
-                <span class="slider-val-badge">{{ studioParams.vorticityCore.toFixed(0) }}</span>
+                <label>Reynolds Number (Re)</label>
+                <span class="slider-val-badge">{{ Math.round(params.reynoldsNumber).toLocaleString() }}</span>
               </div>
               <input
                 type="range"
-                min="10"
-                max="100"
-                step="5"
-                v-model.number="studioParams.vorticityCore"
-                @input="emitParamsChange"
+                min="1"
+                max="5"
+                step="0.05"
+                :value="Math.log10(Math.max(params.reynoldsNumber, 10))"
+                @input="emitReynolds(Number(($event.target as HTMLInputElement).value))"
               />
             </div>
 
@@ -818,7 +818,6 @@ const chatMessages = ref<ChatMessageItem[]>([
 const studioParams = reactive<StudioParameters>({
   irisPurple: props.params.studioParams?.irisPurple ?? 0.45,
   vorticityAngle: props.params.studioParams?.vorticityAngle ?? 0.209,
-  vorticityCore: props.params.studioParams?.vorticityCore ?? 50,
   butterscotchCore: props.params.studioParams?.butterscotchCore ?? 100
 });
 
@@ -865,6 +864,11 @@ function emitForcesChange() {
       referencePressure: 101325
     }
   });
+}
+
+// Re drives the solver's viscosity (nu = U L / Re). The slider is log-scaled.
+function emitReynolds(log10Re: number) {
+  emit('update:params', { ...props.params, reynoldsNumber: Math.round(10 ** log10Re) });
 }
 
 function emitParamsChange() {

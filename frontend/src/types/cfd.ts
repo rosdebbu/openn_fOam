@@ -54,7 +54,6 @@ export interface AerodynamicTelemetry {
 export interface StudioParameters {
   irisPurple: number;        // Inlet velocity / iris magnitude (default: 0.182)
   vorticityAngle: number;    // Swirl angle / vorticity angle / AoA (default: 0.152)
-  vorticityCore: number;     // Core vortex intensity / Re scale (default: 30)
   butterscotchCore: number;  // Thermal core temperature / intensity (default: 84.899)
 }
 
