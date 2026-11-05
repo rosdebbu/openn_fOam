@@ -41,3 +41,8 @@ target/
 backend/saved_projects/
 experiments/output/
 *.vtk
+
+# =====================
+# AI tool session files (contain account emails / local paths)
+# =====================
+.antigravity-chats/
