@@ -30,9 +30,14 @@ from . import projects as project_store
 
 app = FastAPI(title="OpenZess CFD Engine")
 
+# The studio is served from this server (same origin) or from the Vite dev
+# server on another local port. Allowing "*" let ANY website the user visits
+# call this API cross-origin - including DELETE /api/projects.
+LOCAL_ORIGIN_RE = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=LOCAL_ORIGIN_RE.pattern,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -40,84 +45,25 @@ app.add_middleware(
 # Global last results storage for VTK export
 last_results = {}
 
-# Frontend path MUST be defined BEFORE the freshness guard below runs —
-# the guard references it at module import time. Defining it after the call
-# raised NameError at startup and crashed the whole backend, which is what
-# previously made localhost fall back to stale content.
-frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+# The compiled Vue bundle lives in frontend/dist (`npm run build`). The
+# launchers rebuild it when stale (backend/frontend_build.py); importing this
+# module never spawns npm.
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+dist_dir = os.path.join(frontend_path, "dist")
+_dist_index = os.path.join(dist_dir, "index.html")
 
-# Startup Freshness Guard:
-# If any frontend/src file is newer than the compiled dist (user edited and
-# saved but launched main.py directly instead of sync_and_launch.py), rebuild
-# the bundle right here so localhost can NEVER serve a stale build.
-def _ensure_fresh_frontend_build():
-    src_root = os.path.join(frontend_path, "src")
-    dist_root = os.path.join(frontend_path, "dist")
-    if not os.path.isdir(src_root):
-        return
-    latest_src = 0.0
-    for root, _, files in os.walk(src_root):
-        for f in files:
-            try:
-                latest_src = max(latest_src, os.path.getmtime(os.path.join(root, f)))
-            except OSError:
-                continue
-    latest_dist = 0.0
-    if os.path.isdir(dist_root):
-        for root, _, files in os.walk(dist_root):
-            for f in files:
-                try:
-                    latest_dist = max(latest_dist, os.path.getmtime(os.path.join(root, f)))
-                except OSError:
-                    continue
-    if latest_src > latest_dist and os.path.exists(os.path.join(frontend_path, "package.json")):
-        print("[OpenZess] frontend/src is NEWER than dist — rebuilding Vue bundle to prevent stale content...")
-        try:
-            import subprocess
-            res = subprocess.run(
-                ["npm", "run", "build"],
-                cwd=frontend_path, shell=True, capture_output=True, text=True, timeout=300,
-            )
-            if res.returncode == 0:
-                print("[OpenZess] Fresh frontend build complete.")
-            else:
-                print(f"[OpenZess] Rebuild warning: {(res.stderr or res.stdout or '')[:200]}")
-        except Exception as exc:
-            print(f"[OpenZess] Could not auto-rebuild frontend: {exc}")
-
-_ensure_fresh_frontend_build()
-
-# Dynamic Frontend Build Detection:
-# ALWAYS prioritize this workspace's local frontend/dist first to prevent stale builds.
-# (frontend_path is already defined above, before the freshness guard.)
-local_dist = os.path.join(frontend_path, "dist")
-candidates = [
-    local_dist,
-    r"C:\gitwork\openn_fOam\frontend\dist",
-    r"C:\GitHub\openn_fOam\frontend\dist"
-]
-
-static_dir = None
-if os.path.exists(os.path.join(local_dist, "index.html")):
-    static_dir = local_dist
-    newest_time = os.path.getmtime(os.path.join(local_dist, "index.html"))
-else:
-    newest_time = -1
-    for candidate in candidates:
-        idx_path = os.path.join(candidate, "index.html")
-        if os.path.exists(idx_path):
-            mtime = os.path.getmtime(idx_path)
-            if mtime > newest_time:
-                newest_time = mtime
-                static_dir = candidate
-
-if not static_dir:
-    static_dir = frontend_path
-    print(f"[OpenZess] WARNING: No frontend/dist build found. Serving raw source from: {static_dir}")
-else:
+if os.path.exists(_dist_index):
+    static_dir = dist_dir
+    newest_time = os.path.getmtime(_dist_index)
     import datetime
     dt_str = datetime.datetime.fromtimestamp(newest_time).strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[OpenZess] Serving PRIMARY frontend build from: {static_dir} (Build Timestamp: {dt_str})")
+    print(f"[OpenZess] Serving frontend build from: {static_dir} (built {dt_str})")
+else:
+    # Never fall back to serving frontend/ itself: its index.html loads
+    # /src/main.ts, which a browser cannot run (blank page).
+    static_dir = None
+    newest_time = 0
+    print("[OpenZess] WARNING: frontend/dist not found - run `npm ci && npm run build` in frontend/.")
 
 @app.middleware("http")
 async def add_no_cache_headers(request, call_next):
@@ -135,8 +81,8 @@ async def add_no_cache_headers(request, call_next):
 @app.get("/studio/")
 @app.get("/studio/index.html")
 def serve_studio_index():
-    index_file = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_file):
+    index_file = os.path.join(static_dir, "index.html") if static_dir else ""
+    if index_file and os.path.exists(index_file):
         return FileResponse(
             index_file,
             media_type="text/html",
@@ -162,7 +108,7 @@ def serve_studio_index():
         headers={"Cache-Control": "no-store"}
     )
 
-if os.path.exists(static_dir):
+if static_dir:
     app.mount("/studio", StaticFiles(directory=static_dir, html=True), name="frontend")
     assets_dir = os.path.join(static_dir, "assets")
     if os.path.exists(assets_dir):
@@ -179,10 +125,10 @@ def health_check():
         "hybrid_mode": True,
         "engines": {
             "python": "SciPy Sparse Fractional-Step (Active)",
-            "ai": "PINN Physics Surrogate (Active)",
-            "rust": f"Rayon Bare-Metal Sidecar ({'Online ⚡' if rust_live else 'Standby / Auto-fallback 🛡️'})"
+            "ai": "Instant preview: potential flow / Stokes cavity (no ML model)",
+            "rust": f"Rust Rayon sidecar ({'online' if rust_live else 'offline - Python fallback'})"
         },
-        "features": ["Hybrid Rust+Python", "VTK Export", "Three.js 3D", "PINN AI Surrogate", "Graphify"]
+        "features": ["Hybrid Rust+Python", "VTK Export", "OpenFOAM case export", "Three.js 3D", "Instant potential-flow preview"]
     }
 
 
@@ -195,8 +141,8 @@ def engine_status():
         "rust_sidecar_online": rust_live,
         "available_engines": [
             {"id": "python", "name": "Python SciPy Solver", "type": "High-Precision Sparse CPU"},
-            {"id": "rust", "name": "Rust Bare-Metal Kernel", "type": "SIMD Multi-Core Parallel"},
-            {"id": "ai", "name": "PINN Neural Surrogate", "type": "Instant Sub-50ms Inference"}
+            {"id": "rust", "name": "Rust kernel", "type": "Multi-threaded (Rayon) explicit solver"},
+            {"id": "ai", "name": "Instant preview", "type": "Potential flow / Stokes solve (no ML model)"}
         ]
     }
 
@@ -352,6 +298,12 @@ def _scalar_extra(solver) -> dict:
 @app.websocket("/ws/simulate")
 async def websocket_simulate(websocket: WebSocket):
     global last_results
+    # CORS does not cover WebSockets: refuse browser pages from other sites
+    # (non-browser clients send no Origin header).
+    origin = websocket.headers.get("origin")
+    if origin and not LOCAL_ORIGIN_RE.match(origin):
+        await websocket.close(code=1008)
+        return
     await websocket.accept()
     try:
         data_str = await websocket.receive_text()

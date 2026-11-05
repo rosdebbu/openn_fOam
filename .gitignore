@@ -34,3 +34,10 @@ scratch/
 # =====================
 target/
 **/*.rs.bk
+
+# =====================
+# Runtime output
+# =====================
+backend/saved_projects/
+experiments/output/
+*.vtk
