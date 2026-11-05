@@ -1,0 +1,36 @@
+{
+  "project": "UR2627GEN317",
+  "milestone": "30% Experimentation & Simulation",
+  "date": "2026-09-13 03:13:31",
+  "validation_benchmark": {
+    "test_case": "2D Lid-Driven Cavity",
+    "Re": 100.0,
+    "cfd_grid": "41x41",
+    "iterations": 214,
+    "wall_time_seconds": 0.6298150999937207,
+    "rmse_vs_ghia_1982": 0.9850358057708438,
+    "pinn_inference_ms": 2.6806000096257776,
+    "speedup_factor": 234.95303205704508
+  },
+  "grid_independence": {
+    "21x21": {
+      "iterations": 207,
+      "wall_time": 0.3857869999774266,
+      "final_res": 0.0004908778492672683
+    },
+    "41x41": {
+      "iterations": 214,
+      "wall_time": 0.6959118999948259,
+      "final_res": 0.0004922758340609734
+    },
+    "61x61": {
+      "iterations": 300,
+      "wall_time": 1.5517078000120819,
+      "final_res": 0.0005752137820499437
+    }
+  },
+  "error_metrics": {
+    "mae": 0.545566012051571,
+    "max_error": 1.471771481139108
+  }
+}
