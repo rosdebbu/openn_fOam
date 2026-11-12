@@ -1,3 +1,23 @@
 {
-  "liveServer.settings.port": 5501
+  "liveServer.settings.port": 5501,
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/rust-sidecar/target/**": true,
+    "**/frontend/dist/**": true,
+    "**/.pytest_cache/**": true,
+    "**/graphify-out/**": true,
+    "**/.kilo/**": true,
+    "**/scratch/**": true
+  },
+  "search.exclude": {
+    "**/rust-sidecar/target": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.git": true,
+    "**/.pytest_cache": true,
+    "**/graphify-out": true,
+    "**/.kilo": true
+  }
 }

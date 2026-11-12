@@ -245,6 +245,25 @@
         </button>
       </div>
 
+      <!-- Viewport Switcher: 3D WebGL (Three.js) vs. ParaView Web Glance (vtk.js) -->
+      <div class="viewport-switch-pill" title="Toggle 3D WebGL vs ParaView Glance (vtk.js)">
+        <button
+          class="switch-btn"
+          :class="{ active: (viewportMode || 'three') === 'three' }"
+          @click="$emit('update:viewportMode', 'three')"
+        >
+          <span>🌐 3D WebGL</span>
+        </button>
+        <button
+          class="switch-btn"
+          :class="{ active: viewportMode === 'paraview' }"
+          @click="$emit('update:viewportMode', 'paraview')"
+        >
+          <span class="vtk-dot">●</span>
+          <span>ParaView (vtk.js)</span>
+        </button>
+      </div>
+
       <!-- Export OpenFOAM Case Dropdown -->
       <div class="export-dropdown-container" ref="exportDropdownRef">
         <button
@@ -290,12 +309,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import type { SimulationArchetype, AiProviderConfig, SolverMode } from '../types/cfd';
+import type { SimulationArchetype, AiProviderConfig, SolverMode, ViewportMode } from '../types/cfd';
 
 const props = defineProps<{
   caseName?: string;
   currentArchetype: SimulationArchetype;
   solverMode?: SolverMode;
+  viewportMode?: ViewportMode;
   aiConfig: AiProviderConfig;
   isPlaying: boolean;
   isConnected: boolean;
@@ -307,6 +327,7 @@ const emit = defineEmits<{
   (e: 'update:caseName', name: string): void;
   (e: 'update:archetype', arch: SimulationArchetype): void;
   (e: 'update:solverMode', mode: SolverMode): void;
+  (e: 'update:viewportMode', mode: ViewportMode): void;
   (e: 'openSettings'): void;
   (e: 'togglePlay'): void;
   (e: 'stepBack'): void;
@@ -331,7 +352,8 @@ const exportDropdownRef = ref<HTMLDivElement | null>(null);
 const engines: { id: SolverMode; name: string; icon: string; badge: string; tech: string; desc: string; speed: string; speedClass: string }[] = [
   { id: 'rust', name: 'Rust Kernel', icon: '🦀', badge: 'Rayon', tech: 'Axum + Rayon', desc: 'Explicit Navier-Stokes, multi-threaded Jacobi pressure solve (needs the sidecar running)', speed: 'Single result', speedClass: 'fastest' },
   { id: 'ai', name: 'Instant Preview', icon: '⚡', badge: 'No ML', tech: 'Potential flow / Stokes', desc: 'One sparse solve: inviscid flow around the body (Stokes for the cavity). No drag, wake or separation.', speed: 'Instant 🚀', speedClass: 'instant' },
-  { id: 'cfd', name: 'Python SciPy', icon: '🔬', badge: 'Sparse LU', tech: 'SciPy + NumPy', desc: 'Fractional-step projection solver, streamed live (first-order upwind)', speed: 'Live frames', speedClass: 'precise' }
+  { id: 'cfd', name: 'Python SciPy', icon: '🔬', badge: 'Sparse LU', tech: 'SciPy + NumPy', desc: 'Fractional-step projection solver, streamed live (first-order upwind)', speed: 'Live frames', speedClass: 'precise' },
+  { id: 'wasm', name: 'Browser WASM', icon: '🌐', badge: 'Zero-Server', tech: 'Web Worker Float32', desc: 'In-browser client-side Navier-Stokes solver (zero network latency)', speed: '60 FPS ⚡', speedClass: 'fastest' }
 ];
 
 const currentEngineInfo = computed(() => {
@@ -1083,6 +1105,48 @@ onUnmounted(() => {
   background: rgba(56, 189, 248, 0.15);
   border-color: rgba(56, 189, 248, 0.35);
   color: #38bdf8;
+}
+
+/* Viewport Switcher Pill */
+.viewport-switch-pill {
+  display: flex;
+  align-items: center;
+  background: var(--btn-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.switch-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.switch-btn:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.switch-btn.active {
+  background: #1e293b;
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.vtk-dot {
+  color: #0284c7;
+  font-size: 9px;
 }
 
 /* Export Dropdown */

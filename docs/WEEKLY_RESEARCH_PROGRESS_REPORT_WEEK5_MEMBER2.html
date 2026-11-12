@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UR2627GEN317 - Weekly Research Progress Report (Member 2: Systems, UI/UX & Persistence)</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 10mm 12mm;
+  }
+  
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Times New Roman', Times, 'Cambria', Georgia, serif;
+    line-height: 1.36;
+    color: #1a1a1a;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 16px 20px;
+    background: #ffffff;
+    font-size: 9.6pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .screen-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 10px 16px;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 9pt;
+  }
+  .print-btn {
+    background: #0284c7;
+    color: #ffffff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 9pt;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+  }
+  .print-btn:hover {
+    background: #0369a1;
+  }
+
+  .doc-title {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14pt;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #0c4a6e;
+    margin: 0 0 4px 0;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #0c4a6e;
+  }
+
+  .meta-grid {
+    text-align: center;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 8.5pt;
+    line-height: 1.38;
+    color: #333;
+    margin-bottom: 6px;
+  }
+  .meta-grid strong {
+    color: #0c4a6e;
+  }
+
+  .status-banner {
+    display: block;
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+    color: #0369a1;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 8pt;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin: 4px 0 8px 0;
+  }
+
+  .summary-box {
+    background: #f8fafc;
+    border-left: 4px solid #0284c7;
+    border-top: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 7px 11px;
+    margin-bottom: 8px;
+    border-radius: 0 4px 4px 0;
+  }
+  .summary-box p {
+    margin: 0 0 4.5px 0;
+    font-size: 9.1pt;
+    text-align: justify;
+    line-height: 1.4;
+  }
+  .summary-box p:last-child {
+    margin-bottom: 0;
+  }
+  .summary-box strong {
+    color: #0c4a6e;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  h2 {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10.2pt;
+    font-weight: 700;
+    color: #0c4a6e;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 2px;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    page-break-after: avoid;
+    break-after: avoid;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  p {
+    margin: 0 0 4.5px 0;
+    text-align: justify;
+  }
+
+  .equation-card {
+    background: #fdfdfd;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 4.5px 9px;
+    margin: 4.5px 0;
+    text-align: center;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .math-display {
+    font-family: 'Cambria Math', 'Latin Modern Math', 'Times New Roman', serif;
+    font-size: 9.5pt;
+    line-height: 1.42;
+    color: #0c4a6e;
+  }
+  .math-label {
+    display: inline-block;
+    float: right;
+    font-size: 7.6pt;
+    color: #64748b;
+    font-style: italic;
+  }
+  .frac {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: center;
+    padding: 0 2px;
+  }
+  .frac .num {
+    display: block;
+    border-bottom: 1px solid #111;
+    padding-bottom: 1px;
+  }
+  .frac .den {
+    display: block;
+    padding-top: 1px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0 7px 0;
+    font-size: 8.2pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #cbd5e1;
+    padding: 3.2px 5.5px;
+    text-align: left;
+    vertical-align: middle;
+  }
+  th {
+    background-color: #f1f5f9;
+    color: #0c4a6e;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+  }
+  tr:nth-child(even) td {
+    background-color: #f8fafc;
+  }
+
+  .diagram-container {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 5px;
+    margin: 5px 0 7px 0;
+    text-align: center;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .diagram-caption {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 7.6pt;
+    font-weight: 600;
+    color: #475569;
+    margin-top: 3px;
+    text-align: center;
+  }
+
+  .badge-tag {
+    display: inline-block;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 6.8pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 1.2px 4.5px;
+    border-radius: 3px;
+  }
+  .badge-verified { background: #e0f2fe; color: #0369a1; }
+  .badge-active { background: #e6f4ea; color: #137333; }
+  .badge-optimized { background: #fef3c7; color: #b45309; }
+
+  .page-break {
+    page-break-before: always;
+    break-before: always;
+  }
+
+  ol {
+    margin: 0 0 5px 0;
+    padding-left: 17px;
+    font-size: 8.6pt;
+  }
+  li {
+    margin-bottom: 2.5px;
+  }
+
+  .footer-bar {
+    margin-top: 8px;
+    border-top: 1px solid #cbd5e1;
+    padding-top: 3.5px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 7.4pt;
+    color: #64748b;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media print {
+    .screen-toolbar {
+      display: none !important;
+    }
+    body {
+      padding: 0;
+      max-width: 100%;
+      font-size: 9.3pt;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- SCREEN ONLY TOOLBAR -->
+<div class="screen-toolbar">
+  <div><strong>Project UR2627GEN317</strong> — Research Track 2: Systems, UI/UX &amp; Persistence (Week 5 • October/November 2026)</div>
+  <button class="print-btn" onclick="window.print()">
+    🖨️ Print / Save as PDF
+  </button>
+</div>
+
+<!-- DOCUMENT TITLE -->
+<div class="doc-title">Comprehensive Research & Weekly Progress Report</div>
+
+<!-- METADATA HEADER -->
+<div class="meta-grid">
+  <strong>Project Title:</strong> AI-Augmented High-Performance Web CFD Platform: Integrating Finite Volume Solvers, Physics-Informed Surrogates, and Bare-Metal Rust-Python Hybrid Compute with Real-Time 3D Telemetry<br>
+  <strong>Project Code:</strong> UR2627GEN317 &nbsp;|&nbsp; <strong>Research Track:</strong> Hybrid Systems, UI/UX Control Architecture &amp; Project Persistence &nbsp;|&nbsp; <strong>Effort Logged:</strong> 3.0 Hours &nbsp;|&nbsp; <strong>Period:</strong> Week 5 Progress
+</div>
+
+<div class="status-banner">
+  4-Tab Control Center Deployed • Interactive Parametric Obstacle UI Verified • Project Persistence & Zero-Cache Operational
+</div>
+
+<!-- EXECUTIVE WORK SUMMARY -->
+<div class="summary-box">
+  <p>
+    <strong>Executive Work Description (3-Hour Systems & Software Architecture Sprint):</strong> Completed a dedicated 3-hour frontend engineering, state persistence, and application delivery sprint for Project <strong>UR2627GEN317</strong>, restructuring the user experience into a 4-tab control center, building interactive parametric obstacle controls, and engineering a dual-tier simulation persistence engine.
+  </p>
+  <p>
+    • <strong>Step 1: Four-Tab Control Center & OpenFOAM Case Hub Interface (Hour 1 — Completed):</strong> Redesigned and implemented the primary simulation control interface (<code>SidebarControls.vue</code>) by migrating from a cramped two-column layout to four dedicated full-width responsive tabs: 🌊 Physics &amp; Water, 🧱 Geometry &amp; Custom Builder, 📁 Case Tree, and 📝 History &amp; Save. Integrated complete OpenFOAM directory tree visualization (<code>system/controlDict</code>, <code>fvSchemes</code>, <code>fvSolution</code>, <code>constant/transportProperties</code>, <code>0/U</code>, <code>0/p</code>), syntax-highlighted dictionary editing with "Check &amp; Repair" syntax diagnostics, and one-click official OpenFOAM case zip generation.
+  </p>
+  <p>
+    • <strong>Step 2: Interactive Parametric Obstacle UI Controls & Bidirectional AI Sync (Hour 2 — Completed):</strong> Engineered the interactive frontend controls for the Custom Solid Obstacle Builder, enabling users to parameterize custom bodies (Circle/Cylinder, Square/Rectangle, Flat Plate, and NACA 4-digit Airfoil) via reactive sliders for centroid position (c<sub>x</sub>, c<sub>y</sub> &isin; [0.1, 0.9]), dimensional scale (0.05 &ndash; 0.50), and chord angle of attack (&alpha; &isin; [&minus;45&deg;, +45&deg;]). Connected real-time bidirectional synchronization between the AI Copilot recommendations and manual slider controls, allowing one-click execution of tailored obstacle geometries (<code>▶ Run Simulation with This Geometry</code>).
+  </p>
+  <p>
+    • <strong>Step 3: Client-Server Project Persistence Engine & Zero-Cache Pipeline (Hour 3 — Completed):</strong> Engineered the simulation project persistence store (<code>projectStore.ts</code> and <code>backend/projects.py</code>), implementing REST endpoints (<code>POST /api/projects/save</code>, <code>GET /api/projects/load/{id}</code>) for named simulation snapshots, combined with a robust client-side <code>localStorage</code> cache mirror. Hardened local deployment with automated build freshness validation (<code>_ensure_fresh_frontend_build</code> in <code>app.py</code>) and strict ASGI anti-caching HTTP headers (<code>Cache-Control: no-cache, no-store, must-revalidate</code>), eliminating stale asset bugs on <code>localhost:8000</code>.
+  </p>
+  <p>
+    • <strong>Immediate Next Steps:</strong> Advancing toward the 50% Mid-Term Comprehensive Review by developing drag-and-drop 3D STL CAD ingestion into the Three.js viewport, implementing WebGPU compute acceleration for particle streamline advection, and synthesizing interactive aerodynamic polar charts (C<sub>l</sub> vs &alpha;, C<sub>d</sub> vs &alpha;) for benchmark reporting.
+  </p>
+</div>
+
+<!-- SECTION 1: ARCHITECTURE DIAGRAM -->
+<h2>1. Four-Tab Control Hub, State Manager & Persistence Flow</h2>
+<div class="diagram-container">
+  <svg viewBox="0 0 780 215" width="100%" height="205" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="grad-tab1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0284c7" />
+        <stop offset="100%" stop-color="#0369a1" />
+      </linearGradient>
+      <linearGradient id="grad-tab2" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0f766e" />
+        <stop offset="100%" stop-color="#14b8a6" />
+      </linearGradient>
+      <linearGradient id="grad-hub" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#1e3a8a" />
+        <stop offset="100%" stop-color="#2563eb" />
+      </linearGradient>
+      <linearGradient id="grad-persist" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6b21a8" />
+        <stop offset="100%" stop-color="#9333ea" />
+      </linearGradient>
+      <linearGradient id="grad-cache2" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#b45309" />
+        <stop offset="100%" stop-color="#d97706" />
+      </linearGradient>
+      <marker id="arrow3" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 8 5 L 0 9 z" fill="#475569"/>
+      </marker>
+    </defs>
+
+    <!-- 4-TAB CONTROL CENTER -->
+    <rect x="20" y="20" width="220" height="90" rx="6" fill="url(#grad-tab1)" stroke="#075985" stroke-width="1.5"/>
+    <text x="130" y="42" fill="#ffffff" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">4-Tab Control Center (Vue 3)</text>
+    <text x="130" y="60" fill="#e0f2fe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• 🌊 Physics: Velocity, Medium, Buoyancy</text>
+    <text x="130" y="75" fill="#e0f2fe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• 🧱 Geometry: Custom Parametric Builder</text>
+    <text x="130" y="90" fill="#e0f2fe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• 📁 Case Tree &amp; 📝 History / Save</text>
+
+    <!-- CASE TREE & DICTIONARY EDITOR -->
+    <rect x="20" y="125" width="220" height="75" rx="6" fill="url(#grad-tab2)" stroke="#115e59" stroke-width="1.5"/>
+    <text x="130" y="147" fill="#ffffff" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">OpenFOAM Case Hub &amp; Editor</text>
+    <text x="130" y="165" fill="#ccfbf1" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• Syntax-Highlighted Dictionary Editor</text>
+    <text x="130" y="180" fill="#ccfbf1" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• 1-Click ZIP Packaging &amp; Repair</text>
+
+    <!-- REACTIVE CLIENT-SERVER STORE -->
+    <rect x="290" y="20" width="200" height="180" rx="6" fill="url(#grad-hub)" stroke="#1d4ed8" stroke-width="1.5"/>
+    <text x="390" y="44" fill="#ffffff" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle">Reactive Client State Manager</text>
+    <text x="390" y="64" fill="#dbeafe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• Pinia / Vue Composition Store</text>
+    <text x="390" y="79" fill="#dbeafe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• Bidirectional AI Copilot Sync</text>
+    <text x="390" y="94" fill="#dbeafe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• Dynamic Dict Override Propagation</text>
+    <text x="390" y="109" fill="#dbeafe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• Full-Duplex Binary WS Engine</text>
+    <text x="390" y="124" fill="#dbeafe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• OKLCH Design Tokens Isolation</text>
+    <text x="390" y="140" fill="#dbeafe" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• 60 FPS Viewport Telemetry Relay</text>
+    <text x="390" y="165" fill="#f8fafc" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.5" font-weight="bold" text-anchor="middle">[Vite SPA Engine &bull; Port 5173]</text>
+
+    <!-- DUAL-TIER PERSISTENCE -->
+    <rect x="540" y="20" width="220" height="90" rx="6" fill="url(#grad-persist)" stroke="#581c87" stroke-width="1.5"/>
+    <text x="650" y="42" fill="#ffffff" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">Dual-Tier Persistence Engine</text>
+    <text x="650" y="60" fill="#f3e8ff" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• REST: /api/projects/save &amp; /load</text>
+    <text x="650" y="75" fill="#f3e8ff" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• Disk Storage: backend/saved_projects/</text>
+    <text x="650" y="90" fill="#f3e8ff" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• Offline Browser localStorage Mirror</text>
+
+    <!-- ZERO-CACHE DELIVERY -->
+    <rect x="540" y="125" width="220" height="75" rx="6" fill="url(#grad-cache2)" stroke="#92400e" stroke-width="1.5"/>
+    <text x="650" y="147" fill="#ffffff" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">Zero-Cache Delivery Pipeline</text>
+    <text x="650" y="165" fill="#fef3c7" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• ASGI Strict Anti-Cache Headers</text>
+    <text x="650" y="180" fill="#fef3c7" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.8" text-anchor="middle">• Automatic Build Freshness Detector</text>
+
+    <!-- ARROWS -->
+    <path d="M 240 65 L 290 80" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow3)" fill="none"/>
+    <path d="M 240 160 L 290 135" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow3)" fill="none"/>
+    <path d="M 490 80 L 540 65" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow3)" fill="none"/>
+    <path d="M 490 135 L 540 160" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow3)" fill="none"/>
+  </svg>
+  <div class="diagram-caption">Figure 1: Architectural diagram of the systems and software layer, highlighting the 4-tab control hub, reactive state manager, OpenFOAM case hub, and dual-tier project persistence.</div>
+</div>
+
+<!-- PAGE BREAK 1 -->
+<div class="page-break"></div>
+
+<!-- SECTION 2: UI/UX COMPONENT ARCHITECTURE -->
+<h2>2. Component Architecture & User Experience Redesign</h2>
+<p>
+  To resolve interface crowding and enable professional multi-physics simulation workflows, the client-side navigation was restructured into dedicated functional tabs:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 20%;">Sidebar Tab</th>
+      <th style="width: 32%;">Primary Controls &amp; Visualizations</th>
+      <th style="width: 33%;">Underlying State Binding</th>
+      <th style="width: 15%;">Usability Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>🌊 Physics &amp; Water</strong></td>
+      <td>Inflow velocity (U<sub>&infin;</sub>), fluid medium cards (&rho;, &nu;), gravity presets (Earth, Zero-g, Mars), thermal temperature core</td>
+      <td><code>FLUID_DATABASE</code> reactive selector, buoyant Boussinesq term updates</td>
+      <td><span class="badge-tag badge-verified">Verified</span></td>
+    </tr>
+    <tr>
+      <td><strong>🧱 Geometry &amp; Builder</strong></td>
+      <td>Archetype selector (Submarine, Drone, Airfoil, F1, Venturi, Dam, Cylinder) + Interactive Custom Solid Builder (Cylinder, Square, Plate, NACA)</td>
+      <td><code>SolidObstacleSpec</code> payload, dynamic coordinate scaling and chord rotation</td>
+      <td><span class="badge-tag badge-verified">Verified</span></td>
+    </tr>
+    <tr>
+      <td><strong>📁 Case Tree</strong></td>
+      <td>OpenFOAM file tree (<code>system/</code>, <code>constant/</code>, <code>0/</code>), syntax-highlighted dictionary editor, Check &amp; Repair syntax scanner</td>
+      <td><code>parse_dict_overrides()</code> dimensioned scalar regex parser, 1-click ZIP generator</td>
+      <td><span class="badge-tag badge-verified">Verified</span></td>
+    </tr>
+    <tr>
+      <td><strong>📝 History &amp; Save</strong></td>
+      <td>Named project snapshot input, chronological modification timeline, AI Copilot intervention history</td>
+      <td><code>projectStore.ts</code> dual REST API and <code>localStorage</code> backup serialization</td>
+      <td><span class="badge-tag badge-verified">Verified</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  <strong>Scoped Style &amp; Layout Containment:</strong> The interface was hardened with scoped CSS rules, custom scrollbars, and strict flexbox layout bounds to prevent text clipping, horizontal layout overflow, and accidental viewport resizing across varying screen aspect ratios.
+</p>
+
+<!-- SECTION 3: PARAMETRIC INTERACTION MATHEMATICS -->
+<h2>3. Parametric Obstacle Control & Coordinate Mapping Mathematics</h2>
+<p>
+  The custom obstacle builder maps user slider inputs from normalized UI space [0, 1] to domain simulation coordinates:
+</p>
+
+<div class="equation-card">
+  <div class="math-display">
+    X_{	ext{domain}} = c_x \cdot L_x,
+    &emsp;&emsp;&emsp;&emsp;
+    Y_{	ext{domain}} = c_y \cdot L_y,
+    &emsp;&emsp;&emsp;&emsp;
+    R_{	ext{scale}} = s \cdot \min(L_x, L_y)
+    <span class="math-label">[Centroid &amp; Scale Mapping]</span>
+  </div>
+  <div style="margin: 3.5px 0; border-top: 1px dashed #cbd5e1;"></div>
+  <div class="math-display">
+    egin{bmatrix} x' \ y' \end{bmatrix}
+    = egin{bmatrix} \cos(lpha) & \sin(lpha) \ -\sin(lpha) & \cos(lpha) \end{bmatrix}
+    egin{bmatrix} x - X_{	ext{domain}} \ y - Y_{	ext{domain}} \end{bmatrix}
+    <span class="math-label">[2D Affine Rotation Matrix]</span>
+  </div>
+</div>
+
+<p>
+  When an airfoil profile is selected, the reactive client calculates the NACA 4-digit thickness profile envelope:
+</p>
+
+<div class="equation-card">
+  <div class="math-display">
+    y_t(x') = 0.6 c \cdot \left[ 0.2969\sqrt{rac{x'}{c}} - 0.1260\left(rac{x'}{c}ight) - 0.3516\left(rac{x'}{c}ight)^2 + 0.2843\left(rac{x'}{c}ight)^3 - 0.1015\left(rac{x'}{c}ight)^4 ight]
+    <span class="math-label">[Analytical Foil Boundary]</span>
+  </div>
+</div>
+
+<!-- SECTION 4: PERSISTENCE SCHEMA -->
+<h2>4. Client-Server Project Persistence & State Serialization</h2>
+<p>
+  The persistence architecture ensures that complex user-configured simulation cases are preserved with complete physical fidelity:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 22%;">Payload Component</th>
+      <th style="width: 32%;">Serialized Data Schema</th>
+      <th style="width: 32%;">Functional Role</th>
+      <th style="width: 14%;">Storage Mode</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Metadata</strong></td>
+      <td><code>id, name, created_at, modified_at, author</code></td>
+      <td>Case tracking, project naming, and version control</td>
+      <td>JSON / Disk</td>
+    </tr>
+    <tr>
+      <td><strong>Physics Configuration</strong></td>
+      <td><code>fluid_medium, density, viscosity, gravity, inlet_u</code></td>
+      <td>Preserves exact fluid thermodynamic state and body forces</td>
+      <td>JSON / Disk</td>
+    </tr>
+    <tr>
+      <td><strong>Custom Geometry Spec</strong></td>
+      <td><code>{ shape, cx, cy, size, aoa }</code></td>
+      <td>Restores custom obstacle geometry and chord orientation</td>
+      <td>JSON / Disk</td>
+    </tr>
+    <tr>
+      <td><strong>OpenFOAM Overrides</strong></td>
+      <td><code>dict_overrides: { "system/controlDict": "..." }</code></td>
+      <td>Stores user-customized dictionary files and solver parameters</td>
+      <td>JSON / Disk</td>
+    </tr>
+    <tr>
+      <td><strong>Offline Backup Mirror</strong></td>
+      <td><code>localStorage['openzess_projects_backup']</code></td>
+      <td>Guarantees zero work loss during network dropouts or reloads</td>
+      <td>Browser Store</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- PAGE BREAK 2 -->
+<div class="page-break"></div>
+
+<!-- SECTION 5: ZERO-CACHE DELIVERY -->
+<h2>5. Zero-Cache Delivery Pipeline & Startup Freshness Validation</h2>
+<p>
+  To prevent "stale version" issues where developers and users loaded outdated bundled assets from browser memory:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 25%;">Hardening Layer</th>
+      <th style="width: 35%;">Implementation Mechanism</th>
+      <th style="width: 25%;">Target Asset Class</th>
+      <th style="width: 15%;">Effectiveness</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>ASGI Middleware</strong></td>
+      <td>Injects <code>Cache-Control: no-cache, no-store, must-revalidate, max-age=0</code> and <code>Expires: 0</code></td>
+      <td>HTML, JS, CSS, JSON on <code>localhost:8000</code></td>
+      <td><span class="badge-tag badge-verified">100% Fresh</span></td>
+    </tr>
+    <tr>
+      <td><strong>Build Timestamp Stamping</strong></td>
+      <td>Generates dynamic <code>X-OpenZess-Build-Time: &lt;timestamp&gt;</code> response headers</td>
+      <td>HTTP static file server</td>
+      <td><span class="badge-tag badge-verified">Auditable</span></td>
+    </tr>
+    <tr>
+      <td><strong>Startup Build Check</strong></td>
+      <td><code>_ensure_fresh_frontend_build</code> checks if <code>src/</code> is newer than <code>dist/</code> and triggers <code>npm run build</code></td>
+      <td>Vite SPA build artifacts</td>
+      <td><span class="badge-tag badge-verified">Automated</span></td>
+    </tr>
+    <tr>
+      <td><strong>Launcher Automation</strong></td>
+      <td><code>sync_and_launch.py</code> and <code>LAUNCH_STUDIO.bat</code> 1-click startup batch script</td>
+      <td>Full-stack system launch</td>
+      <td><span class="badge-tag badge-optimized">1-Click</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- SECTION 6: NEXT MILESTONES -->
+<h2>6. Upcoming Deliverables Toward 50% Mid-Term Comprehensive Review</h2>
+<ol>
+  <li><strong>3D STL CAD Drag-and-Drop Ingestion:</strong> Enabling users to drop binary/ASCII <code>.stl</code> files directly into the Three.js viewport, with automatic surface triangle voxelization and OpenFOAM <code>snappyHexMeshDict</code> synthesis.</li>
+  <li><strong>WebGPU Accelerated Particle Tracing:</strong> Implementing compute shaders for 100,000+ real-time particle ribbons and vortex core isosurfaces to run at 60 FPS on client hardware.</li>
+  <li><strong>Aerodynamic Polar Comparison Dashboard:</strong> Building interactive validation charts comparing lift ($C_l$ vs $lpha$) and drag ($C_d$ vs $lpha$) curves between OpenZess Studio and published OpenFOAM wind-tunnel data.</li>
+</ol>
+
+<!-- FOOTER -->
+<div class="footer-bar">
+  <span>AI-Augmented High-Performance Web CFD Platform • Project UR2627GEN317</span>
+  <span>Official Research Record • SRM Institute of Science and Technology • October/November 2026</span>
+</div>
+
+</body>
+</html>

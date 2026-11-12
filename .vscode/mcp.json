@@ -1,0 +1,36 @@
+{
+  "servers": {
+    "rea": {
+      "type": "stdio",
+      "command": "C:\\Users\\ROSHNI\\AppData\\Local\\hermes\\node\\node.exe",
+      "args": [
+        "C:\\Users\\ROSHNI\\AppData\\Local\\hermes\\node\\node_modules\\rea-agents\\scripts\\rea.mjs",
+        "mcp"
+      ]
+    },
+    "screenpipe": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "screenpipe-mcp@latest"
+      ]
+    }
+  },
+  "mcpServers": {
+    "rea": {
+      "command": "C:\\Users\\ROSHNI\\AppData\\Local\\hermes\\node\\node.exe",
+      "args": [
+        "C:\\Users\\ROSHNI\\AppData\\Local\\hermes\\node\\node_modules\\rea-agents\\scripts\\rea.mjs",
+        "mcp"
+      ]
+    },
+    "screenpipe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "screenpipe-mcp@latest"
+      ]
+    }
+  }
+}

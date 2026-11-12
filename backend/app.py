@@ -3,10 +3,11 @@ OpenZess FastAPI Server
 Exposes REST APIs & WebSockets for live CFD simulation streaming and VTK exports.
 """
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
+from typing import Optional, Dict, Any
 import asyncio
 import numpy as np
 import os
@@ -525,3 +526,91 @@ async def websocket_simulate(websocket: WebSocket):
             await websocket.send_text(json.dumps({"error": str(e)}))
         except Exception:
             pass
+
+
+# ============================================================================
+# Vercel Labs agent-desktop Computer-Use & Accessibility Automation Endpoints
+# ============================================================================
+from . import agent_desktop
+
+@app.get("/api/agent-desktop/status")
+def agent_desktop_status():
+    """Return agent-desktop adapter health, OS accessibility permissions and version."""
+    return {
+        "installed": agent_desktop.is_agent_desktop_available(),
+        "status": agent_desktop.get_desktop_status()
+    }
+
+@app.get("/api/agent-desktop/windows")
+def agent_desktop_windows(app: Optional[str] = None):
+    """List open native desktop application windows."""
+    return agent_desktop.list_desktop_windows(app=app)
+
+@app.get("/api/agent-desktop/apps")
+def agent_desktop_apps():
+    """List running desktop GUI applications."""
+    return agent_desktop.list_desktop_apps()
+
+@app.post("/api/agent-desktop/snapshot")
+def agent_desktop_snapshot(payload: Dict[str, Any] = Body(default={})):
+    """Capture application accessibility tree as structured JSON with unique @ref IDs."""
+    app_name = payload.get("app")
+    interactive = payload.get("interactive", True)
+    compact = payload.get("compact", True)
+    return agent_desktop.take_app_snapshot(app_name=app_name, interactive_only=interactive, compact=compact)
+
+@app.post("/api/agent-desktop/click")
+def agent_desktop_click(payload: Dict[str, Any] = Body(...)):
+    """Click an accessibility element using its unique @ref ID."""
+    ref_id = payload.get("ref")
+    headed = payload.get("headed", False)
+    if not ref_id:
+        return {"ok": False, "error": "Missing 'ref' parameter"}
+    return agent_desktop.click_desktop_ref(ref_id=ref_id, headed=headed)
+
+@app.post("/api/agent-desktop/type")
+def agent_desktop_type(payload: Dict[str, Any] = Body(...)):
+    """Insert text into a desktop target element."""
+    text = payload.get("text", "")
+    target_ref = payload.get("ref")
+    return agent_desktop.type_desktop_text(text=text, target_ref=target_ref)
+
+@app.post("/api/agent-desktop/screenshot")
+def agent_desktop_screenshot(payload: Dict[str, Any] = Body(default={})):
+    """Capture a PNG screenshot of a desktop window."""
+    output_path = payload.get("output_path", "desktop_screenshot.png")
+    app_name = payload.get("app")
+    return agent_desktop.capture_window_screenshot(output_path=output_path, app_name=app_name)
+
+@app.post("/api/agent-desktop/launch-paraview")
+def agent_desktop_launch_paraview(payload: Dict[str, Any] = Body(default={})):
+    """Launch native desktop ParaView to visualize the current simulation state."""
+    vtk_path = payload.get("vtk_path")
+    return agent_desktop.launch_desktop_paraview(vtk_file_path=vtk_path)
+
+
+# ---------------------------------------------------------------------------
+# Internship Alert Pipeline Endpoints (Sector V Kolkata Early Applicant Tracker)
+# ---------------------------------------------------------------------------
+
+@app.get("/tracker")
+def view_internship_tracker():
+    """Serve the real-time HTML dashboard for Sector V / Kolkata internships."""
+    html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "internship_tracker.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html")
+    return Response("<h1>Tracker not initialized yet. Run scripts/internship_alert_pipeline.py</h1>", media_type="text/html")
+
+@app.get("/api/internships/latest")
+def get_latest_internships():
+    """Retrieve the latest scanned internships with applicant counts and early applicant flags."""
+    json_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "latest_internships.json")
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                return {"ok": True, "data": json.load(f)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    return {"ok": True, "data": []}
+
+

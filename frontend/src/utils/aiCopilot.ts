@@ -1,4 +1,3 @@
-import type Anthropic from '@anthropic-ai/sdk';
 import type { AiProviderConfig, AiProviderType, AiResponse } from '../types/cfd';
 
 const STORAGE_KEY = 'openzess_ai_copilot_config';
@@ -83,13 +82,13 @@ Respond clearly with concise scientific explanations and executable OpenFOAM dic
 // access is intended here. (Previously the Claude option fell through to the
 // OpenAI code path and POSTed the Anthropic key to api.openai.com.)
 // Loaded on first use so users of other providers never download the SDK
-let sdkPromise: Promise<typeof Anthropic> | null = null;
-function loadSdk(): Promise<typeof Anthropic> {
-  sdkPromise ??= import('@anthropic-ai/sdk').then(mod => mod.default);
+let sdkPromise: Promise<any> | null = null;
+function loadSdk(): Promise<any> {
+  sdkPromise ??= import('@anthropic-ai/sdk' as any).then((mod: any) => mod.default);
   return sdkPromise;
 }
 
-async function claudeClient(config: AiProviderConfig): Promise<Anthropic> {
+async function claudeClient(config: AiProviderConfig): Promise<any> {
   const AnthropicSDK = await loadSdk();
   return new AnthropicSDK({
     apiKey: config.apiKey,
@@ -99,16 +98,27 @@ async function claudeClient(config: AiProviderConfig): Promise<Anthropic> {
 }
 
 async function describeClaudeError(err: unknown): Promise<string> {
-  const AnthropicSDK = await loadSdk();
-  if (err instanceof AnthropicSDK.AuthenticationError) return 'Invalid Anthropic API key.';
-  if (err instanceof AnthropicSDK.RateLimitError) return 'Rate limited by the Claude API — retry shortly.';
-  if (err instanceof AnthropicSDK.APIError) return `Claude API error ${err.status ?? ''}: ${err.message}`;
+  try {
+    const AnthropicSDK = await loadSdk();
+    if (AnthropicSDK && AnthropicSDK.AuthenticationError && err instanceof AnthropicSDK.AuthenticationError) {
+      return 'Invalid Anthropic API key.';
+    }
+    if (AnthropicSDK && AnthropicSDK.RateLimitError && err instanceof AnthropicSDK.RateLimitError) {
+      return 'Rate limited by the Claude API — retry shortly.';
+    }
+    if (AnthropicSDK && AnthropicSDK.APIError && err instanceof AnthropicSDK.APIError) {
+      const apiErr = err as any;
+      return `Claude API error ${apiErr.status ?? ''}: ${apiErr.message}`;
+    }
+  } catch {
+    // fallback if SDK fails to load
+  }
   return err instanceof Error ? err.message : String(err);
 }
 
 async function queryClaude(config: AiProviderConfig, prompt: string, context?: string): Promise<string> {
   const client = await claudeClient(config);
-  const response = await client.beta.messages.create({
+  const response: any = await client.beta.messages.create({
     model: config.model || 'claude-opus-5-5',
     max_tokens: 16000,
     system: SYSTEM_PROMPT,
@@ -121,12 +131,13 @@ async function queryClaude(config: AiProviderConfig, prompt: string, context?: s
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default'
   });
-  if (response.stop_reason === 'refusal') {
+  if (response?.stop_reason === 'refusal') {
     return '⚠️ Claude declined this request. Try rephrasing the question.';
   }
-  const text = response.content
-    .filter((block): block is Anthropic.Beta.BetaTextBlock => block.type === 'text')
-    .map(block => block.text)
+  const contentList: any[] = Array.isArray(response?.content) ? response.content : [];
+  const text = contentList
+    .filter((block: any) => block?.type === 'text')
+    .map((block: any) => block?.text ?? '')
     .join('\n')
     .trim();
   return text || 'No response received from Claude.';

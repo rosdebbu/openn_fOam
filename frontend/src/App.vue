@@ -5,6 +5,7 @@
       :caseName="params.caseName"
       :currentArchetype="params.archetype"
       :solverMode="params.solverMode"
+      :viewportMode="viewportMode"
       :aiConfig="aiConfig"
       :isPlaying="isPlaying"
       :isConnected="isConnected"
@@ -12,6 +13,7 @@
       @update:caseName="val => params.caseName = val"
       @update:archetype="setArchetype"
       @update:solverMode="val => params.solverMode = val"
+      @update:viewportMode="val => viewportMode = val"
       @openSettings="isSettingsOpen = true"
       @togglePlay="togglePlay"
       @stepBack="stepBack"
@@ -59,12 +61,16 @@
         </button>
 
         <CfdThree3D
+          v-if="viewportMode === 'three'"
           ref="viewportRef"
           :data="simulationData"
           :params="params"
           :telemetry="telemetry"
           @update:activeField="val => params.activeField = val"
         />
+
+        <!-- ParaView Web Glance Client-Side (vtk.js) Viewport -->
+        <ParaViewGlanceViewer v-else />
 
         <!-- Floating Bottom Slide Drawer: Telemetry & OpenFOAM Terminal Drawer -->
         <div class="bottom-telemetry-dock" :class="{ 'dock-expanded': isBottomDockOpen }">
@@ -144,16 +150,19 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
-import type { SimulationParams, SimulationStepData, SimulationArchetype, SolverMode, AiProviderConfig, AerodynamicTelemetry } from './types/cfd';
+import type { SimulationParams, SimulationStepData, SimulationArchetype, SolverMode, ViewportMode, AiProviderConfig, AerodynamicTelemetry } from './types/cfd';
 import { getStoredAiConfig } from './utils/aiCopilot';
 import { saveProject, loadProjectState } from './utils/projectStore';
 
 import HeaderNavbar from './components/HeaderNavbar.vue';
 import SidebarControls from './components/SidebarControls.vue';
 import CfdThree3D from './components/CfdThree3D.vue';
+import ParaViewGlanceViewer from './components/ParaViewGlanceViewer.vue';
 import ResidualChart from './components/ResidualChart.vue';
 import SolverLog, { type SolverLogEntry } from './components/SolverLog.vue';
 import SettingsModal from './components/SettingsModal.vue';
+
+const viewportMode = ref<ViewportMode>('three');
 
 // Studio Simulation Parameters matching Mockup
 const params = reactive<SimulationParams>({
