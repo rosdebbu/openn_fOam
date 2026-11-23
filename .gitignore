@@ -46,3 +46,10 @@ experiments/output/
 # AI tool session files (contain account emails / local paths)
 # =====================
 .antigravity-chats/
+
+# =====================
+# Local RL model checkpoints & graphify daily backups
+# =====================
+openzess_qwen3_0.6b_rl/
+graphify-out/20*/
+
