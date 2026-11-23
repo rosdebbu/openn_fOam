@@ -225,11 +225,30 @@ export async function testAiConnection(config: AiProviderConfig): Promise<{ succ
 export async function queryAiCopilot(prompt: string, context?: string): Promise<AiResponse> {
   const config = getStoredAiConfig();
   if (!config.apiKey && config.provider !== 'ollama') {
-    return {
-      query: prompt,
-      analysis: '⚠️ No LLM API Key is configured yet. Click **[ 🔑 Set AI Key ]** in the top navbar to configure Google Gemini, OpenAI, Claude, DeepSeek, Groq, or Local Ollama.',
-      suggestedSolver: 'buoyantBoussinesqSimpleFoam'
-    };
+    // Route automatically to local RTX 5050 Qwen3-0.6B RL model when no cloud API key is set
+    try {
+      const apiBase = `http://${window.location.hostname}:8000`;
+      const res = await fetch(`${apiBase}/api/qwen/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, context })
+      });
+      const data = await res.json();
+      if (data.ok && data.analysis) {
+        return {
+          query: prompt,
+          analysis: data.analysis,
+          suggestedSolver: 'icoFoam (Local Qwen3-0.6B RL)'
+        };
+      }
+      throw new Error(data.error || 'Local Qwen backend error');
+    } catch (err: any) {
+      return {
+        query: prompt,
+        analysis: `⚠️ Local Qwen3-0.6B unavailable (${err?.message || err}). Click **[ 🔑 Set AI Key ]** in the top navbar to configure Gemini, OpenAI, Claude, or Ollama.`,
+        suggestedSolver: 'buoyantBoussinesqSimpleFoam'
+      };
+    }
   }
 
   const fullPrompt = `${SYSTEM_PROMPT}\n\n${context ? `Current Simulation Context:\n${context}\n\n` : ''}User Query: ${prompt}`;

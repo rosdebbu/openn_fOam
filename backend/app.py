@@ -83,6 +83,8 @@ async def add_no_cache_headers(request, call_next):
 @app.get("/studio")
 @app.get("/studio/")
 @app.get("/studio/index.html")
+@app.get("/paraview")
+@app.get("/paraview/")
 def serve_studio_index():
     index_file = os.path.join(static_dir, "index.html") if static_dir else ""
     if index_file and os.path.exists(index_file):
@@ -612,5 +614,150 @@ def get_latest_internships():
         except Exception as e:
             return {"ok": False, "error": str(e)}
     return {"ok": True, "data": []}
+
+
+# ---------------------------------------------------------------------------
+# Laya System-1 Decision Router (https://github.com/NandhaKishorM/laya)
+# ---------------------------------------------------------------------------
+_laya_router = None
+
+LAYA_CFD_PRESETS = {
+    "simple_house": {"preset_id": 4, "reynolds": 200.0, "dt": 0.004, "desc": "Simple house with walls and pitched roof in wind with structural stress FSI"},
+    "building_fsi": {"preset_id": 3, "reynolds": 300.0, "dt": 0.004, "desc": "Wind pressure fluid-structure interaction on a tall 20m glass tower or skyscraper"},
+    "cylinder":     {"preset_id": 1, "reynolds": 100.0, "dt": 0.005, "desc": "Cylinder bluff-body flow and Karman vortex shedding"},
+    "airfoil":      {"preset_id": 5, "reynolds": 400.0, "dt": 0.003, "desc": "NACA airfoil wing aerodynamics lift and drag"},
+    "venturi":      {"preset_id": 2, "reynolds": 250.0, "dt": 0.003, "desc": "Venturi pipe constriction and Bernoulli pressure drop"},
+    "cavity":       {"preset_id": 0, "reynolds": 100.0, "dt": 0.005, "desc": "Lid-driven square cavity CFD benchmark Ghia 1982"},
+}
+
+def _get_laya_router():
+    global _laya_router
+    if _laya_router is None:
+        import laya
+        _laya_router = laya.LayaRouter(
+            criteria={name: info["desc"] for name, info in LAYA_CFD_PRESETS.items()},
+            instructions="Select the best CFD simulation preset for the user's physics request.",
+            fallback="cylinder",
+        )
+    return _laya_router
+
+@app.post("/api/ai/simulate")
+def ai_simulate(payload: Dict[str, Any] = Body(default={})):
+    """Natural-language prompt -> validated, runnable simulation spec."""
+    from .ai_simulate import build_spec
+    prompt = str(payload.get("prompt", "")).strip()
+    return build_spec(prompt) if prompt else {"ok": False, "message": "Missing 'prompt'"}
+
+
+@app.post("/api/laya/route")
+def laya_route_simulation(payload: Dict[str, Any] = Body(default={})):
+    """Route a natural-language CFD request in <40ms using local Laya System-1 engine."""
+    prompt = str(payload.get("prompt", "")).strip()
+    if not prompt:
+        return {"ok": False, "error": "Missing 'prompt'"}
+    try:
+        router = _get_laya_router()
+        decision = router.route(prompt) if hasattr(router, "route") else router(prompt)
+        route_name = getattr(decision, "route", None) or str(decision)
+        preset = LAYA_CFD_PRESETS.get(route_name, LAYA_CFD_PRESETS["cylinder"])
+        return {
+            "ok": True,
+            "engine": "laya-system1",
+            "route": route_name,
+            "confidence": getattr(decision, "confidence", None),
+            "preset": preset,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Local RTX 5050 Qwen3-0.6B + RL Adapter Chat Endpoint (Zero API Key)
+# ---------------------------------------------------------------------------
+_qwen_model = None
+_qwen_tok = None
+
+def _get_qwen_rl():
+    global _qwen_model, _qwen_tok
+    if _qwen_model is None:
+        import torch
+        from transformers import AutoTokenizer, AutoModelForCausalLM
+        from peft import PeftModel
+        adapter_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "openzess_qwen3_0.6b_rl")
+        base_id = "Qwen/Qwen3-0.6B"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        dtype = torch.bfloat16 if device == "cuda" else torch.float32
+        base = AutoModelForCausalLM.from_pretrained(base_id, dtype=dtype, device_map=device)
+        _qwen_model = PeftModel.from_pretrained(base, adapter_dir) if os.path.exists(adapter_dir) else base
+        _qwen_tok = AutoTokenizer.from_pretrained(base_id)
+    return _qwen_model, _qwen_tok
+
+@app.post("/api/qwen/chat")
+def qwen_local_chat(payload: Dict[str, Any] = Body(default={})):
+    """Chat with the local RL-tuned Qwen3-0.6B CFD assistant on RTX 5050."""
+    prompt = str(payload.get("prompt", "")).strip()
+    context = str(payload.get("context", "")).strip()
+    if not prompt:
+        return {"ok": False, "error": "Missing 'prompt'"}
+    try:
+        import torch
+        model, tok = _get_qwen_rl()
+        sys_msg = (
+            "You are the OpenZess AI CFD Co-Pilot (Qwen3-0.6B RL). "
+            "Help the user with OpenFOAM simulations, boundary conditions, Reynolds number, dt, and ParaView. "
+            "Be concise and practical."
+        )
+        user_msg = f"Context:\n{context}\n\nQuestion: {prompt}" if context else prompt
+        msgs = [{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}]
+        text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+        inputs = tok(text, return_tensors="pt").to(model.device)
+        with torch.no_grad():
+            out = model.generate(**inputs, max_new_tokens=220, do_sample=True, temperature=0.6, top_p=0.9)
+        reply = tok.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
+        return {"ok": True, "engine": "qwen3-0.6b-rl-rtx5050", "analysis": reply}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/ai/simulate")
+def unified_ai_simulate(payload: Dict[str, Any] = Body(default={})):
+    """Unified simulation router combining Laya System-1 + keyword guardrails for 1-click WASM launch."""
+    prompt = str(payload.get("prompt", "")).strip()
+    if not prompt:
+        return {"ok": False, "error": "Missing 'prompt'"}
+    low = prompt.lower()
+    # Fast deterministic check for everyday shapes, backed by Laya System-1 for open-ended queries
+    route_name = None
+    if any(w in low for w in ("house", "home", "roof", "cottage", "bungalow")):
+        route_name = "simple_house"
+    elif any(w in low for w in ("tower", "skyscraper", "building", "glass", "fsi", "stress")):
+        route_name = "building_fsi"
+    elif any(w in low for w in ("airfoil", "wing", "naca", "f1", "spoiler", "lift")):
+        route_name = "airfoil"
+    elif any(w in low for w in ("venturi", "pipe", "nozzle", "bernoulli", "throat")):
+        route_name = "venturi"
+    elif any(w in low for w in ("cavity", "lid", "ghia", "box")):
+        route_name = "cavity"
+    elif any(w in low for w in ("cylinder", "vortex", "karman", "circle")):
+        route_name = "cylinder"
+
+    engine = "openzess-laya-hybrid"
+    if route_name is None:
+        try:
+            router = _get_laya_router()
+            decision = router.route(prompt) if hasattr(router, "route") else router(prompt)
+            route_name = getattr(decision, "route", None) or str(decision)
+            engine = "laya-system1"
+        except Exception:
+            route_name = "simple_house"
+
+    preset = LAYA_CFD_PRESETS.get(route_name, LAYA_CFD_PRESETS["simple_house"])
+    return {
+        "ok": True,
+        "engine": engine,
+        "route": route_name,
+        "preset": preset,
+    }
+
 
 

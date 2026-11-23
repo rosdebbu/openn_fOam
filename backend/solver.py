@@ -179,7 +179,7 @@ def build_obstacle_mask(
     """Construct the discrete solid-body mask for ANY supported archetype.
 
     `obstacle_spec` enables fully custom geometry straight from the UI:
-        {"shape": "circle"|"square"|"rectangle"|"airfoil",
+        {"shape": "circle"|"square"|"rectangle"|"airfoil"|"house"|"tower",
          "cx": 0..1, "cy": 0..1, "size": 0..1, "aoa": degrees}
     This is the pathway that lets users build their OWN simulations.
     """
@@ -256,6 +256,15 @@ def build_obstacle_mask(
                 mask = (np.abs(X - cx) <= 1.6 * size * lx) & (np.abs(Y - cy) <= 0.6 * size * ly)
             elif shape == "airfoil":
                 mask = _naca_symmetric_mask(X, Y, cx, cy, 3.0 * size * lx, spec_aoa, 0.12)
+            elif shape == "house":
+                # Side elevation: square walls (Y in [cy-half, cy]) + triangular pitched roof
+                half = size * ly
+                dx = np.abs(X - cx)
+                walls = (dx <= half) & (Y >= cy - half) & (Y <= cy)
+                roof = (dx <= half) & (Y > cy) & (Y <= cy + 0.8 * half * (1.0 - dx / half))
+                mask = walls | roof
+            elif shape == "tower":
+                mask = (np.abs(X - cx) <= 0.4 * size * ly) & (np.abs(Y - cy) <= 2.0 * size * ly)
         # No spec yet -> no geometry (user has not chosen a shape)
 
     # plume / weather_plume / cavity -> no solid obstacle (thermal or lid driven)
