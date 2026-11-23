@@ -25,7 +25,7 @@ potential-flow preview. Cases can be exported as ParaView `.vtk` files and edite
 OpenFOAM-style dictionaries. Everything runs locally.
 
 <div align="center">
-  <img src="docs/assets/openzess_studio_ui.jpg" alt="OpenZess Studio UI" width="800"/>
+  <img src="docs/assets/openzess_studio_ui.png" alt="OpenZess Studio 3D CFD Workbench" width="880"/>
 </div>
 
 ---
