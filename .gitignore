@@ -48,8 +48,11 @@ experiments/output/
 .antigravity-chats/
 
 # =====================
-# Local RL model checkpoints & graphify daily backups
+# Local RL model checkpoints, reports & graphify daily backups
 # =====================
 openzess_qwen3_0.6b_rl/
 graphify-out/20*/
+*.pdf
+*.docx
+
 
