@@ -26,7 +26,7 @@
         :class="{ active: activeMode === 'manual' }"
         @click="setMode('manual')"
       >
-        <span>⚙️ Manual OpenFOAM</span>
+        <span>⚙️ Manual OpenZess</span>
       </button>
       <button
         class="mode-btn"
@@ -721,7 +721,9 @@ const builderShapes = [
   { id: 'circle', name: 'Cylinder', icon: '⚪' },
   { id: 'square', name: 'Square', icon: '⬛' },
   { id: 'rectangle', name: 'Plate', icon: '▬' },
-  { id: 'airfoil', name: 'Airfoil', icon: '✈️' }
+  { id: 'airfoil', name: 'Airfoil', icon: '✈️' },
+  { id: 'house', name: 'House', icon: '🏠' },
+  { id: 'tower', name: 'Tower', icon: '🏢' }
 ];
 const builderShape = ref<string | null>(null);
 const builderCx = ref(0.4);
@@ -1154,8 +1156,31 @@ function handleFileDrop(e: DragEvent) {
   }
 }
 
-function parseActionFromAiResponse(aiText: string, userText: string) {
-  const combined = (aiText + ' ' + userText).toLowerCase();
+// Deterministic prompt -> runnable spec (backend/ai_simulate.py); never guesses a shape from the LLM's reply
+async function fetchSimulationAction(prompt: string) {
+  try {
+    const res = await fetch(`http://${window.location.hostname}:8000/api/ai/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    if (!data.ok) return null;
+    const s = data.simulation_spec;
+    return {
+      archetype: s.archetype as SimulationArchetype,
+      substance: s.fluid.substance as string,
+      re: s.fluid.reynolds as number,
+      obstacleSpec: s.obstacleSpec as { shape: string; cx: number; cy: number; size: number; aoa: number } | undefined,
+      label: data.message as string
+    };
+  } catch {
+    return null; // backend offline -> fall back to keyword parse
+  }
+}
+
+function parseActionFromAiResponse(_aiText: string, userText: string) {
+  const combined = userText.toLowerCase();
   let arch: SimulationArchetype | undefined;
   if (combined.includes('submarine') || combined.includes('hull')) arch = 'submarine';
   else if (combined.includes('airfoil') || combined.includes('naca') || combined.includes('wing')) arch = 'airfoil';
@@ -1203,6 +1228,16 @@ function executeAiAction(action: any) {
   if (action.re) {
     updated.reynoldsNumber = action.re;
   }
+  if (action.obstacleSpec) {
+    const o = action.obstacleSpec;
+    builderShape.value = o.shape;
+    builderCx.value = o.cx;
+    builderCy.value = o.cy;
+    builderSize.value = o.size;
+    builderAoa.value = o.aoa;
+    emitCustomGeometry();
+    updated.caseName = `AI_${o.shape}_Run`;
+  }
   emit('update:params', updated);
   emit('startSimulation');
   chatMessages.value.push({
@@ -1226,10 +1261,10 @@ async function handleSendAiPrompt() {
   if (chatHistoryRef.value) chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight;
 
   const context = `Substance: ${currentSubstance.value.name}, Gravity: ${gravityZ.value}, Temp: ${coreTemp.value}, Archetype: ${props.params.archetype}`;
-  const res = await queryAiCopilot(promptText, context);
+  const [res, simAction] = await Promise.all([queryAiCopilot(promptText, context), fetchSimulationAction(promptText)]);
 
   isAiLoading.value = false;
-  const detectedAction = parseActionFromAiResponse(res.analysis, promptText);
+  const detectedAction = simAction ?? parseActionFromAiResponse(res.analysis, promptText);
   const dictCode = res.openfoamDictSnippet || extractDictCode(res.analysis);
 
   chatMessages.value.push({

@@ -1,7 +1,8 @@
 <template>
   <div class="app-layout">
-    <!-- Top Navigation Header -->
+    <!-- Top Navigation Header (only shown in legacy 3D WebGL mode; unified OpenZess Workbench owns its full chrome) -->
     <HeaderNavbar
+      v-if="viewportMode === 'three'"
       :caseName="params.caseName"
       :currentArchetype="params.archetype"
       :solverMode="params.solverMode"
@@ -27,10 +28,10 @@
 
     <!-- Main Studio Body -->
     <div class="studio-body">
-      <!-- Left OpenFOAM Case Hub (Collapsible Slide Bar) -->
+      <!-- Left Case Hub (only in legacy 3D WebGL mode) -->
       <transition name="slide-sidebar">
         <SidebarControls
-          v-show="isSidebarOpen"
+          v-show="isSidebarOpen && viewportMode === 'three'"
           :params="params"
           :aiConfig="aiConfig"
           :isComputing="status === 'computing'"
@@ -50,7 +51,7 @@
       <main class="viewport-area">
         <!-- Floating Expand Pill when Sidebar is Collapsed -->
         <button
-          v-if="!isSidebarOpen"
+          v-if="!isSidebarOpen && viewportMode === 'three'"
           class="sidebar-floating-toggle-btn"
           @click="toggleSidebar"
           title="Open Case Hub (Ctrl + \)"
@@ -72,8 +73,8 @@
         <!-- ParaView Web Glance Client-Side (vtk.js) Viewport -->
         <ParaViewGlanceViewer v-else />
 
-        <!-- Floating Bottom Slide Drawer: Telemetry & OpenFOAM Terminal Drawer -->
-        <div class="bottom-telemetry-dock" :class="{ 'dock-expanded': isBottomDockOpen }">
+        <!-- Floating Bottom Slide Drawer (legacy 3D WebGL mode only) -->
+        <div v-if="viewportMode === 'three'" class="bottom-telemetry-dock" :class="{ 'dock-expanded': isBottomDockOpen }">
           <!-- Slide Bar Handle Pill -->
           <div class="dock-slide-bar" @click="isBottomDockOpen = !isBottomDockOpen">
             <div class="slide-bar-left">
@@ -162,7 +163,7 @@ import ResidualChart from './components/ResidualChart.vue';
 import SolverLog, { type SolverLogEntry } from './components/SolverLog.vue';
 import SettingsModal from './components/SettingsModal.vue';
 
-const viewportMode = ref<ViewportMode>('three');
+const viewportMode = ref<ViewportMode>('paraview');
 
 // Studio Simulation Parameters matching Mockup
 const params = reactive<SimulationParams>({
@@ -193,8 +194,17 @@ const params = reactive<SimulationParams>({
 const aiConfig = reactive<AiProviderConfig>(getStoredAiConfig());
 const isSettingsOpen = ref(false);
 const isBottomDockOpen = ref(false);
-const isSidebarOpen = ref(true);
+const isSidebarOpen = ref(false);
 const activeDockTab = ref<'residuals' | 'terminal'>('terminal');
+
+watch(viewportMode, (newMode) => {
+  if (newMode === 'paraview') {
+    isSidebarOpen.value = false;
+  }
+  setTimeout(() => {
+    window.dispatchEvent(new Event('resize'));
+  }, 100);
+});
 
 function toggleSidebar() {
   isSidebarOpen.value = !isSidebarOpen.value;
