@@ -2580,10 +2580,13 @@ async function sendAiChat(overridePrompt?: string) {
       const nx = spec.mesh?.nx ?? 41;
       const shapeName = spec.geometry?.type || spec.archetype || 'custom';
 
+      pendingPresetRe = reVal;
       const changed = wasmPreset.value !== targetPreset;
       wasmPreset.value = targetPreset;
-      if (!changed) await initPresetPreview(targetPreset, reVal);
-      else customReynolds.value = reVal;
+      if (!changed) {
+        pendingPresetRe = undefined;
+        await initPresetPreview(targetPreset, reVal);
+      }
 
       chatMessages.value.push({
         id: Date.now() + 1,
