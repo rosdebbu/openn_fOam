@@ -65,7 +65,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt
 # optional, for the AI model:
-pip install torch transformers peft
+pip install torch transformers peft laya trl   # laya = intent router (installed 0.3.20 on laptop 1); trl only for retraining
 
 cd frontend
 npm ci
