@@ -972,14 +972,15 @@ def _run_ai_pipeline(prompt: str, context: str = "", history: list | None = None
     # Stage 3 fallback: deterministic CFL-guarded rule router (or procedural custom idea)
     if is_custom_idea:
         prims = _procedural_primitives_for_idea(prompt)
-        spec = validate_spec({"mode": "2d", "archetype": "custom", "geometry": {"type": sanitize_case_name(prompt[:24])}, "fluid": {"substance": "air", "reynolds": 300}, "mesh": {"nx": 41}, "numerics": {"dt": 0.0035}})
+        fb_re = explicit_reynolds(prompt) or 300
+        spec = validate_spec({"mode": "2d", "archetype": "custom", "geometry": {"type": sanitize_case_name(prompt[:24])}, "fluid": {"substance": "air", "reynolds": fb_re}, "mesh": {"nx": 41}, "numerics": {"dt": 0.0035}})
         return {
             "ok": True,
             "intent": "simulate",
-            "engine": "Procedural 3D Builder + CFL Guard",
+            "engine": "Keyword Template Builder + CFL Guard",
             "laya_route": laya_route,
             "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
-            "message": f"Model unavailable. Used a keyword template ({len(prims)} parts) for \"{prompt[:36]}\" (Re=300, dt={spec['numerics']['dt']:.5f}s). Edit parts in 🛠️ Build.",
+            "message": f"Model unavailable. Used a keyword template ({len(prims)} parts) for \"{prompt[:36]}\" (Re={spec['fluid']['reynolds']:g}, dt={spec['numerics']['dt']:.5f}s). Edit parts in 🛠️ Build.",
             "simulation_spec": spec,
             "custom_primitives": prims,
             "custom_name": prompt[:36],
