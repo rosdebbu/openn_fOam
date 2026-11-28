@@ -135,7 +135,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import * as THREE from 'three';
-import type { OpenFoamWasmEngine } from '../utils/openfoamWasmBridge';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { OpenFoamWasmEngine, CustomPrimitive } from '../utils/openfoamWasmBridge';
 
 const props = defineProps<{
   engine: OpenFoamWasmEngine | null;
@@ -149,6 +150,15 @@ const props = defineProps<{
   representation: 'surface' | 'surface_with_edges' | 'wireframe' | 'points';
   opacity: number;
   showSource: boolean;
+  customPrimitives?: CustomPrimitive[];
+  customGlbUrl?: string;
+  filters: {
+    slice: boolean;
+    clip: boolean;
+    contour: boolean;
+    glyph: boolean;
+    streamlines: boolean;
+  };
 }>();
 
 const emit = defineEmits<{
@@ -190,28 +200,37 @@ let modelGroup: THREE.Group | null = null;
 let swayTarget: THREE.Object3D | null = null;
 let lidBeltMesh: THREE.Mesh | null = null;
 
-// 3D Flow Beads (InstancedMesh for crisp 60 FPS beads + dark ink rims)
-const BEAD_COUNT = 84;
-let beadCoreMesh: THREE.InstancedMesh | null = null;
-let beadRimMesh: THREE.InstancedMesh | null = null;
+// Real ParaView Pipeline Filter Objects (Slice, Clip, Contour, Glyph, RK4 StreamTracer)
+let slicePlaneMesh: THREE.Mesh | null = null;
+let streamlinesGroup: THREE.Group | null = null;
+let contourGroup: THREE.Group | null = null;
+let glyphMesh: THREE.InstancedMesh | null = null;
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0.05);
+const GLYPH_NX = 10;
+const GLYPH_NY = 8;
+const GLYPH_COUNT = GLYPH_NX * GLYPH_NY;
+
+// Flow tracers: streaklines advected through the live solver velocity field.
+const TRACER_COUNT = 220;
+const TRAIL_LEN = 32;
+const TRACER_HEIGHT = 0.3; // above the deck: the physics is 2-D, so one flat layer
+let tracerLines: THREE.LineSegments | null = null;
 let freeProbeMesh: THREE.Group | null = null;
 let freeTrailLine: THREE.Line | null = null;
 const dummyObj = new THREE.Object3D();
 
-interface BeadState {
+interface Tracer {
   x: number; // domain [-1, 1]
-  y: number; // domain [-1, 1]
-  z: number; // height above deck
-  life: number;
-  maxLife: number;
+  y: number;
+  age: number;
+  maxAge: number;
+  speed: number;
+  trail: Float32Array; // TRAIL_LEN domain points, oldest first
 }
-const beads: BeadState[] = Array.from({ length: BEAD_COUNT }, () => ({
-  x: Math.random() * 2 - 1,
-  y: Math.random() * 2 - 1,
-  z: 0.35 + Math.random() * 1.4,
-  life: Math.random() * 160,
-  maxLife: 120 + Math.random() * 80
+const tracers: Tracer[] = Array.from({ length: TRACER_COUNT }, () => ({
+  x: 0, y: 0, age: 1e9, maxAge: 0, speed: 0, trail: new Float32Array(TRAIL_LEN * 2)
 }));
+let seedPhase = 0;
 
 const freeProbe = {
   x: -0.92,
@@ -251,7 +270,7 @@ function addInkOutlinedPart(
   geo: THREE.BufferGeometry,
   colorHex: number,
   inkHex: number = 0x18213d,
-  opts?: { metalness?: number; roughness?: number; transparent?: boolean; opacity?: number }
+  opts?: { metalness?: number; roughness?: number; transparent?: boolean; opacity?: number; edgeAngle?: number }
 ): THREE.Mesh {
   const mat = new THREE.MeshStandardMaterial({
     color: colorHex,
@@ -264,7 +283,7 @@ function addInkOutlinedPart(
   mesh.castShadow = !opts?.transparent;
   mesh.receiveShadow = true;
 
-  const edges = new THREE.EdgesGeometry(geo, 22);
+  const edges = new THREE.EdgesGeometry(geo, opts?.edgeAngle ?? 22);
   const lineMat = new THREE.LineBasicMaterial({
     color: inkHex,
     transparent: true,
@@ -324,9 +343,74 @@ function rebuildPresetModel() {
     }
   }
 
-  // 2. Preset-Specific 3D Architectural / Aerodynamic Model
+  // 2. Preset-Specific OR AI-Generated Real .GLB Mesh OR Custom 3D Primitives
   const p = props.preset;
-  if (p === 4) {
+  if (props.customGlbUrl) {
+    const targetGroup = modelGroup;
+    const loader = new GLTFLoader();
+    loader.load(props.customGlbUrl, (gltf) => {
+      if (modelGroup !== targetGroup) return;
+      const root = gltf.scene;
+      const box = new THREE.Box3().setFromObject(root);
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+      const maxDim = Math.max(size.x, size.y, size.z, 0.001);
+      const scale = 5.0 / maxDim;
+      root.scale.setScalar(scale);
+      root.position.set(-center.x * scale - 0.6, DECK_H - box.min.y * scale + 0.04, -center.z * scale);
+      root.traverse((obj: any) => {
+        if (obj.isMesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+        }
+      });
+      targetGroup.add(root);
+    });
+  } else if (props.customPrimitives && props.customPrimitives.length > 0) {
+    const customGrp = new THREE.Group();
+    for (const prim of props.customPrimitives) {
+      const colHex = prim.color ? parseInt(prim.color.replace('#', ''), 16) : 0xd8cfc6;
+      const sx = Math.max(0.4, prim.w * DECK_W * 0.44);
+      const sz = Math.max(0.4, prim.h * DECK_D * 0.44);
+      const sy = Math.max(0.4, (prim.d ?? 0.35) * 4.2);
+      // The solver sees every part as a plan-view footprint (box = rectangle, cylinder and
+      // capsule = ellipse, cone = wedge pointing into the flow). Draw exactly that footprint,
+      // extruded upward with softened edges, so the body matches what the flow goes around.
+      let geo: THREE.BufferGeometry;
+      if (prim.kind === 'box') {
+        geo = new THREE.BoxGeometry(sx, sy, sz);
+      } else {
+        const bevel = Math.min(0.14, Math.min(sx, sz) * 0.12, sy * 0.3);
+        const hx = sx / 2 - bevel, hz = sz / 2 - bevel;
+        const shape = new THREE.Shape();
+        if (prim.kind === 'cone') {
+          shape.moveTo(-hx, -hz * 0.15);
+          shape.lineTo(hx, -hz);
+          shape.lineTo(hx, hz);
+          shape.lineTo(-hx, hz * 0.15);
+          shape.closePath();
+        } else {
+          shape.absellipse(0, 0, hx, hz, 0, Math.PI * 2, false, 0);
+        }
+        geo = new THREE.ExtrudeGeometry(shape, {
+          depth: Math.max(0.05, sy - 2 * bevel),
+          bevelEnabled: true,
+          bevelSize: bevel,
+          bevelThickness: bevel,
+          bevelSegments: 3,
+          curveSegments: 48
+        });
+        geo.rotateX(-Math.PI / 2); // shape y -> world -z (= domain +y), extrusion -> up
+        geo.translate(0, -(sy - 2 * bevel) / 2, 0); // centre vertically like the box
+      }
+      const mesh = addInkOutlinedPart(customGrp, geo, colHex, ink, { roughness: 0.38, metalness: 0.2, edgeAngle: 55 });
+      const wp = domainToWorld(prim.x, prim.y, (prim.z ?? 0) + sy * 0.5);
+      mesh.position.copy(wp);
+    }
+    modelGroup.add(customGrp);
+  } else if (p === 4) {
     // Fig. 01 — Simple House (Wind + FSI)
     const house = new THREE.Group();
     house.position.set(-1.3, DECK_H, 0.3);
@@ -451,6 +535,39 @@ function rebuildPresetModel() {
       wall.position.set(0, 2.2, side * 4.9);
     }
     modelGroup.add(ventGroup);
+  } else if (p === 6) {
+    // Fig. 07 — Submarine Hull (Hydrodynamics)
+    const sub = new THREE.Group();
+    sub.position.set(-0.6, DECK_H + 1.35, 0);
+    const hull = addInkOutlinedPart(sub, new THREE.CapsuleGeometry(0.95, 4.0, 12, 20), 0x3f5466, ink, { roughness: 0.45, metalness: 0.25 });
+    hull.rotation.z = Math.PI / 2;
+    const sail = addInkOutlinedPart(sub, new THREE.BoxGeometry(1.3, 1.05, 0.55), 0x2d3d4b, ink);
+    sail.position.set(-0.2, 1.1, 0);
+    const periscope = addInkOutlinedPart(sub, new THREE.CylinderGeometry(0.06, 0.06, 0.7, 8), 0xc8a97e, ink);
+    periscope.position.set(-0.35, 1.9, 0);
+    const tailV = addInkOutlinedPart(sub, new THREE.BoxGeometry(0.7, 1.65, 0.14), 0xa89080, ink);
+    tailV.position.set(2.55, 0, 0);
+    const tailH = addInkOutlinedPart(sub, new THREE.BoxGeometry(0.7, 0.14, 1.75), 0xa89080, ink);
+    tailH.position.set(2.55, 0, 0);
+    modelGroup.add(sub);
+  } else if (p === 7) {
+    // Fig. 08 — Spaceship / Rocket (Aerodynamics)
+    const ship = new THREE.Group();
+    ship.position.set(-0.5, DECK_H + 1.45, 0);
+    const body = addInkOutlinedPart(ship, new THREE.CylinderGeometry(0.72, 0.78, 3.6, 20), 0xede6dd, ink, { roughness: 0.4 });
+    body.rotation.z = Math.PI / 2;
+    const nose = addInkOutlinedPart(ship, new THREE.ConeGeometry(0.72, 1.75, 20), 0xc85a44, ink);
+    nose.rotation.z = Math.PI / 2;
+    nose.position.set(-2.67, 0, 0);
+    const nozzle = addInkOutlinedPart(ship, new THREE.CylinderGeometry(0.45, 0.68, 0.65, 16), 0x3a3838, ink, { metalness: 0.45 });
+    nozzle.rotation.z = Math.PI / 2;
+    nozzle.position.set(2.1, 0, 0);
+    for (const ang of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+      const fin = addInkOutlinedPart(ship, new THREE.BoxGeometry(1.1, 0.95, 0.1), 0xc85a44, ink);
+      fin.position.set(1.35, Math.cos(ang) * 0.95, Math.sin(ang) * 0.95);
+      fin.rotation.x = ang;
+    }
+    modelGroup.add(ship);
   } else {
     // Fig. 06 — Lid-Driven Cavity (Cutaway Acrylic Box + Moving Top Belt)
     const cav = new THREE.Group();
@@ -504,13 +621,39 @@ function sampleColorRGB(t: number, preset: string): [number, number, number] {
   ];
 }
 
+// The solver grid is coarse (41x41). Draw it at 4x with bilinear interpolation so the
+// field reads as a smooth contour plot instead of a mosaic of blocks.
+const FIELD_UP = 4;
+const CONTOUR_LEVELS = 14;
+const rangeState = { key: '', lo: 0, hi: 1 };
+let rangeBuf = new Float32Array(0);
+const lutCache = new Map<string, Uint8Array>();
+
+function colorLut(preset: string): Uint8Array {
+  let lut = lutCache.get(preset);
+  if (!lut) {
+    lut = new Uint8Array(256 * 3);
+    for (let k = 0; k < 256; k++) {
+      const [r, g, b] = sampleColorRGB(k / 255, preset);
+      lut[3 * k] = r;
+      lut[3 * k + 1] = g;
+      lut[3 * k + 2] = b;
+    }
+    lutCache.set(preset, lut);
+  }
+  return lut;
+}
+
 function updateDeckScalarTexture() {
   const eng = props.engine;
   if (!eng || !deckCanvas || !deckCtx || !deckTexture) return;
   const { nx, ny, mask } = eng;
-  if (deckCanvas.width !== nx || deckCanvas.height !== ny) {
-    deckCanvas.width = nx;
-    deckCanvas.height = ny;
+  const W = (nx - 1) * FIELD_UP + 1;
+  const H = (ny - 1) * FIELD_UP + 1;
+  if (deckCanvas.width !== W || deckCanvas.height !== H) {
+    deckCanvas.width = W;
+    deckCanvas.height = H;
+    deckTexture.dispose(); // new size: let three re-allocate the GPU texture
   }
 
   let fieldArr: Float32Array = eng.speed;
@@ -518,30 +661,86 @@ function updateDeckScalarTexture() {
   else if (props.fieldKey === 'vorticity') fieldArr = eng.vorticity;
   else if (props.fieldKey === 'building_stress_MPa') fieldArr = eng.stress;
 
-  let minV = Infinity, maxV = -Infinity;
+  const showSolidDark = props.fieldKey !== 'building_stress_MPa';
+  // Range over fluid cells only, eased over time so colours do not flicker frame to frame.
+  // Percentiles, not min/max: a few corner cells must not wash out the whole plot.
+  if (rangeBuf.length < fieldArr.length) rangeBuf = new Float32Array(fieldArr.length);
+  let nFluid = 0;
   for (let i = 0; i < fieldArr.length; i++) {
-    if (fieldArr[i] < minV) minV = fieldArr[i];
-    if (fieldArr[i] > maxV) maxV = fieldArr[i];
+    if (showSolidDark && mask[i] === 1) continue;
+    rangeBuf[nFluid++] = fieldArr[i];
   }
-  const span = Math.max(1e-6, maxV - minV);
-  const img = deckCtx.createImageData(nx, ny);
-  for (let j = 0; j < ny; j++) {
-    for (let i = 0; i < nx; i++) {
-      const id = j * nx + i;
-      const py = ny - 1 - j;
-      const idx = (py * nx + i) * 4;
-      if (mask[id] === 1 && props.fieldKey !== 'building_stress_MPa') {
-        img.data[idx] = 58;
-        img.data[idx + 1] = 56;
-        img.data[idx + 2] = 56;
-        img.data[idx + 3] = 220;
+  let minV = 0, maxV = 1;
+  if (nFluid > 8) {
+    const vals = rangeBuf.subarray(0, nFluid);
+    vals.sort();
+    minV = vals[Math.floor(nFluid * 0.02)];
+    maxV = vals[Math.min(nFluid - 1, Math.floor(nFluid * 0.98))];
+  }
+  if (props.fieldKey === 'pressure' || props.fieldKey === 'vorticity') {
+    const m = Math.max(Math.abs(minV), Math.abs(maxV), 1e-6); // signed: centre the scale on zero
+    minV = -m;
+    maxV = m;
+  } else {
+    minV = 0; // speed and stress start at zero, so a uniform freestream sits mid-scale
+  }
+  const rk = props.fieldKey + '|' + nx + 'x' + ny;
+  if (rangeState.key !== rk) {
+    rangeState.key = rk;
+    rangeState.lo = minV;
+    rangeState.hi = maxV;
+  } else {
+    rangeState.lo += (minV - rangeState.lo) * 0.12;
+    rangeState.hi += (maxV - rangeState.hi) * 0.12;
+  }
+  const lo = rangeState.lo;
+  const span = Math.max(1e-6, rangeState.hi - rangeState.lo);
+
+  const lut = colorLut(props.colorMap);
+  const img = deckCtx.createImageData(W, H);
+  const data = img.data;
+  const isSolidColor = props.fieldKey === 'solid';
+  const isPointsMode = props.representation === 'points';
+  const fluidAlpha = Math.round(235 * props.opacity);
+  const solidR = props.isPaperTheme ? 168 : 110;
+  const solidG = props.isPaperTheme ? 144 : 102;
+  const solidB = props.isPaperTheme ? 128 : 96;
+  const dot = FIELD_UP * 2;
+  for (let py = 0; py < H; py++) {
+    const fj = (H - 1 - py) / FIELD_UP;
+    const j0 = Math.min(ny - 2, Math.floor(fj));
+    const ay = fj - j0;
+    for (let px = 0; px < W; px++) {
+      const o = (py * W + px) * 4;
+      if (isPointsMode && (px % dot > 1 || (H - 1 - py) % dot > 1)) {
+        data[o + 3] = 0;
+        continue;
+      }
+      const fi = px / FIELD_UP;
+      const i0 = Math.min(nx - 2, Math.floor(fi));
+      const ax = fi - i0;
+      const id = j0 * nx + i0;
+      // Solid mask, interpolated and thresholded: clean body edges at 4x resolution.
+      const m = (mask[id] * (1 - ax) + mask[id + 1] * ax) * (1 - ay)
+              + (mask[id + nx] * (1 - ax) + mask[id + nx + 1] * ax) * ay;
+      if (isSolidColor) {
+        data[o] = solidR; data[o + 1] = solidG; data[o + 2] = solidB;
+        data[o + 3] = Math.round(210 * props.opacity);
+      } else if (m > 0.5 && showSolidDark) {
+        data[o] = 58; data[o + 1] = 56; data[o + 2] = 56; data[o + 3] = 220;
       } else {
-        const t = (fieldArr[id] - minV) / span;
-        const [r, g, b] = sampleColorRGB(t, props.colorMap);
-        img.data[idx] = r;
-        img.data[idx + 1] = g;
-        img.data[idx + 2] = b;
-        img.data[idx + 3] = Math.round(235 * props.opacity);
+        const f = (fieldArr[id] * (1 - ax) + fieldArr[id + 1] * ax) * (1 - ay)
+                + (fieldArr[id + nx] * (1 - ax) + fieldArr[id + nx + 1] * ax) * ay;
+        let t = (f - lo) / span;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const c = 3 * ((t * 255) | 0);
+        // Thin iso-lines, as in a CFD contour plot.
+        const lv = t * CONTOUR_LEVELS;
+        const shade = Math.abs(lv - Math.round(lv)) < 0.035 ? 0.8 : 1;
+        data[o] = lut[c] * shade;
+        data[o + 1] = lut[c + 1] * shade;
+        data[o + 2] = lut[c + 2] * shade;
+        data[o + 3] = fluidAlpha;
       }
     }
   }
@@ -556,6 +755,15 @@ function updateDeckScalarTexture() {
   }
   if (deckWireframe) {
     deckWireframe.visible = props.showSource && props.representation === 'surface_with_edges';
+  }
+  if (modelGroup) {
+    const isWire = props.representation === 'wireframe';
+    modelGroup.visible = props.showSource;
+    modelGroup.traverse((obj: any) => {
+      if (obj.isMesh && obj.material && !Array.isArray(obj.material)) {
+        obj.material.wireframe = isWire;
+      }
+    });
   }
 }
 
@@ -572,6 +780,93 @@ function sampleFieldAt(dx: number, dy: number) {
     p: eng.p[id] || 0,
     solid: eng.mask[id] === 1
   };
+}
+
+// Bilinear velocity at a domain point (smooth paths), nearest-cell solid test.
+function sampleVelocity(dx: number, dy: number) {
+  const eng = props.engine;
+  if (!eng) return { u: 0, v: 0, solid: false };
+  const { nx, ny } = eng;
+  const fx = Math.max(0, Math.min(nx - 1.001, (dx + 1) * 0.5 * (nx - 1)));
+  const fy = Math.max(0, Math.min(ny - 1.001, (dy + 1) * 0.5 * (ny - 1)));
+  const i0 = Math.floor(fx), j0 = Math.floor(fy);
+  const ax = fx - i0, ay = fy - j0;
+  const a = j0 * nx + i0;
+  const w00 = (1 - ax) * (1 - ay), w10 = ax * (1 - ay), w01 = (1 - ax) * ay, w11 = ax * ay;
+  return {
+    u: eng.u[a] * w00 + eng.u[a + 1] * w10 + eng.u[a + nx] * w01 + eng.u[a + nx + 1] * w11,
+    v: eng.v[a] * w00 + eng.v[a + 1] * w10 + eng.v[a + nx] * w01 + eng.v[a + nx + 1] * w11,
+    solid: eng.mask[Math.round(fy) * nx + Math.round(fx)] === 1
+  };
+}
+
+function seedTracer(t: Tracer, warmStart: boolean) {
+  if (props.preset === 0) {
+    // Closed cavity: no inlet, so scatter inside the box.
+    t.x = Math.random() * 1.7 - 0.85;
+    t.y = Math.random() * 1.7 - 0.85;
+  } else {
+    // Open flow: start on the inlet, evenly spread (golden-ratio sequence).
+    seedPhase = (seedPhase + 0.6180339887) % 1;
+    t.x = warmStart ? -0.97 + Math.random() * 1.9 : -0.97 + Math.random() * 0.04;
+    t.y = -0.9 + 1.8 * seedPhase;
+  }
+  t.age = 0;
+  t.maxAge = 140 + Math.random() * 160;
+  for (let k = 0; k < TRAIL_LEN; k++) {
+    t.trail[2 * k] = t.x;
+    t.trail[2 * k + 1] = t.y;
+  }
+}
+
+function updateTracers() {
+  const pos = tracerLines!.geometry.getAttribute('position') as THREE.BufferAttribute;
+  const col = tracerLines!.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const P = pos.array as Float32Array;
+  const C = col.array as Float32Array;
+  const dtv = 0.012; // domain units per frame per unit velocity
+  const sx = DECK_W * 0.46, sz = DECK_D * 0.46, wy = DECK_H + TRACER_HEIGHT;
+  let o = 0, oc = 0;
+  for (let n = 0; n < TRACER_COUNT; n++) {
+    const t = tracers[n];
+    const first = t.maxAge === 0;
+    let respawn = first || t.age >= t.maxAge;
+    if (!respawn) {
+      t.age++;
+      // RK2 (midpoint) through the live field
+      const a = sampleVelocity(t.x, t.y);
+      if (a.solid) {
+        respawn = true;
+      } else {
+        const b = sampleVelocity(t.x + 0.5 * dtv * a.u, t.y + 0.5 * dtv * a.v);
+        t.x += dtv * b.u;
+        t.y += dtv * b.v;
+        t.speed = Math.hypot(b.u, b.v);
+        if (b.solid || t.x > 0.985 || t.x < -0.99 || t.y > 0.985 || t.y < -0.985) {
+          respawn = true;
+        } else {
+          t.trail.copyWithin(0, 2);
+          t.trail[2 * (TRAIL_LEN - 1)] = t.x;
+          t.trail[2 * (TRAIL_LEN - 1) + 1] = t.y;
+        }
+      }
+    }
+    if (respawn) seedTracer(t, first);
+    // Slow fluid (wake, stagnation) reads dimmer, fast fluid brighter.
+    const bright = Math.min(1, 0.35 + t.speed * 0.6);
+    for (let k = 0; k < TRAIL_LEN - 1; k++) {
+      const fade = Math.pow((k + 1) / (TRAIL_LEN - 1), 1.5) * bright;
+      for (let e = 0; e < 2; e++) {
+        const q = 2 * (k + e);
+        P[o++] = t.trail[q] * sx;
+        P[o++] = wy;
+        P[o++] = -t.trail[q + 1] * sz;
+        C[oc++] = 1; C[oc++] = 1; C[oc++] = 1; C[oc++] = fade * 0.95;
+      }
+    }
+  }
+  pos.needsUpdate = true;
+  col.needsUpdate = true;
 }
 
 function projectToScreen(pos: THREE.Vector3): [number, number] | null {
@@ -679,22 +974,32 @@ const projectedPins = computed(() => {
         }
   ];
 
-  return defs.map((d) => {
+  const raw = defs.map((d) => {
     const sp = projectToScreen(d.pos);
     const ax = sp ? sp[0] : w * 0.5;
     const ay = sp ? sp[1] : h * 0.5;
     const dirX = ax < w * 0.48 ? -1 : 1;
-    const lx = Math.max(92, Math.min(w - 92, ax + Math.abs(d.ox) * scale * dirX));
-    const ly = Math.max(26, Math.min(h - 68, ay + d.oy * scale));
-    const elbowX = ax + (lx - ax) * 0.52;
+    const lx = Math.max(96, Math.min(w - 96, ax + Math.abs(d.ox) * scale * dirX));
+    const ly = Math.max(26, Math.min(h - 72, ay + d.oy * scale));
+    return { ...d, ax, ay, lx, ly, alignRight: lx < ax };
+  });
+
+  // Vertical de-collision pass per side so callout pills never overlap
+  for (const side of [true, false]) {
+    const grp = raw.filter((item) => item.alignRight === side).sort((a, b) => a.ly - b.ly);
+    const minGap = 34;
+    for (let i = 1; i < grp.length; i++) {
+      if (grp[i].ly - grp[i - 1].ly < minGap) {
+        grp[i].ly = Math.min(h - 72, grp[i - 1].ly + minGap);
+      }
+    }
+  }
+
+  return raw.map((item) => {
+    const elbowX = item.ax + (item.lx - item.ax) * 0.52;
     return {
-      ...d,
-      ax,
-      ay,
-      lx,
-      ly,
-      alignRight: lx < ax,
-      pathD: `M ${ax.toFixed(1)} ${ay.toFixed(1)} L ${elbowX.toFixed(1)} ${ly.toFixed(1)} L ${lx.toFixed(1)} ${ly.toFixed(1)}`
+      ...item,
+      pathD: `M ${item.ax.toFixed(1)} ${item.ay.toFixed(1)} L ${elbowX.toFixed(1)} ${item.ly.toFixed(1)} L ${item.lx.toFixed(1)} ${item.ly.toFixed(1)}`
     };
   });
 });
@@ -826,6 +1131,7 @@ function initThreeStage() {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(w, h, false);
+  renderer.localClippingEnabled = true;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -931,19 +1237,17 @@ function initThreeStage() {
   deckWireframe.visible = false;
   scene.add(deckWireframe);
 
-  // 3D Flow Beads (#board dark-rimmed cream spheres advected by live WASM U,V)
-  beadRimMesh = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(0.145, 10, 10),
-    new THREE.MeshBasicMaterial({ color: 0x18213d }),
-    BEAD_COUNT
+  // Streaklines: one LineSegments for every tracer, fading from head to tail.
+  const tracerSegs = TRACER_COUNT * (TRAIL_LEN - 1);
+  const tracerGeo = new THREE.BufferGeometry();
+  tracerGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(tracerSegs * 2 * 3), 3));
+  tracerGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(tracerSegs * 2 * 4), 4));
+  tracerLines = new THREE.LineSegments(
+    tracerGeo,
+    new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false })
   );
-  beadCoreMesh = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(0.105, 10, 10),
-    new THREE.MeshBasicMaterial({ color: 0xfff6d6 }),
-    BEAD_COUNT
-  );
-  scene.add(beadRimMesh);
-  scene.add(beadCoreMesh);
+  tracerLines.frustumCulled = false;
+  scene.add(tracerLines);
 
   // Free-Moving 3D Lagrangian Probe Sphere + Ribbon Trail
   freeProbeMesh = new THREE.Group();
@@ -965,8 +1269,45 @@ function initThreeStage() {
   );
   scene.add(freeTrailLine);
 
+  // Real ParaView Pipeline Filter Layers: Slice, StreamTracer (RK4), Glyph3D, Contour
+  const sliceGeo = new THREE.PlaneGeometry(DECK_W * 0.92, 4.4);
+  const sliceMat = new THREE.MeshBasicMaterial({
+    map: deckTexture,
+    transparent: true,
+    opacity: 0.78,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  slicePlaneMesh = new THREE.Mesh(sliceGeo, sliceMat);
+  slicePlaneMesh.position.set(0, DECK_H + 2.22, 0);
+  slicePlaneMesh.add(new THREE.LineSegments(
+    new THREE.EdgesGeometry(sliceGeo),
+    new THREE.LineBasicMaterial({ color: 0x18213d, transparent: true, opacity: 0.75 })
+  ));
+  slicePlaneMesh.visible = false;
+  scene.add(slicePlaneMesh);
+
+  streamlinesGroup = new THREE.Group();
+  streamlinesGroup.visible = false;
+  scene.add(streamlinesGroup);
+
+  contourGroup = new THREE.Group();
+  contourGroup.visible = false;
+  scene.add(contourGroup);
+
+  const arrowGeo = new THREE.ConeGeometry(0.11, 0.44, 6);
+  arrowGeo.rotateZ(-Math.PI / 2); // Point along +X by default
+  glyphMesh = new THREE.InstancedMesh(
+    arrowGeo,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    GLYPH_COUNT
+  );
+  glyphMesh.visible = false;
+  scene.add(glyphMesh);
+
   rebuildPresetModel();
   updateDeckScalarTexture();
+  updateParaViewFilters();
 
   let frameTick = 0;
   const animate = (now: number) => {
@@ -1009,40 +1350,10 @@ function initThreeStage() {
       lidBeltMesh.position.x = Math.sin(now * 0.004) * 0.35;
     }
 
-    // Advect 3D Flow Beads through live WASM (u, v) field
-    if (beadCoreMesh && beadRimMesh) {
-      beadCoreMesh.visible = showFlow.value;
-      beadRimMesh.visible = showFlow.value;
-      if (showFlow.value) {
-        for (let i = 0; i < BEAD_COUNT; i++) {
-          const b = beads[i];
-          b.life += 1;
-          const s = sampleFieldAt(b.x, b.y);
-          const vx = props.preset === 0 ? s.u : (Math.abs(s.u) + Math.abs(s.v) > 0.02 ? s.u : 0.7);
-          const vy = s.v;
-          b.x += vx * 0.015;
-          b.y += vy * 0.015;
-
-          if (s.solid || b.x > 0.98 || b.x < -0.99 || b.y > 0.98 || b.y < -0.98 || b.life > b.maxLife) {
-            b.x = props.preset === 0 ? (Math.random() * 1.6 - 0.8) : -0.96;
-            b.y = Math.random() * 1.7 - 0.85;
-            b.z = 0.28 + Math.random() * (props.preset === 3 ? 2.6 : 1.5);
-            b.life = 0;
-          }
-
-          // Lift beads smoothly over obstacles for crisp 3D aerodynamic flow
-          const overObstacleBoost = (props.preset === 4 || props.preset === 5) && Math.abs(b.x + 0.18) < 0.36 ? 0.85 : 0;
-          const wp = domainToWorld(b.x, b.y, b.z + overObstacleBoost);
-          dummyObj.position.copy(wp);
-          const scale = 0.75 + Math.min(0.6, s.spd * 0.35);
-          dummyObj.scale.setScalar(scale);
-          dummyObj.updateMatrix();
-          beadRimMesh.setMatrixAt(i, dummyObj.matrix);
-          beadCoreMesh.setMatrixAt(i, dummyObj.matrix);
-        }
-        beadRimMesh.instanceMatrix.needsUpdate = true;
-        beadCoreMesh.instanceMatrix.needsUpdate = true;
-      }
+    // Advect tracers through the live solver (u, v) field and draw their trails
+    if (tracerLines) {
+      tracerLines.visible = showFlow.value;
+      if (showFlow.value && props.engine) updateTracers();
     }
 
     // Advect Free-Moving 3D Lagrangian Probe
@@ -1051,7 +1362,7 @@ function initThreeStage() {
       freeTrailLine.visible = showFlow.value;
       if (showFlow.value) {
         const fs = sampleFieldAt(freeProbe.x, freeProbe.y);
-        const fvx = props.preset === 0 ? (Math.abs(fs.u) > 0.01 ? fs.u : 0.4) : (Math.abs(fs.u) + Math.abs(fs.v) > 0.02 ? fs.u : 0.65);
+        const fvx = fs.u;
         freeProbe.x += fvx * 0.013;
         freeProbe.y += fs.v * 0.013;
         if (fs.solid || freeProbe.x > 0.96 || freeProbe.x < -0.98 || freeProbe.y > 0.95 || freeProbe.y < -0.95) {
@@ -1087,18 +1398,173 @@ function initThreeStage() {
   rafId = requestAnimationFrame(animate);
 }
 
-watch(() => props.preset, () => {
+function clearGroup(grp: THREE.Group | null) {
+  if (!grp) return;
+  while (grp.children.length > 0) {
+    const ch = grp.children[0] as any;
+    if (ch.geometry) ch.geometry.dispose();
+    if (ch.material) ch.material.dispose();
+    grp.remove(ch);
+  }
+}
+
+function updateParaViewFilters() {
+  const eng = props.engine;
+  const f = props.filters;
+
+  // 1. Slice Filter: Vertical X-Y Centerline Cut-Plane
+  if (slicePlaneMesh) {
+    slicePlaneMesh.visible = f.slice;
+  }
+
+  // 2. Clip Filter: Plane Clip exposing internal domain cross-section
+  const activeClips = f.clip ? [clipPlane] : [];
+  if (deckMesh) {
+    (deckMesh.material as THREE.MeshBasicMaterial).clippingPlanes = activeClips;
+  }
+  if (modelGroup) {
+    modelGroup.traverse((obj: any) => {
+      if (obj.material && !Array.isArray(obj.material)) {
+        obj.material.clippingPlanes = activeClips;
+      }
+    });
+  }
+
+  // 3. RK4 3D StreamTracer Filter (Velocity-colored streamlines wrapping around obstacle)
+  if (streamlinesGroup) {
+    clearGroup(streamlinesGroup);
+    streamlinesGroup.visible = f.streamlines && !!eng;
+    if (f.streamlines && eng) {
+      const seeds = 17;
+      for (let sIdx = 0; sIdx < seeds; sIdx++) {
+        let px = props.preset === 0 ? -0.75 + (sIdx / seeds) * 1.4 : -0.94;
+        let py = props.preset === 0 ? 0.78 - (sIdx % 4) * 0.25 : -0.82 + (sIdx / (seeds - 1)) * 1.64;
+        const baseZ = 0.42; // one flat layer: the solved flow is 2-D, lines never climb over bodies
+        const pts: number[] = [];
+        const cols: number[] = [];
+        const dtRK = 0.02;
+
+        // RK4 through the bilinear field. A line ends at a body or where the fluid is still;
+        // it never invents a speed.
+        for (let step = 0; step < 150; step++) {
+          const k1 = sampleVelocity(px, py);
+          if (k1.solid || px > 0.97 || px < -0.98 || py > 0.97 || py < -0.97) break;
+          const spd = Math.hypot(k1.u, k1.v);
+          if (spd < 1e-3) break;
+          const k2 = sampleVelocity(px + 0.5 * dtRK * k1.u, py + 0.5 * dtRK * k1.v);
+          const k3 = sampleVelocity(px + 0.5 * dtRK * k2.u, py + 0.5 * dtRK * k2.v);
+          const k4 = sampleVelocity(px + dtRK * k3.u, py + dtRK * k3.v);
+
+          const wp = domainToWorld(px, py, baseZ);
+          pts.push(wp.x, wp.y, wp.z);
+          const [r, g, b] = sampleColorRGB(Math.min(1, spd / 1.35), props.colorMap);
+          cols.push(r / 255, g / 255, b / 255);
+
+          px += dtRK * (k1.u + 2 * k2.u + 2 * k3.u + k4.u) / 6;
+          py += dtRK * (k1.v + 2 * k2.v + 2 * k3.v + k4.v) / 6;
+        }
+
+        if (pts.length >= 6) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+          geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+          const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.92 }));
+          streamlinesGroup.add(line);
+        }
+      }
+    }
+  }
+
+  // 4. 3D Velocity Vector Glyphs (Instanced Arrow Cones)
+  if (glyphMesh) {
+    glyphMesh.visible = f.glyph && !!eng;
+    if (f.glyph && eng) {
+      let idx = 0;
+      const tmpColor = new THREE.Color();
+      for (let gy = 0; gy < GLYPH_NY; gy++) {
+        for (let gx = 0; gx < GLYPH_NX; gx++) {
+          const dx = -0.86 + (gx / (GLYPH_NX - 1)) * 1.72;
+          const dy = -0.82 + (gy / (GLYPH_NY - 1)) * 1.64;
+          const s = sampleFieldAt(dx, dy);
+          if (s.solid) {
+            dummyObj.scale.setScalar(0.0001);
+          } else {
+            const wp = domainToWorld(dx, dy, 0.42);
+            dummyObj.position.copy(wp);
+            const angle = Math.atan2(-s.v, s.u); // Map +y domain -> -z world
+            dummyObj.rotation.set(0, -angle, 0);
+            const mag = Math.max(0.35, Math.min(1.6, s.spd * 1.15));
+            dummyObj.scale.set(mag, 0.85, 0.85);
+            const [r, g, b] = sampleColorRGB(Math.min(1, s.spd / 1.3), props.colorMap);
+            tmpColor.setRGB(r / 255, g / 255, b / 255);
+            glyphMesh.setColorAt(idx, tmpColor);
+          }
+          dummyObj.updateMatrix();
+          glyphMesh.setMatrixAt(idx, dummyObj.matrix);
+          idx++;
+        }
+      }
+      glyphMesh.instanceMatrix.needsUpdate = true;
+      if (glyphMesh.instanceColor) glyphMesh.instanceColor.needsUpdate = true;
+    }
+  }
+
+  // 5. Contour Iso-Lines Filter (3 Iso-Levels across active scalar field)
+  if (contourGroup) {
+    clearGroup(contourGroup);
+    contourGroup.visible = f.contour && !!eng;
+    if (f.contour && eng) {
+      const { nx, ny, speed } = eng;
+      let maxS = 0.01;
+      for (let i = 0; i < speed.length; i++) if (speed[i] > maxS) maxS = speed[i];
+      const levels = [0.3, 0.55, 0.8];
+      const levelColors = [0x3b82f6, 0x1aa3a1, 0xef4444];
+      levels.forEach((lvl, li) => {
+        const thresh = lvl * maxS;
+        const segPts: number[] = [];
+        for (let j = 1; j < ny - 1; j++) {
+          for (let i = 1; i < nx - 1; i++) {
+            const v0 = speed[j * nx + i];
+            const vx = speed[j * nx + (i + 1)];
+            const vy = speed[(j + 1) * nx + i];
+            if ((v0 - thresh) * (vx - thresh) < 0 || (v0 - thresh) * (vy - thresh) < 0) {
+              const wx = (i / (nx - 1)) * 2 - 1;
+              const wy = (j / (ny - 1)) * 2 - 1;
+              const pA = domainToWorld(wx, wy, 0.14 + li * 0.08);
+              const pB = domainToWorld(wx + 0.04, wy + 0.02, 0.14 + li * 0.08);
+              segPts.push(pA.x, pA.y, pA.z, pB.x, pB.y, pB.z);
+            }
+          }
+        }
+        if (segPts.length >= 6) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(segPts, 3));
+          contourGroup!.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: levelColors[li] })));
+        }
+      });
+    }
+  }
+}
+
+watch(() => [props.preset, props.customPrimitives, props.customGlbUrl], () => {
   rebuildPresetModel();
   updateDeckScalarTexture();
-});
+  updateParaViewFilters();
+}, { deep: true });
 
 watch(() => [props.fieldRev, props.colorMap, props.fieldKey, props.representation, props.opacity, props.showSource], () => {
   updateDeckScalarTexture();
+  updateParaViewFilters();
+});
+
+watch(() => [props.filters.slice, props.filters.clip, props.filters.contour, props.filters.glyph, props.filters.streamlines], () => {
+  updateParaViewFilters();
 });
 
 watch(() => props.isPaperTheme, () => {
   updateThemeColors();
   rebuildPresetModel();
+  updateParaViewFilters();
 });
 
 onMounted(() => {

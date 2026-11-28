@@ -1,0 +1,705 @@
+<title>OpenZess Architecture Audit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: single reading column; two full-bleed figure bands; findings as a flat ranked list with severity rails. */
+  :root {
+    --bg: #f6f8fa;
+    --surface: #ffffff;
+    --surface-2: #edf1f5;
+    --fg: #16202c;
+    --muted: #586b7c;
+    --line: #d2dae2;
+    --accent: #0b7484;
+    --ok: #16744a;
+    --warn: #8f5e00;
+    --bad: #b52a2a;
+    --dead: #8c9aa8;
+    --font-display: "Barlow", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1117;
+      --surface: #151c24;
+      --surface-2: #1b2430;
+      --fg: #e4ebf2;
+      --muted: #93a2b1;
+      --line: #2a3542;
+      --accent: #2fd0e2;
+      --ok: #4ad089;
+      --warn: #e9b452;
+      --bad: #ff7b7b;
+      --dead: #677584;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117;
+    --surface: #151c24;
+    --surface-2: #1b2430;
+    --fg: #e4ebf2;
+    --muted: #93a2b1;
+    --line: #2a3542;
+    --accent: #2fd0e2;
+    --ok: #4ad089;
+    --warn: #e9b452;
+    --bad: #ff7b7b;
+    --dead: #677584;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15.5px;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 2.5rem 4rem;
+  }
+  .wide { max-width: 68rem; }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.9rem, 5vw, 2.7rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 0.5rem;
+    text-wrap: balance;
+  }
+  .standfirst { font-size: 1.1rem; color: var(--muted); margin: 0 0 1.25rem; max-width: 42rem; }
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding-block: 0.7rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 3rem 0 0.25rem;
+    text-wrap: balance;
+  }
+  h2 .num {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--accent);
+    display: block;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.3rem;
+  }
+  h3 { font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; margin: 1.75rem 0 0.4rem; }
+  p { margin: 0 0 0.9rem; }
+  ul { margin: 0 0 0.9rem; padding-left: 1.2rem; }
+  li { margin-bottom: 0.4rem; }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.08em 0.32em;
+    overflow-wrap: anywhere;
+  }
+  strong { font-weight: 600; }
+
+  .lede { border-left: 3px solid var(--accent); padding-left: 1rem; }
+
+  /* --- figures --- */
+  figure { margin: 1.5rem 0 2rem; }
+  figure svg { width: 100%; max-width: 100%; height: auto; display: block; color: var(--fg); }
+  .scroller { overflow-x: auto; }
+  .scroller > svg { min-width: 680px; }
+  figcaption { font-size: 0.86rem; color: var(--muted); margin-top: 0.7rem; max-width: 46rem; }
+  .fig-box { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1.1rem; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-family: var(--font-mono); font-size: 0.73rem; margin-top: 0.9rem; }
+  .legend span { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--muted); }
+  .swatch { width: 22px; height: 3px; border-radius: 2px; flex: none; }
+
+  /* --- findings --- */
+  .find { border-left: 3px solid var(--line); padding: 0 0 0 1rem; margin: 0 0 1.6rem; }
+  .find.sev-bad { border-left-color: var(--bad); }
+  .find.sev-warn { border-left-color: var(--warn); }
+  .find.sev-dead { border-left-color: var(--dead); }
+  .find > h3 { margin: 0 0 0.35rem; display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap; }
+  .find > h3 .tag {
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 0.14em 0.45em;
+    border-radius: 3px;
+    border: 1px solid currentColor;
+    flex: none;
+  }
+  .sev-bad .tag { color: var(--bad); }
+  .sev-warn .tag { color: var(--warn); }
+  .sev-dead .tag { color: var(--dead); }
+  .find p { margin-bottom: 0.6rem; }
+  .find p:last-child { margin-bottom: 0; }
+  .where { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 0.6rem 0 1rem; }
+  th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 500; }
+  td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tbl-scroll { overflow-x: auto; }
+
+  .ok-list { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 0 6px 6px 0; padding: 1.1rem 1.1rem 1.1rem 1.3rem; }
+  .ok-list h3 { margin-top: 0; }
+  .ok-list ul { margin-bottom: 0; }
+
+  hr { border: 0; border-top: 1px solid var(--line); margin: 2.5rem 0; }
+  .footnote { font-size: 0.86rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+
+  <h1>OpenZess Architecture Audit</h1>
+  <p class="standfirst">What actually runs, what only looks like it runs, and the two numbers in the IEEE results that are measuring nothing.</p>
+  <div class="meta">
+    <span>Branch main · ea2211d</span>
+    <span>84 Python tests pass</span>
+    <span>0 frontend tests</span>
+    <span>7 Navier–Stokes implementations</span>
+  </div>
+
+  <h2><span class="num">00 / Background</span>CFD in five minutes, in your own code's terms</h2>
+
+  <div class="lede">
+    <p>Computational Fluid Dynamics means solving the <strong>Navier–Stokes equations</strong> — the equations for how a fluid's velocity and pressure evolve — numerically, because they have no general closed-form solution. You chop the domain into a grid of cells, and march forward in small time steps, updating every cell from its neighbours.</p>
+  </div>
+
+  <p>Your solvers all use the same recipe, the <strong>projection method</strong>: each step, first move the velocity forward using momentum alone (advection + viscosity), which leaves a flow that doesn't conserve mass; then solve a pressure equation and subtract its gradient, which pushes the flow back to mass-conserving. You can see this literally in <code>scripts/train_openzess_grpo.py</code> lines 148–184: upwind advection, a Laplacian for viscosity, 15 Jacobi sweeps for pressure, then the projection subtraction.</p>
+
+  <p>Three dimensionless numbers decide whether it works, and all three appear in your code:</p>
+
+  <div class="tbl-scroll">
+  <table>
+    <thead><tr><th>Number</th><th>Meaning</th><th>Rule</th><th>Where it lives</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Reynolds</strong> Re</td><td>inertia ÷ viscosity — how chaotic the flow is</td><td class="n">input</td><td class="n">ν = 1/Re</td></tr>
+      <tr><td><strong>Courant</strong> Co = U·dt/dx</td><td>how far fluid moves per step vs. cell size</td><td class="n">&lt; 1</td><td class="n">validate_spec, capped 0.65</td></tr>
+      <tr><td><strong>Diffusion</strong> ν·dt/dx²</td><td>how far viscosity spreads per step</td><td class="n">≤ 0.25</td><td class="n">validate_spec</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Those two guards are correctly implemented in <code>backend/ai_simulate.py</code>. Break either and the solution blows up to infinity within a few steps — which is why your code checks them before running anything.</p>
+
+  <p>The last concept is the one this whole audit turns on. A simulation is <strong>converged</strong> when you have marched forward long enough that the flow stops changing. Only then does it represent a real steady flow. The standard way to prove a 2D solver is correct is the <strong>lid-driven cavity</strong>: a square box, the top lid slides sideways, one big vortex forms. Ghia, Ghia &amp; Shin (1982) published the exact centreline velocities for this case, so you compare your converged numbers against their table. Your repo does exactly this — and that comparison is finding 01.</p>
+
+  <h2><span class="num">01 / Figure</span>What the system actually is</h2>
+</div>
+
+<div class="wrap wide">
+  <figure class="fig-box">
+    <div class="scroller">
+    <svg viewBox="0 0 980 620" role="img" aria-label="Runtime architecture of OpenZess: a Vue browser app containing one working WebAssembly solver plus three dead or fake data sources; a FastAPI backend on localhost:8000 that any web deployment cannot reach; and cloud LLM APIs called directly from the browser.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+        <marker id="ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/>
+        </marker>
+        <marker id="ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--ok)"/>
+        </marker>
+      </defs>
+
+      <!-- ===== COLUMN 1: BROWSER ===== -->
+      <rect x="16" y="34" width="290" height="528" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+      <text x="16" y="24" font-family="var(--font-mono)" font-size="11" font-weight="600" fill="var(--fg)">BROWSER · Vue 3 SPA · 15,852 lines</text>
+
+      <!-- viewer -->
+      <rect x="30" y="48" width="262" height="40" rx="4" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="42" y="65" font-size="12" font-weight="600" fill="var(--fg)">ParaViewGlanceViewer.vue</text>
+      <text x="42" y="79" font-size="10" fill="var(--muted)">3,591 lines · vtk.js render surface</text>
+
+      <!-- sidebar -->
+      <rect x="30" y="96" width="262" height="40" rx="4" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="42" y="113" font-size="12" font-weight="600" fill="var(--fg)">SidebarControls.vue</text>
+      <text x="42" y="127" font-size="10" fill="var(--muted)">2,304 lines · holds the only real chat UI</text>
+
+      <!-- bridge -->
+      <rect x="30" y="144" width="262" height="36" rx="4" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="42" y="160" font-size="12" font-weight="600" fill="var(--fg)">openfoamWasmBridge.ts</text>
+      <text x="42" y="173" font-size="10" fill="var(--muted)">loader + TypeScript fallback solver #5</text>
+
+      <!-- WASM: works -->
+      <rect x="44" y="190" width="248" height="42" rx="4" fill="none" stroke="var(--ok)" stroke-width="2"/>
+      <text x="56" y="207" font-size="12" font-weight="600" fill="var(--ok)">fvm_solver.wasm</text>
+      <text x="56" y="221" font-size="10" fill="var(--ok)">C → Emscripten · REAL, and it runs</text>
+
+      <!-- procedural: fake -->
+      <rect x="44" y="242" width="248" height="42" rx="4" fill="none" stroke="var(--warn)" stroke-width="2"/>
+      <text x="56" y="259" font-size="12" font-weight="600" fill="var(--warn)">generateProceduralCfdData()</text>
+      <text x="56" y="273" font-size="10" fill="var(--warn)">analytic swirl · what the app opens on</text>
+
+      <!-- dead code -->
+      <rect x="44" y="300" width="248" height="34" rx="4" fill="none" stroke="var(--dead)" stroke-dasharray="4 3"/>
+      <text x="56" y="315" font-size="11.5" fill="var(--dead)">cfdWorker.ts — solver #6</text>
+      <text x="56" y="328" font-size="10" fill="var(--dead)">308 lines · imported by 0 files</text>
+
+      <rect x="44" y="342" width="248" height="34" rx="4" fill="none" stroke="var(--dead)" stroke-dasharray="4 3"/>
+      <text x="56" y="357" font-size="11.5" fill="var(--dead)">wasm-solver/src/lib.rs — solver #3</text>
+      <text x="56" y="370" font-size="10" fill="var(--dead)">Rust→wasm · never built, never loaded</text>
+
+      <rect x="44" y="384" width="248" height="34" rx="4" fill="none" stroke="var(--dead)" stroke-dasharray="4 3"/>
+      <text x="56" y="399" font-size="11.5" fill="var(--dead)">AiAssistant.vue</text>
+      <text x="56" y="412" font-size="10" fill="var(--dead)">setTimeout(600) fake · imported by 0 files</text>
+
+      <rect x="44" y="426" width="248" height="34" rx="4" fill="none" stroke="var(--dead)" stroke-dasharray="4 3"/>
+      <text x="56" y="441" font-size="11.5" fill="var(--dead)">CfdCanvas2D · OpenFoamTerminal</text>
+      <text x="56" y="454" font-size="10" fill="var(--dead)">OpenFoamDictEditor · HelloWorld — all orphaned</text>
+
+      <!-- localStorage -->
+      <rect x="30" y="476" width="262" height="34" rx="4" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="42" y="491" font-size="11.5" fill="var(--fg)">localStorage: your LLM API key</text>
+      <text x="42" y="504" font-size="10" fill="var(--muted)">aiCopilot.ts · never leaves the browser</text>
+
+      <!-- ===== THE CUT LINE ===== -->
+      <line x1="348" y1="30" x2="348" y2="432" stroke="var(--bad)" stroke-width="2" stroke-dasharray="7 5"/>
+      <text x="340" y="232" font-family="var(--font-mono)" font-size="11" font-weight="600" fill="var(--bad)"
+            text-anchor="middle" transform="rotate(-90 340 232)">VERCEL DEPLOY ENDS HERE</text>
+
+      <!-- ===== COLUMN 2: BACKEND ===== -->
+      <rect x="398" y="34" width="306" height="398" rx="6" fill="var(--surface)" stroke="var(--bad)" stroke-dasharray="7 5"/>
+      <text x="398" y="24" font-family="var(--font-mono)" font-size="11" font-weight="600" fill="var(--bad)">localhost:8000 · FastAPI — CORS: localhost only</text>
+
+      <rect x="412" y="48" width="278" height="40" rx="4" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="424" y="65" font-size="12" font-weight="600" fill="var(--fg)">/ws/simulate → solver.py</text>
+      <text x="424" y="79" font-size="10" fill="var(--muted)">760 lines NumPy · solver #1</text>
+
+      <rect x="412" y="96" width="278" height="40" rx="4" fill="none" stroke="var(--warn)" stroke-width="2"/>
+      <text x="424" y="113" font-size="12" font-weight="600" fill="var(--warn)">/api/ai/simulate → ai_simulate.py</text>
+      <text x="424" y="127" font-size="10" fill="var(--warn)">10 regex rules. No model anywhere.</text>
+
+      <rect x="412" y="144" width="278" height="46" rx="4" fill="none" stroke="var(--bad)" stroke-width="2"/>
+      <text x="424" y="161" font-size="12" font-weight="600" fill="var(--bad)">/api/qwen/chat → Qwen3-0.6B + LoRA</text>
+      <text x="424" y="175" font-size="10" fill="var(--bad)">torch / transformers / peft not in</text>
+      <text x="424" y="186" font-size="10" fill="var(--bad)">requirements.txt → ImportError on call</text>
+
+      <rect x="412" y="198" width="278" height="36" rx="4" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="424" y="214" font-size="12" fill="var(--fg)">/api/export/vtk · /openfoam-zip</text>
+      <text x="424" y="227" font-size="10" fill="var(--muted)">OpenFOAM case: cavity geometry only</text>
+
+      <rect x="412" y="242" width="278" height="36" rx="4" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="424" y="258" font-size="12" fill="var(--fg)">/api/projects · /api/engine/status</text>
+      <text x="424" y="271" font-size="10" fill="var(--muted)">save, load, delete, benchmark</text>
+
+      <rect x="412" y="286" width="278" height="40" rx="4" fill="none" stroke="var(--bad)" stroke-width="2"/>
+      <text x="424" y="303" font-size="12" font-weight="600" fill="var(--bad)">/api/agent-desktop/click · type</text>
+      <text x="424" y="317" font-size="10" fill="var(--bad)">screenshot · remote control of this PC</text>
+
+      <rect x="412" y="334" width="278" height="36" rx="4" fill="none" stroke="var(--dead)" stroke-dasharray="4 3"/>
+      <text x="424" y="350" font-size="11.5" fill="var(--dead)">/tracker · /api/internships/latest</text>
+      <text x="424" y="363" font-size="10" fill="var(--dead)">internship scraper, inside a CFD server</text>
+
+      <rect x="412" y="378" width="278" height="40" rx="4" fill="none" stroke="var(--dead)" stroke-dasharray="4 3"/>
+      <text x="424" y="395" font-size="11.5" fill="var(--dead)">rust-sidecar :8081 → cfd_solver.rs</text>
+      <text x="424" y="408" font-size="10" fill="var(--dead)">solver #2 · optional, usually offline</text>
+
+      <!-- ===== COLUMN 3 ===== -->
+      <rect x="760" y="144" width="206" height="70" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+      <text x="772" y="166" font-size="12" font-weight="600" fill="var(--fg)">HuggingFace Hub</text>
+      <text x="772" y="182" font-size="10" fill="var(--muted)">Qwen/Qwen3-0.6B base weights</text>
+      <text x="772" y="196" font-size="10" fill="var(--bad)">~1.2 GB, downloaded inside</text>
+      <text x="772" y="207" font-size="10" fill="var(--bad)">the first HTTP request</text>
+
+      <rect x="760" y="454" width="206" height="86" rx="6" fill="var(--surface)" stroke="var(--ok)" stroke-width="2"/>
+      <text x="772" y="476" font-size="12" font-weight="600" fill="var(--ok)">Cloud LLM APIs</text>
+      <text x="772" y="492" font-size="10" fill="var(--muted)">Gemini · OpenAI · Claude</text>
+      <text x="772" y="505" font-size="10" fill="var(--muted)">Groq · DeepSeek · Ollama</text>
+      <text x="772" y="521" font-size="10" fill="var(--ok)">works on a deploy — the key</text>
+      <text x="772" y="532" font-size="10" fill="var(--ok)">is the user's own</text>
+
+      <!-- ===== ARROWS ===== -->
+      <!-- bridge -> wasm -->
+      <path d="M160,180 L160,190" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+      <!-- viewer <- procedural -->
+      <path d="M36,263 L24,263 L24,68 L30,68" stroke="var(--warn)" stroke-width="1.5" fill="none" marker-end="url(#ah-bad)" stroke-dasharray="5 3"/>
+      <text x="8" y="160" font-family="var(--font-mono)" font-size="9.5" fill="var(--warn)" text-anchor="middle" transform="rotate(-90 8 160)">initial + timeline frames</text>
+      <!-- wasm -> viewer -->
+      <path d="M300,205 L316,205 L316,60 L300,60" stroke="var(--ok)" stroke-width="1.5" fill="none" marker-end="url(#ah-ok)"/>
+      <text x="330" y="132" font-family="var(--font-mono)" font-size="9.5" fill="var(--ok)" text-anchor="middle" transform="rotate(-90 330 132)">u, v, p fields</text>
+
+      <!-- sidebar -> /api/ai/simulate -->
+      <path d="M296,112 L412,112" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+      <text x="354" y="106" font-family="var(--font-mono)" font-size="9.5" fill="var(--muted)" text-anchor="middle">POST prompt</text>
+
+      <!-- sidebar -> /api/qwen/chat (routed) -->
+      <path d="M296,126 L370,126 L370,166 L412,166" stroke="var(--bad)" stroke-width="1.5" fill="none" marker-end="url(#ah-bad)"/>
+      <text x="382" y="146" font-family="var(--font-mono)" font-size="9.5" fill="var(--bad)">fallback when no API key</text>
+
+      <!-- qwen -> HF -->
+      <path d="M694,166 L760,172" stroke="var(--bad)" stroke-width="1.5" fill="none" marker-end="url(#ah-bad)"/>
+
+      <!-- viewer -> /api/export/vtk -->
+      <path d="M296,60 L340,60 L340,216 L412,216" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+
+      <!-- browser -> cloud, UNDER the backend box -->
+      <path d="M296,140 L324,140 L324,576 L744,576 L744,500 L760,500"
+            stroke="var(--ok)" stroke-width="1.5" fill="none" marker-end="url(#ah-ok)"/>
+      <text x="520" y="594" font-family="var(--font-mono)" font-size="9.5" fill="var(--ok)" text-anchor="middle">direct from browser · bypasses the backend entirely</text>
+    </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--ok)"></span>real and working</span>
+      <span><span class="swatch" style="background:var(--warn)"></span>works, but is not what it is called</span>
+      <span><span class="swatch" style="background:var(--bad)"></span>broken or unreachable</span>
+      <span><span class="swatch" style="background:var(--dead)"></span>dead code — zero callers</span>
+    </div>
+    <figcaption><strong>Figure 1.</strong> The red dashed line is the whole deployment problem: <code>frontend/vercel.json</code> ships a static SPA, and <code>backend/app.py</code> restricts CORS to <code>localhost</code>. On the deployed site, the WebAssembly solver and the cloud LLM path still work; everything inside the dashed box — your Python solver, both AI endpoints, VTK and OpenFOAM export, project saving — does not exist. Four of the seven Navier–Stokes implementations in this repo have no caller at all.</figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+  <h2><span class="num">02 / Findings</span>Research integrity — fix before submission</h2>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">blocking</span>The published “Max CFL” column is a default value, not a measurement</h3>
+    <p><code>verify_cfd_physics()</code> returns a key named <code>cfl_max</code>. The benchmark harness reads <code>res.get("cfl", 0.0)</code>. The key never matches, so the fallback <code>0.0</code> is printed for every row — which is exactly what <code>docs/IEEE_BENCHMARK_RESULTS.md</code> shows: <code>0.000</code> on all four grids. A Courant number of zero is physically impossible for a flow that is moving.</p>
+    <p class="where">scripts/run_ieee_benchmarks.py:42 ← scripts/train_openzess_grpo.py:218</p>
+  </div>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">blocking</span>The Ghia validation runs 12 time steps and is never converged</h3>
+    <p>The verifier loops <code>for _ in range(12)</code>, then interpolates the centreline and compares it to Ghia's table. At a 41×41 grid with the CFL cap, dt ≈ 0.016, so twelve steps is about <strong>0.2 seconds</strong> of physical time. A Re = 100 cavity needs roughly <strong>20–30 seconds</strong> to reach steady state. You are comparing a flow that has barely started against a converged reference.</p>
+    <p>The table proves it: RMSE goes 0.2200 → 0.2325 → 0.2381 → 0.2378 as the grid refines. Error <em>rising</em> with refinement is the signature of a solution that isn't converged — a correct solver shows the opposite. Right now the number mostly measures “the lid has moved a little and the rest of the box is still at rest”, which is why it barely changes with grid size.</p>
+    <p><strong>Fix:</strong> march to a steady-state residual (loop until max |u<sup>n+1</sup> − u<sup>n</sup>| &lt; 1e-6, cap the iterations), and re-run. Expect RMSE to drop by an order of magnitude and to <em>fall</em> with refinement. That gives you a real grid-independence study. Keep the 12-step version as the fast RL reward only, and call it something else.</p>
+    <p class="where">scripts/train_openzess_grpo.py:146, :215</p>
+  </div>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">blocking</span>The RL result measures JSON formatting, not physics</h3>
+    <p>The reward gives physics credit only when <code>ghia_rmse &lt; 0.65</code>. Because the un-converged verifier returns ≈ 0.23 for essentially every candidate, that term is saturated — the same bonus for a good spec and a bad one. The gradient the model actually receives comes from the remaining terms: valid JSON, allowed enum values, CFL arithmetic.</p>
+    <p>So “Base 33.3% → RL 100.0% valid JSON” is honest, and it is a <strong>formatting and constraint-satisfaction</strong> result. It is not evidence that GRPO taught a 0.6B model fluid dynamics. Framed the first way it is a perfectly publishable finding — small models can be RL-tuned to emit schema-valid, stability-constrained simulation specs. Framed as physics-verified RL, a reviewer who reads the reward function will reject it.</p>
+    <p class="where">scripts/train_openzess_grpo.py:264</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">weak</span>The ablation is six prompts, one seed, no held-out set</h3>
+    <p>Six prompts cannot distinguish 100% from 83%. Minimum viable: 60–100 prompts, a held-out split the model never trained on, three seeds, and mean ± std. You have the generator for this already — <code>SEED_PROMPTS</code> plus the archetype/substance enums will produce hundreds of combinations cheaply.</p>
+    <p class="where">scripts/run_ieee_benchmarks.py:20–28</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">weak</span>The SFT-vs-RL comparison isn't reproducible from the repo</h3>
+    <p><code>openzess_qwen3_0.6b_rl_sft/</code> is untracked in git, and the serving endpoint hardcodes the <code>_rl</code> directory. Nobody can reproduce the two rows of your ablation table from a clone.</p>
+  </div>
+
+  <h2><span class="num">03 / Findings</span>Why the AI “doesn't run properly”</h2>
+
+  <p>This is your actual bug, and it has four causes stacked on top of each other.</p>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">bug</span>The model's dependencies are not installed</h3>
+    <p><code>requirements.txt</code> lists fastapi, uvicorn, numpy, scipy, matplotlib, websockets. The Qwen endpoint imports <code>torch</code>, <code>transformers</code> and <code>peft</code> at first call. On any fresh environment that raises ImportError, the endpoint returns <code>{ok: false}</code>, and the UI prints <em>“⚠️ Local Qwen3-0.6B unavailable”</em>. That message is the symptom you have been looking at.</p>
+    <p class="where">backend/app.py:683–685 vs requirements.txt</p>
+  </div>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">design</span>The adapter was trained for JSON and is being asked to chat</h3>
+    <p>GRPO trained it against a system prompt that says <em>“output ONLY a valid JSON object”</em>. The chat endpoint hands it a different system prompt — <em>“Help the user with OpenFOAM… be concise and practical”</em> — and asks for prose. A 0.6B model fine-tuned hard onto one output format will produce near-garbage in another. Even with the dependencies fixed, this endpoint will read as broken.</p>
+    <p>The task it <em>was</em> trained for — turning a sentence into a simulation spec — is served by <code>/api/ai/simulate</code>, which doesn't use it. <strong>Swap them.</strong> Let the adapter produce the spec JSON, pipe it through <code>validate_spec()</code> (which already coerces and clamps), and fall back to the regex table when the JSON fails to parse. That is a genuine LLM-in-the-loop contribution, and it is the one your paper can defend.</p>
+    <p class="where">backend/app.py:706 vs scripts/train_openzess_grpo.py:38</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">honesty</span>The “AI builds your simulation” path contains no model</h3>
+    <p><code>/api/ai/simulate</code> is a ten-entry keyword table — <code>house</code>, <code>tower</code>, <code>box</code>, <code>f1</code>, <code>cylinder</code>… first match wins. It is clean, well-commented, deterministic code and a reasonable product decision. It is not AI, and it must not be described as AI in the paper.</p>
+    <p class="where">backend/ai_simulate.py:11–22</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">bug</span>First request blocks on a 1.2 GB download, with no lock and no timeout</h3>
+    <p><code>_get_qwen_rl()</code> loads base weights from HuggingFace synchronously inside the request handler. The first user waits minutes or the request times out; two simultaneous requests load the model twice and can exhaust VRAM. Load at startup behind a flag, or pre-download and read from a local path.</p>
+    <p class="where">backend/app.py:680–693</p>
+  </div>
+
+  <h2><span class="num">04 / Findings</span>“There is no chat feature”</h2>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">bug</span>There are two chat UIs. The convincing-looking one is fake and unreachable.</h3>
+    <p><code>AiAssistant.vue</code> has an input box, an “Ask AI” button and a “Thinking…” state. It calls no model. It runs <code>setTimeout(…, 600)</code> and then shows three hardcoded formulas — vortex core position, δ ≈ 1/√Re, and a laminar/transitional label picked by <code>Re &lt; 400</code>. It is also imported by <strong>zero</strong> files, so it never renders.</p>
+    <p>The working chat — message history, streaming states, code-block extraction, an “apply this dictionary” button — lives inside <code>SidebarControls.vue</code>, buried in a 2,304-line component. <strong>Delete <code>AiAssistant.vue</code></strong> and lift the real panel out where people can find it.</p>
+    <p class="where">frontend/src/components/AiAssistant.vue:38–47</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">design</span>The real chat has no memory</h3>
+    <p><code>queryAiCopilot(prompt, context)</code> sends a single user message every time. Nothing in the signature carries prior turns. Ask a follow-up and the model has never seen your first question — so it behaves like a search box that answers slowly, not an assistant. This is probably the biggest reason it “feels broken” even when the API call succeeds. Fix: pass the <code>chatMessages</code> array through as the <code>messages</code> list; every provider you support already accepts multi-turn.</p>
+    <p class="where">frontend/src/utils/aiCopilot.ts:225</p>
+  </div>
+
+  <h2><span class="num">05 / Findings</span>The simulation story</h2>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">honesty</span>The app opens on procedurally generated fake flow</h3>
+    <p><code>activeData</code> is initialised to <code>generateProceduralCfdData(41, 41)</code> — an analytic swirl, not a solve. Timeline scrubbing calls it too. So the first thing any visitor, demo audience or reviewer sees is decoration. The WASM solver is real and does run, but only once a simulation is explicitly started. Replace the opening frame with a short pre-computed WASM result, or label it “preview — press Run to solve”.</p>
+    <p class="where">ParaViewGlanceViewer.vue:943, :1904, :1907</p>
+  </div>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">bug</span><code>syncWithActiveSolver</code> silently parses HTML as VTK</h3>
+    <p>It fetches the relative path <code>/api/export/vtk</code>. On Vercel, the rewrite <code>/(.*) → /index.html</code> returns <code>index.html</code> with <strong>status 200</strong>, so <code>res.ok</code> is true, the procedural fallback is skipped, and <code>parseVtkAscii</code> is handed HTML. No error — just wrong fields in the viewer. Check the content type, or fetch an absolute backend URL.</p>
+    <p class="where">ParaViewGlanceViewer.vue:1893–1901 + frontend/vercel.json</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">risk</span>Seven Navier–Stokes implementations, no cross-check between any two</h3>
+    <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>#</th><th>Implementation</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="n">1</td><td><code>backend/solver.py</code> — 760 lines NumPy</td><td>used via WebSocket</td></tr>
+        <tr><td class="n">2</td><td><code>rust-sidecar/src/cfd_solver.rs</code></td><td>optional, usually offline</td></tr>
+        <tr><td class="n">3</td><td><code>wasm-solver/src/lib.rs</code> (Rust→wasm)</td><td><strong>never built or loaded</strong></td></tr>
+        <tr><td class="n">4</td><td><code>openfoam_icoFoam_wasm.c</code> → <code>fvm_solver.wasm</code></td><td>the one that actually runs</td></tr>
+        <tr><td class="n">5</td><td>TypeScript fallback in <code>openfoamWasmBridge.ts</code></td><td>runs when WASM fails</td></tr>
+        <tr><td class="n">6</td><td><code>frontend/src/workers/cfdWorker.ts</code> — 308 lines</td><td><strong>imported by 0 files</strong></td></tr>
+        <tr><td class="n">7</td><td><code>verify_cfd_physics()</code> in the training script</td><td>the RL reward</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>Each one can disagree with the others about the same physics, and nothing in the test suite compares any two. For a paper this is the credibility question a reviewer will ask first: <em>which solver produced your figures?</em> Delete #3 and #6 (zero callers, ~1,100 lines), then add one test that runs #1, #4 and #7 on the same cavity case and asserts the centreline velocities agree to a stated tolerance. That single test is worth more than the rest of the suite combined.</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">gap</span>OpenFOAM export only matches one geometry</h3>
+    <p>The README already says so. The export produces a runnable <code>icoFoam</code> lid-driven-cavity case; every other archetype — house, tower, airfoil, F1, venturi, submarine, drone — exports a case that is not the geometry on screen. Fine as a limitation, but it needs to be stated in the paper wherever “OpenFOAM export” is claimed, not only in the repo.</p>
+  </div>
+
+  <h2><span class="num">06 / Answer</span>How does a user actually make their own simulation?</h2>
+
+  <p>Two paths exist. Both work. <strong>They are separate systems and they never meet</strong> — which is why the platform feels like it can't do the thing it is for.</p>
+</div>
+
+<div class="wrap wide">
+  <figure class="fig-box">
+    <div class="scroller">
+    <svg viewBox="0 0 980 470" role="img" aria-label="Two disconnected simulation paths: the Custom Geometry Builder reaches the Python solver but needs localhost, while the preset and AI Run path reaches the WebAssembly solver but offers no custom geometry. A missing adapter between them is the one change that would join them.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+        <marker id="a2-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+
+      <!-- ===== PATH A ===== -->
+      <text x="20" y="26" font-family="var(--font-mono)" font-size="11.5" font-weight="600" fill="var(--fg)">PATH A — build your own geometry</text>
+      <text x="20" y="42" font-family="var(--font-mono)" font-size="10.5" fill="var(--bad)">needs localhost:8000 · does not exist on the deployed site</text>
+
+      <rect x="20" y="56" width="205" height="68" rx="5" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="32" y="76" font-size="12" font-weight="600" fill="var(--fg)">Custom Geometry Builder</text>
+      <text x="32" y="92" font-size="10" fill="var(--muted)">6 shapes: cylinder, square, plate,</text>
+      <text x="32" y="104" font-size="10" fill="var(--muted)">airfoil, house, tower</text>
+      <text x="32" y="117" font-size="10" fill="var(--muted)">3 sliders: x, y, size (+ angle)</text>
+
+      <rect x="267" y="56" width="205" height="68" rx="5" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="279" y="76" font-size="12" font-weight="600" fill="var(--fg)">obstacleSpec</text>
+      <text x="279" y="92" font-size="10" fill="var(--muted)">{ shape, cx, cy, size, aoa }</text>
+      <text x="279" y="105" font-size="10" fill="var(--muted)">coordinates in 0 … 1</text>
+      <text x="279" y="118" font-size="10" fill="var(--accent)">App.vue:439</text>
+
+      <rect x="514" y="56" width="205" height="68" rx="5" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="526" y="76" font-size="12" font-weight="600" fill="var(--fg)">ws /ws/simulate</text>
+      <text x="526" y="92" font-size="10" fill="var(--muted)">build_obstacle_mask()</text>
+      <text x="526" y="105" font-size="10" fill="var(--muted)">rasterizes all 6 shapes properly</text>
+      <text x="526" y="118" font-size="10" fill="var(--muted)">solver.py · 760 lines NumPy</text>
+
+      <rect x="761" y="56" width="205" height="68" rx="5" fill="none" stroke="var(--ok)" stroke-width="2"/>
+      <text x="773" y="80" font-size="12" font-weight="600" fill="var(--ok)">A real custom simulation</text>
+      <text x="773" y="98" font-size="10" fill="var(--ok)">your shape, your position,</text>
+      <text x="773" y="111" font-size="10" fill="var(--ok)">your Reynolds number</text>
+
+      <path d="M229,90 L263,90" stroke="currentColor" stroke-width="1.5" marker-end="url(#a2)" fill="none"/>
+      <path d="M476,90 L510,90" stroke="currentColor" stroke-width="1.5" marker-end="url(#a2)" fill="none"/>
+      <path d="M723,90 L757,90" stroke="currentColor" stroke-width="1.5" marker-end="url(#a2)" fill="none"/>
+
+      <!-- ===== PATH B ===== -->
+      <text x="20" y="320" font-family="var(--font-mono)" font-size="11.5" font-weight="600" fill="var(--fg)">PATH B — presets and “AI Run”</text>
+      <text x="20" y="336" font-family="var(--font-mono)" font-size="10.5" fill="var(--ok)">runs in any browser, no server — but you cannot place your own shape</text>
+
+      <rect x="20" y="350" width="205" height="68" rx="5" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="32" y="370" font-size="12" font-weight="600" fill="var(--fg)">Preset dropdown · “AI Run”</text>
+      <text x="32" y="386" font-size="10" fill="var(--muted)">one text box in the ribbon</text>
+      <text x="32" y="399" font-size="10" fill="var(--muted)">“120 km/h wind on 20m tower”</text>
+      <text x="32" y="412" font-size="10" fill="var(--muted)">ParaViewGlanceViewer.vue:135</text>
+
+      <rect x="267" y="350" width="205" height="68" rx="5" fill="none" stroke="var(--warn)" stroke-width="2"/>
+      <text x="279" y="370" font-size="12" font-weight="600" fill="var(--warn)">3 keyword matchers</text>
+      <text x="279" y="386" font-size="10" fill="var(--warn)">synthesizeCustomPrimitives()</text>
+      <text x="279" y="399" font-size="10" fill="var(--warn)">inferLocalPresetFromPrompt()</text>
+      <text x="279" y="412" font-size="10" fill="var(--warn)">/api/ai/simulate — no LLM at all</text>
+
+      <rect x="514" y="350" width="205" height="68" rx="5" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="526" y="370" font-size="12" font-weight="600" fill="var(--fg)">1 of 8 fixed presets</text>
+      <text x="526" y="386" font-size="10" fill="var(--muted)">→ fvm_solver.wasm</text>
+      <text x="526" y="399" font-size="10" fill="var(--accent)">applyCustomPrimitives() exists here</text>
+      <text x="526" y="412" font-size="10" fill="var(--accent)">but only “car” / “lander” reach it</text>
+
+      <rect x="761" y="350" width="205" height="68" rx="5" fill="none" stroke="var(--warn)" stroke-width="2"/>
+      <text x="773" y="374" font-size="12" font-weight="600" fill="var(--warn)">Runs anywhere —</text>
+      <text x="773" y="390" font-size="12" font-weight="600" fill="var(--warn)">but it is a menu</text>
+      <text x="773" y="408" font-size="10" fill="var(--warn)">8 cases + 2 secret keywords</text>
+
+      <path d="M229,384 L263,384" stroke="currentColor" stroke-width="1.5" marker-end="url(#a2)" fill="none"/>
+      <path d="M476,384 L510,384" stroke="currentColor" stroke-width="1.5" marker-end="url(#a2)" fill="none"/>
+      <path d="M723,384 L757,384" stroke="currentColor" stroke-width="1.5" marker-end="url(#a2)" fill="none"/>
+
+      <!-- ===== THE MISSING LINK ===== -->
+      <path d="M370,128 C370,210 616,230 616,346"
+            stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="8 5" fill="none" marker-end="url(#a2-acc)"/>
+      <rect x="398" y="196" width="200" height="56" rx="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+      <text x="498" y="217" font-size="12" font-weight="700" fill="var(--accent)" text-anchor="middle">THE MISSING ADAPTER</text>
+      <text x="498" y="232" font-size="10" fill="var(--accent)" text-anchor="middle">{shape, cx, cy, size} 0…1</text>
+      <text x="498" y="245" font-size="10" fill="var(--accent)" text-anchor="middle">→ {kind, x, y, w, h} −1…1 · ~25 lines</text>
+    </svg>
+    </div>
+    <figcaption><strong>Figure 2.</strong> Both halves of “build your own simulation in the browser” are already written. The builder produces a shape spec; the WebAssembly solver already voxelizes arbitrary primitives through <code>fvm_paint_obstacle</code>. Nothing translates between the two coordinate conventions, so the builder can only reach the Python solver and the WASM solver can only be reached by a preset menu. One small adapter joins them.</figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h3>Path A — the Custom Geometry Builder (real, but local only)</h3>
+  <p>Open the sidebar, find the <strong>Custom Geometry Builder</strong> card, pick one of six shapes, drag three sliders (x position, y position, size — plus angle of attack for the airfoil), press Apply. That emits <code>obstacleSpec</code>, which travels over the WebSocket to <code>build_obstacle_mask()</code> in <code>solver.py</code>. That function genuinely rasterizes all six shapes at your chosen position and size, and its docstring says so: <em>“This is the pathway that lets users build their OWN simulations.”</em> It is real, and it works — on <code>localhost</code>.</p>
+
+  <h3>Path B — presets and “AI Run” (works on the web, but is a menu)</h3>
+  <p>The viewer ribbon has a preset dropdown and the “AI Run” text box. Both resolve to one of eight hardcoded cases and run <code>fvm_solver.wasm</code> in the browser. No server needed. But you cannot place your own shape — except for two undocumented keywords: type <strong>“car”</strong> or <strong>“lander”</strong> and <code>synthesizeCustomPrimitives()</code> assembles a hardcoded four-primitive model. Nothing in the UI tells anyone those exist.</p>
+
+  <h3>So the thing a user cannot do is the project's own premise</h3>
+  <p>Build their own geometry <em>and</em> have it run in the browser. Fixing it is small, because both ends are already built: <code>OpenFoamWasmEngine.applyCustomPrimitives()</code> voxelizes arbitrary primitives straight into the WASM solver via <code>fvm_paint_obstacle</code>. It is simply only ever called from those two keyword matches. Write the coordinate adapter, call it from the builder's Apply button, and Path A runs with no backend at all. <strong>This is the highest-value change in the whole audit</strong> — it is the difference between a demo with eight slides and a platform.</p>
+
+  <h3>What file upload actually does today</h3>
+  <ul>
+    <li><strong><code>.vtk</code> into the ParaView viewer</strong> — works. You can load and inspect an existing result.</li>
+    <li><strong><code>.stl</code> / <code>.obj</code> / <code>.step</code></strong> — the dropzone accepts the file, then shows <em>“📎 filename — not used”</em> under the label <em>“CAD import is not implemented yet”</em>. Honest, but it means there is no geometry import.</li>
+    <li><strong>An OpenFOAM case folder</strong> — no import path exists. Export only, and only the cavity geometry is correct.</li>
+  </ul>
+
+  <h2><span class="num">06b / Findings</span>What “AI Run” is really doing</h2>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">honesty</span>“AI Run” contains no model, and it cannot fail</h3>
+    <p>Three keyword matchers stacked: <code>synthesizeCustomPrimitives()</code> (two regexes), then <code>inferLocalPresetFromPrompt()</code> (seven regex lines), then the backend's ten-rule table. The network call sits in a <code>try</code> with an empty <code>catch</code> and the preset load in <code>finally</code> — so the backend can be <em>entirely absent</em> and the button still reports success and animates a flow. That is why clicking it always appears to work.</p>
+    <p class="where">ParaViewGlanceViewer.vue:1800–1861</p>
+  </div>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">bug</span>Any unrecognised prompt silently gives you a house</h3>
+    <p><code>inferLocalPresetFromPrompt</code> ends with an unconditional <code>return { presetId: 4, label: 'simple_house' }</code>. Type “blood flow through an artery” and you get a house, with no warning anywhere in the UI. It should say it didn't understand and list what it supports.</p>
+    <p class="where">ParaViewGlanceViewer.vue:1748</p>
+  </div>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">bug</span>The Reynolds number is discarded, and the label claims otherwise</h3>
+    <p>When “AI Run” changes the preset — the normal case — it assigns <code>wasmPreset.value</code> and lets the watcher do the work. The watcher is <code>initPresetPreview(nextPreset)</code> with no Reynolds override, and <code>initPresetPreview</code> then falls back to <code>meta.re</code>, the preset's hardcoded value. Meanwhile <code>layaStatusText</code> displays the Reynolds number it parsed from your prompt.</p>
+    <p>So the status reads <code>Re=1000</code> while the solver actually ran at <code>Re=200</code>. The UI reports a number that was never used. One-line fix: pass the value through the watcher.</p>
+    <p class="where">ParaViewGlanceViewer.vue:1632 vs :1851</p>
+  </div>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">design</span>The chat physically cannot drive the WebAssembly simulation</h3>
+    <p>The real chat lives in <code>SidebarControls.vue</code>, and its autonomous-action path writes <code>obstacleSpec</code> into the <em>backend</em> solver. The WASM engine in the viewer is driven only by the preset dropdown and the one-line “AI Run” box. There is no route from a chat message to the browser solver. So “chat with the model about my simulation” isn't a missing feature — it's structurally impossible in the current wiring, on top of the no-message-history problem from finding 04.</p>
+    <p>Once the adapter in Figure 2 exists, this becomes easy: the chat already extracts a shape spec, so point it at <code>applyCustomPrimitives()</code> too, and the same message can place geometry and run it in the browser.</p>
+  </div>
+
+  <h2><span class="num">07 / Findings</span>Deployment, safety, structure</h2>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">bug</span>The deployed web version cannot have a backend, by construction</h3>
+    <p>Two independent blocks. <code>vercel.json</code> ships only the static SPA — there is no Python runtime. And <code>app.py</code> deliberately restricts CORS to <code>^https?://(localhost|127\.0\.0\.1|\[::1\])</code>, so even a separately hosted backend would reject the deployed origin. The “open web version anyone can use” is today the WASM solver plus the user's own cloud LLM key. That is a real, defensible product — just describe it as that.</p>
+    <p>To actually ship the backend: host it (Railway, Fly, Render), add the deploy origin to the CORS regex, and set <code>VITE_API_URL</code> at build time.</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">bug</span>Five different conventions for the backend URL, three of them hardcoded</h3>
+    <p><code>http://${window.location.hostname}:8000</code> appears literally in <code>aiCopilot.ts</code>, <code>SidebarControls.vue</code> and <code>ParaViewGlanceViewer.vue</code>; elsewhere the code sniffs for port <code>5173</code>, or reads <code>VITE_API_URL</code>, or uses a relative path. On an HTTPS page the hardcoded <code>http://</code> is blocked as mixed content. Collapse all five into one exported <code>apiBase()</code>.</p>
+  </div>
+
+  <div class="find sev-bad">
+    <h3><span class="tag">risk</span>The server can click, type and screenshot on this machine</h3>
+    <p><code>/api/agent-desktop/click</code>, <code>/type</code>, <code>/screenshot</code> and <code>/launch-paraview</code> drive the host desktop over plain HTTP with no authentication. The localhost CORS rule is the only thing protecting you, and CORS does not stop a non-browser client. Never expose port 8000 to a network, and put this behind an explicit opt-in flag that defaults to off.</p>
+  </div>
+
+  <div class="find sev-warn">
+    <h3><span class="tag">gap</span>84 backend tests; zero tests for the 15,852 lines where the product lives</h3>
+    <p>The Python suite passes cleanly. But the WASM solver, the viewer, the AI copilot, the dictionary generation and the 3D stage have no tests at all. The two cheapest high-value tests: <code>validate_spec</code> / CFL clamping already has coverage — add one that asserts the WASM solver and <code>solver.py</code> agree on the cavity, and one that asserts <code>parseVtkAscii</code> rejects non-VTK input (finding above).</p>
+  </div>
+
+  <div class="find sev-dead">
+    <h3><span class="tag">cleanup</span>Dead weight</h3>
+    <ul>
+      <li>Five orphaned Vue components — <code>AiAssistant</code>, <code>HelloWorld</code>, <code>CfdCanvas2D</code>, <code>OpenFoamTerminal</code>, <code>OpenFoamDictEditor</code> — roughly 800 lines with no importer.</li>
+      <li>Two orphaned solvers (#3, #6) — roughly 1,100 lines.</li>
+      <li>An internship scraper (<code>/tracker</code>, <code>/api/internships/latest</code>) living inside the CFD API server.</li>
+      <li>Over thirty PDFs and a 768 KB Overleaf zip committed at the repository root.</li>
+      <li><code>requirements-dev.txt</code> pins <code>httpx2&gt;=2.0</code>; FastAPI's TestClient wants <code>httpx</code>. Verify that this is the package you meant.</li>
+    </ul>
+  </div>
+
+  <h2><span class="num">08 / Credit</span>What is genuinely solid</h2>
+
+  <div class="ok-list">
+    <h3>Don't let the list above obscure these</h3>
+    <ul>
+      <li><strong>The WebAssembly claim is true.</strong> <code>fvm_solver.wasm</code> is real Emscripten-compiled C with a proper C ABI — <code>fvm_create</code>, <code>fvm_step</code>, pointer accessors into the heap, obstacle painting, adaptive CFL. Plus a second module, <code>fea_structure.wasm</code>, for the structural side. Browser-native CFD with no server is the strongest thing in this project and it actually works.</li>
+      <li><strong>The stability guards are correct.</strong> <code>validate_spec</code> caps dt at both the Courant and the diffusion limit, with the reasoning written in the comment. This is the part most student CFD code gets wrong.</li>
+      <li><strong>Security decisions were made deliberately, not by accident.</strong> The CORS regex has a comment explaining that <code>"*"</code> would let any site call <code>DELETE /api/projects</code>. The Gemini key is sent in a header rather than the URL, with the reason stated. A previous bug that POSTed Anthropic keys to <code>api.openai.com</code> was found and fixed, and the fix is documented in place.</li>
+      <li><strong>84 passing backend tests</strong>, and a README that already admits its gaps in a “Not implemented yet” section — which is more honesty than most projects at this stage.</li>
+    </ul>
+  </div>
+
+  <hr>
+
+  <h2><span class="num">09 / Order</span>What to do first</h2>
+
+  <div class="tbl-scroll">
+  <table>
+    <thead><tr><th>#</th><th>Action</th><th>Effort</th><th>Why now</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>Fix <code>res.get("cfl")</code> → <code>res["cfl_max"]</code>; converge the verifier to steady state; re-run the benchmarks</td><td class="n">~1 h</td><td>Two numbers in the paper currently measure nothing</td></tr>
+      <tr><td class="n">2</td><td>Reframe the RL claim as schema + stability compliance, not learned physics</td><td class="n">~1 h</td><td>A reviewer who reads the reward function will catch it</td></tr>
+      <tr><td class="n">3</td><td>Add torch / transformers / peft to <code>requirements.txt</code></td><td class="n">5 min</td><td>This is the “AI unavailable” message you are seeing</td></tr>
+      <tr><td class="n">4</td><td>Point the trained adapter at <code>/api/ai/simulate</code> (spec JSON → <code>validate_spec</code>), keep regex as the fallback</td><td class="n">~3 h</td><td>Makes the model do the job it was trained for, and gives the paper a real contribution</td></tr>
+      <tr><td class="n">5</td><td><strong>Write the coordinate adapter; wire the Geometry Builder into <code>applyCustomPrimitives()</code></strong></td><td class="n">~3 h</td><td>Makes “build your own simulation” work in the browser. Both ends already exist (Figure 2)</td></tr>
+      <tr><td class="n">6</td><td>Pass Reynolds through the <code>wasmPreset</code> watcher; make an unmatched prompt say so instead of returning a house</td><td class="n">~1 h</td><td>The UI currently reports a Reynolds number the solver never used</td></tr>
+      <tr><td class="n">7</td><td>Delete <code>AiAssistant.vue</code>; surface the real chat; pass message history; point it at the WASM engine too</td><td class="n">~3 h</td><td>Turns a slow search box into an assistant that can actually drive a simulation</td></tr>
+      <tr><td class="n">8</td><td>Delete solvers #3 and #6; add one cross-solver cavity agreement test</td><td class="n">~3 h</td><td>Answers “which solver made your figures?”</td></tr>
+      <tr><td class="n">9</td><td>Expand the ablation to 60+ prompts, held-out split, 3 seeds</td><td class="n">~4 h</td><td>n = 6 is not a result</td></tr>
+      <tr><td class="n">10</td><td>One <code>apiBase()</code> helper; content-type check in <code>syncWithActiveSolver</code></td><td class="n">~2 h</td><td>Stops the deployed build parsing HTML as VTK</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="footnote">Items 1–3 change what you can claim in the paper. Item 5 changes what the platform <em>is</em>. Everything else is engineering debt that can wait until after submission.</p>
+
+</div>

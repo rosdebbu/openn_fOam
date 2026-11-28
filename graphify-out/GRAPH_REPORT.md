@@ -1,16 +1,16 @@
-# Graph Report - openn_fOam  (2026-11-23)
+# Graph Report - openn_fOam  (2026-11-28)
 
 ## Corpus Check
-- 373 files · ~4,264,186 words
+- 378 files · ~1,509,021 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 8591 nodes · 27360 edges · 218 communities (206 shown, 12 thin omitted)
-- Extraction: 84% EXTRACTED · 16% INFERRED · 0% AMBIGUOUS · INFERRED: 4507 edges (avg confidence: 0.57)
+- 8743 nodes · 27621 edges · 223 communities (205 shown, 18 thin omitted)
+- Extraction: 84% EXTRACTED · 16% INFERRED · 0% AMBIGUOUS · INFERRED: 4510 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7b9cdb95`
+- Built from commit: `ea2211d4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,131 +18,137 @@
 - join
 - OpenZessBoardStage.vue
 - index-DWio60ZM.js
-- .[(ro=new WeakMap,io=new WeakMap,F=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,uo=new WeakMap,Symbol.asyncIterator)]
-- ci
+- constructor
+- constructor
 - fea_structure.js
+- O
 - Model Card for Model ID
-- Model Card for Model ID
-- Model Card for Model ID
-- node.browser-IVEl0lnr.js
-- get
-- setup
+- OpenZess Studio: Gap Analysis (what is missing)
+- node.browser-BvQxiRFz.js
+- e
+- Any
 - agent_desktop.py
 - FeaContext
-- J
+- r
+- CfdCanvas2D.vue
+- We
 - q
-- .slice
-- forEach
-- n
+- a
 - index-C8zzSVhK.js
-- v_
-- .constructor
-- node.browser-C7HKJzsa.js
-- xx
-- .then
+- AcceleratedSolver
+- created
+- _run_ai_pipeline
+- push
+- .[(no=new WeakMap,ro=new WeakMap,I=new WeakMap,io=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,Symbol.asyncIterator)]
 - SidebarControls.vue
-- node.browser-BvQxiRFz.js
-- test_ai_simulate.py
+- .[(ro=new WeakMap,io=new WeakMap,F=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,uo=new WeakMap,Symbol.asyncIterator)]
+- Verification brief: AI Run and browser geometry changes
 - Mesh2D
 - CfdThree3D.vue
-- clearUpdateRanges
-- getPoint
-- export_vtk
-- CfdCanvas2D.vue
-- at
+- th
+- .[(ro=new WeakMap,io=new WeakMap,F=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,uo=new WeakMap,Symbol.asyncIterator)]
+- push
+- getPoints
+- v_
 - SettingsModal.vue
-- hs
-- e
-- .[(no=new WeakMap,ro=new WeakMap,I=new WeakMap,io=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,Symbol.asyncIterator)]
-- devDependencies
-- .then
-- App.vue
-- CasePhysics
-- index-CpCa-dRu.js
 - wf
-- nb
-- .[(Pd=new WeakMap,Fd=new WeakMap,J=new WeakMap,Id=new WeakMap,Y=new WeakMap,Ld=new WeakMap,Rd=new WeakMap,X=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Z=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,q=new WeakSet,Jd=function(e){return S(this,Ud,`f`)?Rt.with(S(this,Ud,`f`),e):e()},Symbol.asyncIterator)]
-- .getNextPage
-- e
-- A. Backend Architecture
-- set
-- index-Yl2o4bhZ.js
+- .slice
+- openfoamWasmBridge.ts
+- devDependencies
+- NumberedCanvas
+- App.vue
+- N
+- index-CpCa-dRu.js
+- NumberedCanvas
+- wr
+- r
+- vercel.json
 - n
+- h
+- .then
+- index-Yl2o4bhZ.js
+- _parse_primitives
+- push
+- export_vtk
+- COLLABORATOR_README.md
+- .then
+- generate_3d_mesh
+- obstacleGeometry.ts
+- J
+- .getNextPage
+- OpenZess Studio — Verified IEEE Research Benchmark Results
+- inferLocalPresetFromPrompt
+- handleViewportKeydown
+- setup
+- NumberedCanvas
+- NumberedCanvas
+- .slice
+- A. Backend Architecture
 - 🧭 OpenZess Studio — Project Overview & Vision
 - 🚀 Quick Start
-- handleViewportKeydown
-- CodeStatsRequest
-- jC
-- clearUpdateRanges
-- clearUpdateRanges
-- created
+- W
+- n
 - 📚 OpenZess 3D Studio Documentation
-- .constructor
-- kc
-- setup
-- copy
+- asd-ste100.md
+- verify_backend_limits.py
+- clearUpdateRanges
 - compilerOptions
 - copy
+- CodeStatsRequest
+- .[(Pd=new WeakMap,Fd=new WeakMap,J=new WeakMap,Id=new WeakMap,Y=new WeakMap,Ld=new WeakMap,Rd=new WeakMap,X=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Z=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,q=new WeakSet,Jd=function(e){return S(this,Ud,`f`)?Rt.with(S(this,Ud,`f`),e):e()},Symbol.asyncIterator)]
+- Ns
 - n
-- r
+- setup
 - HeaderNavbar.vue
+- q
+- paintSketchCell
+- clearUpdateRanges
 - copy
 - copy
 - cfd.ts
 - compilerOptions
-- join
-- push
-- push
-- created
+- constructor
+- get
+- r
 - sdk-Dme12cId.js
 - sdk-Cq6IE8uJ.js
-- wb
+- setup
 - OpenFoamTerminal.vue
 - sdk-DUE-lw3x.js
 - $e
-- $e
+- S
 - constructor
 - $e
 - cfd_solver.rs
-- constructor
+- created
 - push
 - b
 - k
-- push
 - .[(Nd=new WeakMap,Pd=new WeakMap,Y=new WeakMap,Fd=new WeakMap,X=new WeakMap,Id=new WeakMap,Ld=new WeakMap,Z=new WeakMap,Rd=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,J=new WeakSet,Jd=function(e){return C(this,Hd,`f`)?Lt.with(C(this,Hd,`f`),e):e()},Symbol.asyncIterator)]
 - b
 - app.py
 - b
-- .constructor
-- O
-- .[(Pd=new WeakMap,Fd=new WeakMap,J=new WeakMap,Id=new WeakMap,Y=new WeakMap,Ld=new WeakMap,Rd=new WeakMap,X=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Z=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,q=new WeakSet,Jd=function(e){return S(this,Ud,`f`)?Rt.with(S(this,Ud,`f`),e):e()},Symbol.asyncIterator)]
+- $e
+- T
 - ParaViewGlanceViewer.vue
 - T
 - fvm_solver.js
-- te
-- at
-- bh
 - ensure_frontend_build
 - test_solver.py
-- .decode
 - a
 - tsconfig.json
 - save_chat_entry.py
 - HelloWorld.vue
 - 2. Turn-by-Turn Executive Summary
-- bh
 - WasmCfdSolver
-- A. Backend Architecture
+- B. Frontend Architecture
 - ⚡ OpenZess Studio
 - 🌊 OpenZess 3D Studio & OpenFOAM Real Physics — Current Session Log
-- setup
 - openfoam_icoFoam_wasm.c
 - Json
 - projectStore.ts
 - 📜 Complete Master AI Conversation & Design Archive
 - test_api.py
-- post
-- COLLABORATOR_README.md
 - Literature Review & Scope Definition Report
 - 🛠️ OpenZess 3D Studio — Technology Stack
 - 💻 Local Hardware Runtime Architecture (Colab-Style Local Bridge)
@@ -163,8 +169,7 @@
 - 2. Key Highlights of Completed Work
 - 2. Detailed Task Breakdown
 - 🧩 Architectural Breakdown by Layer
-- loadData
-- vtkOpenFoamParser.ts
+- initPresetPreview
 - InBrowserCfdEngine
 - Turn 9: Expanding Simulation Archetypes (Airfoil, Plume, Cylinder, Venturi, Cavity, CAD)
 - NumberedCanvas
@@ -251,63 +256,63 @@
   tests/test_ai_simulate.py → backend/ai_simulate.py
 - `test_unknown_prompt_does_not_fall_back_to_airfoil()` --calls--> `build_spec()`  [EXTRACTED]
   tests/test_ai_simulate.py → backend/ai_simulate.py
-- `centrelines()` --uses--> `Mesh2D`  [INFERRED]
-  experiments/run_milestone_simulations.py → backend/mesh.py
-- `make()` --calls--> `Mesh2D`  [EXTRACTED]
-  tests/test_solver.py → backend/mesh.py
+- `test_user_reynolds_beats_the_models_guess()` --calls--> `normalize_rl_spec()`  [EXTRACTED]
+  tests/test_ai_simulate.py → backend/ai_simulate.py
+- `test_complete_json_gives_all_parts_name_and_re()` --calls--> `_parse_primitives()`  [EXTRACTED]
+  tests/test_parse_primitives.py → backend/app.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (218 total, 12 thin omitted)
+## Communities (223 total, 18 thin omitted)
 
 ### Community 0 - "join"
-Cohesion: 0.08
-Nodes (27): ap(), Cx(), dx(), fR(), ge(), ix(), jn(), join() (+19 more)
+Cohesion: 0.05
+Nodes (43): ax(), clearUpdateRanges(), Cx(), disableAll(), dispose(), dx(), fromEquirectangularTexture(), hC() (+35 more)
 
 ### Community 1 - "OpenZessBoardStage.vue"
-Cohesion: 0.07
-Nodes (36): addInkOutlinedPart(), beads, BeadState, camState, domainToWorld(), dummyObj, emit, freeProbe (+28 more)
+Cohesion: 0.06
+Nodes (46): addInkOutlinedPart(), camState, clearGroup(), clipPlane, colorLut(), domainToWorld(), dummyObj, emit (+38 more)
 
 ### Community 2 - "index-DWio60ZM.js"
 Cohesion: 0.01
-Nodes (267): WD(), YM(), zP(), absarc(), absellipse(), aj(), ak(), _allocateTargets() (+259 more)
+Nodes (258): WD(), YM(), zP(), ab(), absarc(), absellipse(), AF(), ak() (+250 more)
 
-### Community 3 - ".[(ro=new WeakMap,io=new WeakMap,F=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,uo=new WeakMap,Symbol.asyncIterator)]"
-Cohesion: 0.17
-Nodes (9): ec(), eo(), Qa(), to(), u(), Xa(), Ya(), Za() (+1 more)
+### Community 3 - "constructor"
+Cohesion: 0.03
+Nodes (91): addGroup(), at(), r(), connect(), constructor(), te(), at(), dt() (+83 more)
 
-### Community 4 - "ci"
-Cohesion: 0.04
-Nodes (169): b(), d(), s(), ae(), An(), ar(), bh(), br() (+161 more)
+### Community 4 - "constructor"
+Cohesion: 0.03
+Nodes (83): addGroup(), ag(), cb(), b(), x(), connect(), constructor(), ee() (+75 more)
 
 ### Community 5 - "fea_structure.js"
 Cohesion: 0.08
 Nodes (24): abort(), assignWasmExports(), convertReturnValue(), createWasm(), receiveInstance(), receiveInstantiationResult(), EmscriptenEH, EmscriptenSjLj (+16 more)
 
-### Community 6 - "Model Card for Model ID"
+### Community 6 - "O"
 Cohesion: 0.05
-Nodes (37): Bias, Risks, and Limitations, Citation [optional], Compute Infrastructure, Direct Use, Downstream Use [optional], Environmental Impact, Evaluation, Factors (+29 more)
+Nodes (27): approve(), bc(), ca(), Cc(), deny(), dh(), download(), la() (+19 more)
 
 ### Community 7 - "Model Card for Model ID"
 Cohesion: 0.05
 Nodes (37): Bias, Risks, and Limitations, Citation [optional], Compute Infrastructure, Direct Use, Downstream Use [optional], Environmental Impact, Evaluation, Factors (+29 more)
 
-### Community 8 - "Model Card for Model ID"
-Cohesion: 0.05
-Nodes (37): Bias, Risks, and Limitations, Citation [optional], Compute Infrastructure, Direct Use, Downstream Use [optional], Environmental Impact, Evaluation, Factors (+29 more)
-
-### Community 9 - "node.browser-IVEl0lnr.js"
-Cohesion: 0.17
-Nodes (22): c(), close(), closed(), constructor(), d(), dispose(), download(), exec() (+14 more)
-
-### Community 10 - "get"
-Cohesion: 0.02
-Nodes (185): Zi(), _a(), addBounds(), ar(), be(), Ee(), me(), Ne() (+177 more)
-
-### Community 11 - "setup"
+### Community 8 - "OpenZess Studio: Gap Analysis (what is missing)"
 Cohesion: 0.04
-Nodes (141): DC(), addEventListener(), Ae(), At(), ae(), oe(), _e(), He() (+133 more)
+Nodes (44): 1. Summary, 2. Promised features vs the code, 3.1 The main user journey, 3.2 Solver and physics, 3.3 Results and analysis, 3.4 Interoperability, 3.5 Quality of use, 3. Missing product capabilities (+36 more)
+
+### Community 9 - "node.browser-BvQxiRFz.js"
+Cohesion: 0.05
+Nodes (68): constructor(), makeMessage(), c(), close(), closed(), constructor(), d(), dispose() (+60 more)
+
+### Community 10 - "e"
+Cohesion: 0.10
+Nodes (41): e(), ah(), backgroundRefresh(), bh(), ch(), doRefresh(), Dr(), Dt() (+33 more)
+
+### Community 11 - "Any"
+Cohesion: 0.09
+Nodes (29): agent_desktop_click(), agent_desktop_launch_paraview(), agent_desktop_screenshot(), agent_desktop_snapshot(), agent_desktop_type(), ai_chat(), ai_simulate(), ai_text_to_3d() (+21 more)
 
 ### Community 12 - "agent_desktop.py"
 Cohesion: 0.13
@@ -317,241 +322,289 @@ Nodes (26): capture_window_screenshot(), click_desktop_ref(), get_agent_desktop_
 Cohesion: 0.13
 Nodes (19): FEA_EXPORT, vector, fea_create(), fea_get_disp_ptr(), fea_get_max_disp(), fea_get_max_stress(), fea_get_pressure_in_ptr(), fea_get_stress_ptr() (+11 more)
 
-### Community 14 - "J"
-Cohesion: 0.07
-Nodes (41): aa(), Ge(), o(), We(), customProgramCacheKey(), h(), fromArray(), fromJSON() (+33 more)
-
-### Community 15 - "q"
-Cohesion: 0.12
-Nodes (24): at(), customProgramCacheKey(), fromArray(), fromJSON(), getColorAt(), getFragmentShaderStage(), _getShaderStage(), getVertexShaderStage() (+16 more)
-
-### Community 16 - ".slice"
-Cohesion: 0.07
-Nodes (40): pw(), dirty(), dw(), ec(), Fe(), Gs(), ic(), Ie() (+32 more)
-
-### Community 17 - "forEach"
+### Community 14 - "r"
 Cohesion: 0.04
-Nodes (84): dF(), fF(), WP(), aI(), b(), ba(), bH(), bind() (+76 more)
+Nodes (115): d(), s(), ay(), bh(), C_(), i(), t(), v() (+107 more)
 
-### Community 18 - "n"
-Cohesion: 0.13
-Nodes (19): vt(), Je(), archive(), attach(), Cc(), constructor(), disable(), et() (+11 more)
+### Community 15 - "CfdCanvas2D.vue"
+Cohesion: 0.17
+Nodes (13): canvasRef, containerRef, hoverInfo, initParticles(), particles, props, render(), resizeCanvas() (+5 more)
+
+### Community 16 - "We"
+Cohesion: 0.11
+Nodes (27): At(), lt(), ut(), Dt(), et(), gt(), ht(), it() (+19 more)
+
+### Community 17 - "q"
+Cohesion: 0.08
+Nodes (27): applyEuler(), conjugate(), fromArray(), fromJSON(), getColorAt(), hs(), f(), u() (+19 more)
+
+### Community 18 - "a"
+Cohesion: 0.08
+Nodes (31): Le(), a(), add(), an(), archive(), bc(), c(), ca() (+23 more)
 
 ### Community 19 - "index-C8zzSVhK.js"
 Cohesion: 0.01
-Nodes (277): absarc(), absellipse(), aD(), addBounds(), addPoint(), addPoints(), aE(), ak() (+269 more)
+Nodes (274): ab(), absarc(), absellipse(), addBounds(), addPoint(), addPoints(), aE(), ak() (+266 more)
 
-### Community 20 - "v_"
+### Community 20 - "AcceleratedSolver"
 Cohesion: 0.14
-Nodes (6): v_(), c(), m(), p(), w(), x()
+Nodes (11): AcceleratedSolver, ndarray, Fractional-step incompressible Navier-Stokes with a CasePhysics layer., Initialize transported scalars: hot plume strip or dam-break reservoir., Assemble and LU-factorize the 5-point pressure Laplacian once. Neumann (dp/dn =…, Apply the archetype's velocity BCs in place. Used for BOTH the predictor (u*,…, Apply velocity boundary conditions to the current solution., Integrate pressure + viscous forces on the immersed body. Staircase immersed… (+3 more)
 
-### Community 21 - ".constructor"
+### Community 21 - "created"
 Cohesion: 0.07
-Nodes (28): mp(), po(), Qf(), Cd(), ec(), eo(), error(), fe() (+20 more)
+Nodes (39): $a(), as(), beforeUpdate(), ca(), concat(), O(), created(), Do() (+31 more)
 
-### Community 22 - "node.browser-C7HKJzsa.js"
-Cohesion: 0.17
-Nodes (22): c(), close(), closed(), constructor(), d(), dispose(), download(), exec() (+14 more)
+### Community 22 - "_run_ai_pipeline"
+Cohesion: 0.22
+Nodes (17): build_spec(), explicit_reynolds(), normalize_rl_spec(), Any, Deterministic prompt -> executable simulation spec for POST /api/ai/simulate.…, Convert Qwen3-0.6B-RL JSON output into a CFL-validated OpenZess simulation_spec., Re typed by the user ("Re=900", "reynolds number 900"). It always beats a…, Coerce types ("41x41" -> 41), clamp ranges, and cap dt for explicit-scheme… (+9 more)
 
-### Community 23 - "xx"
-Cohesion: 0.05
-Nodes (35): ax(), c(), l(), s(), bx(), create(), dx(), i() (+27 more)
+### Community 23 - "push"
+Cohesion: 0.03
+Nodes (84): addGroup(), ax(), c(), s(), Ay(), c(), bx(), clear() (+76 more)
 
-### Community 24 - ".then"
+### Community 24 - ".[(no=new WeakMap,ro=new WeakMap,I=new WeakMap,io=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,Symbol.asyncIterator)]"
 Cohesion: 0.21
-Nodes (7): ap(), getComponent(), _createWithRecovery(), jd(), send(), stream(), Ys()
+Nodes (7): co(), eo(), error(), Xa(), Xs(), Ya(), Za()
 
 ### Community 25 - "SidebarControls.vue"
 Cohesion: 0.05
 Nodes (55): activeMode, activeSubTab, aiStatusBadge, applyBuilderToSimulation(), availableArchetypes, builderAoa, builderCx, builderCy (+47 more)
 
-### Community 26 - "node.browser-BvQxiRFz.js"
-Cohesion: 0.17
-Nodes (22): c(), close(), closed(), constructor(), d(), dispose(), download(), exec() (+14 more)
+### Community 26 - ".[(ro=new WeakMap,io=new WeakMap,F=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,uo=new WeakMap,Symbol.asyncIterator)]"
+Cohesion: 0.13
+Nodes (18): Cs(), c(), c(), ec(), eo(), error(), info(), je() (+10 more)
 
-### Community 27 - "test_ai_simulate.py"
-Cohesion: 0.29
-Nodes (10): build_spec(), Any, Deterministic prompt -> executable simulation spec for POST /api/ai/simulate.…, Coerce types ("41x41" -> 41), clamp ranges, and cap dt for explicit-scheme…, validate_spec(), parametrize, test_new_shapes_make_nonempty_partial_mask(), test_prompt_routes_to_expected_shape() (+2 more)
+### Community 27 - "Verification brief: AI Run and browser geometry changes"
+Cohesion: 0.09
+Nodes (22): 1. Context, 2. Scope boundary (important), 3.1 This round: AI Run and the backend, 3.2 Earlier in the session, 3. What Claude changed, 4. Verification steps, 5. Weak points. Please attack these., 6. Operations note (+14 more)
 
 ### Community 28 - "Mesh2D"
-Cohesion: 0.07
-Nodes (42): predict_cavity_stokes(), predict_potential_flow(), ndarray, OpenZess instant flow preview ("ai" solver mode). Despite the module name,…, Inviscid potential flow through a channel around a solid mask. Finite-volume…, Stokes-flow (Re -> 0) solution of the lid-driven cavity. Solves the biharmonic…, Mesh2D, OpenZess Mesh Module — 2D Grid Generation (+34 more)
+Cohesion: 0.11
+Nodes (31): predict_cavity_stokes(), predict_potential_flow(), ndarray, OpenZess instant flow preview ("ai" solver mode). Despite the module name,…, Inviscid potential flow through a channel around a solid mask. Finite-volume…, Stokes-flow (Re -> 0) solution of the lid-driven cavity. Solves the biharmonic…, Mesh2D, OpenZess Mesh Module — 2D Grid Generation (+23 more)
 
 ### Community 29 - "CfdThree3D.vue"
 Cohesion: 0.07
 Nodes (50): activeColormap, activeField, animate(), archetypeBadgeTitle, buildActiveArchetype(), buildCutplanes(), buildProbeMarker(), buildSimulatedGeometry() (+42 more)
 
-### Community 30 - "clearUpdateRanges"
-Cohesion: 0.50
-Nodes (4): clearUpdateRanges(), n(), r(), onUploadCallback()
+### Community 30 - "th"
+Cohesion: 0.15
+Nodes (22): ah(), backgroundRefresh(), bh(), cancel(), ch(), doRefresh(), eh(), getToken() (+14 more)
 
-### Community 31 - "getPoint"
-Cohesion: 0.11
-Nodes (27): ae(), n(), bj(), cj(), closePath(), equals(), extractPoints(), fk() (+19 more)
+### Community 31 - ".[(ro=new WeakMap,io=new WeakMap,F=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,uo=new WeakMap,Symbol.asyncIterator)]"
+Cohesion: 0.14
+Nodes (14): c(), ec(), eo(), error(), je(), Qa(), qe(), to() (+6 more)
 
-### Community 32 - "export_vtk"
-Cohesion: 0.38
-Nodes (6): export_vtk(), generate_vtk_bytes(), ndarray, OpenZess VTK Writer — Export CFD Fields to ParaView format (.vtk), Generate VTK Legacy Structured Points format directly in-memory as bytes.…, Export 2D mesh fields (u, v, p) into a VTK Legacy Structured Points format.…
+### Community 32 - "push"
+Cohesion: 0.02
+Nodes (117): dF(), fF(), hL(), pw(), WP(), aD(), ax(), bind() (+109 more)
 
-### Community 33 - "CfdCanvas2D.vue"
-Cohesion: 0.17
-Nodes (13): canvasRef, containerRef, hoverInfo, initParticles(), particles, props, render(), resizeCanvas() (+5 more)
+### Community 33 - "getPoints"
+Cohesion: 0.12
+Nodes (20): aj(), Ae(), n(), closePath(), Dj(), dV(), equals(), extractPoints() (+12 more)
 
-### Community 34 - "at"
-Cohesion: 0.09
-Nodes (25): at(), dt(), st(), ut(), r(), entries(), every(), filter() (+17 more)
+### Community 34 - "v_"
+Cohesion: 0.14
+Nodes (6): v_(), c(), m(), p(), w(), x()
 
 ### Community 35 - "SettingsModal.vue"
 Cohesion: 0.10
 Nodes (30): close(), currentModels, dynamicOllamaModels, emit, handleClearKey(), handleSave(), isTesting, localConfig (+22 more)
 
-### Community 36 - "hs"
-Cohesion: 0.09
-Nodes (22): created(), ds(), es(), fs(), hs(), f(), m(), u() (+14 more)
+### Community 36 - "wf"
+Cohesion: 0.27
+Nodes (10): cl(), Io(), jf(), kf(), Mf(), ml(), pl(), sl() (+2 more)
 
-### Community 37 - "e"
-Cohesion: 0.07
-Nodes (34): aa(), cb(), b(), x(), y(), clone(), concat(), qe() (+26 more)
+### Community 37 - ".slice"
+Cohesion: 0.06
+Nodes (34): aD(), BC(), dD(), ec(), ED(), getInterpolatedAttribute(), getInterpolation(), getZRange() (+26 more)
 
-### Community 38 - ".[(no=new WeakMap,ro=new WeakMap,I=new WeakMap,io=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,Symbol.asyncIterator)]"
-Cohesion: 0.20
-Nodes (8): co(), eo(), Qa(), Xa(), Xs(), Ya(), yo(), Za()
+### Community 38 - "openfoamWasmBridge.ts"
+Cohesion: 0.16
+Nodes (12): downloadOpenFoamTimeCase(), handleFileDrop(), handleFileUpload(), readFile(), syncWithActiveSolver(), CustomPrimitive, generateOpenFoamCase(), OpenFoamCaseFiles (+4 more)
 
 ### Community 39 - "devDependencies"
 Cohesion: 0.06
 Nodes (32): @anthropic-ai/sdk, dependencies, @anthropic-ai/sdk, @kitware/vtk.js, three, vue, devDependencies, @types/node (+24 more)
 
-### Community 40 - ".then"
-Cohesion: 0.29
-Nodes (5): _createWithRecovery(), Md(), send(), stream(), Xs()
-
 ### Community 41 - "App.vue"
 Cohesion: 0.05
 Nodes (39): activeDockTab, aiConfig, customGeometry, dictOverrides, fastForward(), frameHistory, frameIndex, handleApplyDict() (+31 more)
 
-### Community 42 - "CasePhysics"
-Cohesion: 0.18
-Nodes (5): CasePhysics, Reynolds number from the actual march viscosity (U*L/nu)., Signed temperature difference (K) driving the plume. Both temperatures are…, Normalized physical case configuration. Bridges what the user selects in the UI…, test_temperature_difference_is_signed_kelvin()
+### Community 42 - "N"
+Cohesion: 0.14
+Nodes (18): N(), decompose(), determinantAffine(), extractBasis(), extractRotation(), fromArray(), getColorAt(), identity() (+10 more)
 
 ### Community 43 - "index-CpCa-dRu.js"
 Cohesion: 0.01
-Nodes (210): Ay(), $a(), absarc(), absellipse(), Ag(), _allocateTargets(), applyAxisAngle(), applyEuler() (+202 more)
+Nodes (220): absarc(), absellipse(), Ag(), applyAxisAngle(), applyEuler(), applyQuaternion(), arc(), area() (+212 more)
 
-### Community 44 - "wf"
-Cohesion: 0.27
-Nodes (12): Fo(), gl(), hl(), jf(), kf(), Mf(), ml(), ol() (+4 more)
+### Community 45 - "wr"
+Cohesion: 0.33
+Nodes (5): _createWithRecovery(), jh(), Md(), send(), wr()
 
-### Community 45 - "nb"
-Cohesion: 0.17
-Nodes (21): ab(), B(), bb(), cb(), db(), Eb(), hb(), ib() (+13 more)
+### Community 46 - "r"
+Cohesion: 0.03
+Nodes (260): _a(), aa(), aM(), anythingToPoints(), oe(), ba(), be(), Bi() (+252 more)
 
-### Community 46 - ".[(Pd=new WeakMap,Fd=new WeakMap,J=new WeakMap,Id=new WeakMap,Y=new WeakMap,Ld=new WeakMap,Rd=new WeakMap,X=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Z=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,q=new WeakSet,Jd=function(e){return S(this,Ud,`f`)?Rt.with(S(this,Ud,`f`),e):e()},Symbol.asyncIterator)]"
-Cohesion: 0.11
-Nodes (26): si(), Bi(), da(), Df(), ea(), end(), er(), gd() (+18 more)
+### Community 47 - "vercel.json"
+Cohesion: 0.33
+Nodes (5): buildCommand, framework, headers, outputDirectory, rewrites
 
-### Community 47 - ".getNextPage"
-Cohesion: 0.32
-Nodes (4): getPaginatedItems(), hasNextPage(), le(), nextPageRequestOptions()
+### Community 48 - "n"
+Cohesion: 0.06
+Nodes (42): Ae(), archive(), attach(), bc(), Bi(), bn(), constructor(), Cr() (+34 more)
 
-### Community 48 - "e"
-Cohesion: 0.15
-Nodes (21): constructor(), e(), makeMessage(), ah(), backgroundRefresh(), bh(), ch(), doRefresh() (+13 more)
+### Community 49 - "h"
+Cohesion: 0.18
+Nodes (13): l(), cr(), deleteAttribute(), dr(), enableAll(), getNormalMatrix(), hs(), lr() (+5 more)
 
-### Community 49 - "A. Backend Architecture"
-Cohesion: 0.29
-Nodes (7): 1. [`backend/app.py`](../backend/app.py), 2. [`backend/solver.py`](../backend/solver.py), 3. [`backend/projects.py`](../backend/projects.py) *(New File)*, 4. [`backend/rust_bridge.py`](../backend/rust_bridge.py) *(New File)*, 5. [`backend/vtk_writer.py`](../backend/vtk_writer.py), 6. [`main.py`](../main.py), A. Backend Architecture
-
-### Community 50 - "set"
-Cohesion: 0.14
-Nodes (19): at(), Bt(), tt(), fromArray(), fromJSON(), getColorAt(), gt(), Ht() (+11 more)
+### Community 50 - ".then"
+Cohesion: 0.23
+Nodes (5): _createWithRecovery(), jd(), send(), stream(), Ys()
 
 ### Community 51 - "index-Yl2o4bhZ.js"
 Cohesion: 0.01
-Nodes (211): intersectTriangle(), intersectTriangle(), absarc(), Ah(), Ai(), _allocateTargets(), ao(), applyAxisAngle() (+203 more)
+Nodes (206): absarc(), absellipse(), Ah(), _allocateTargets(), angleTo(), ao(), applyAxisAngle(), applyEuler() (+198 more)
 
-### Community 52 - "n"
+### Community 52 - "_parse_primitives"
+Cohesion: 0.31
+Nodes (9): _parse_primitives(), Clamp and validate arbitrary LLM-generated 3D primitives into safe domain…, Pull primitives out of model text. Reads each complete {...} part on its own,…, _sanitize_primitives(), test_complete_json_gives_all_parts_name_and_re(), test_garbage_gives_no_parts(), test_markdown_fences_are_ignored(), test_out_of_range_values_are_clamped() (+1 more)
+
+### Community 53 - "push"
 Cohesion: 0.03
-Nodes (184): _a(), aa(), se(), ba(), bo(), By(), r(), c_() (+176 more)
+Nodes (121): A_(), b(), c(), m(), p(), T(), w(), x() (+113 more)
 
-### Community 53 - "🧭 OpenZess Studio — Project Overview & Vision"
+### Community 54 - "export_vtk"
+Cohesion: 0.38
+Nodes (6): export_vtk(), generate_vtk_bytes(), ndarray, OpenZess VTK Writer — Export CFD Fields to ParaView format (.vtk), Generate VTK Legacy Structured Points format directly in-memory as bytes.…, Export 2D mesh fields (u, v, p) into a VTK Legacy Structured Points format.…
+
+### Community 55 - "COLLABORATOR_README.md"
+Cohesion: 0.20
+Nodes (7): ⚡ 10-Second Quickstart (Windows), 📚 Collaborator Documentation Suite, 🤝 Welcome to OpenZess Studio (UR2627GEN317), 1. System Architecture Diagram, 2. Directory & File-by-File Reference, 3. Division of Work: Rust vs. Python, 🏗️ Architecture & Codebase Map
+
+### Community 56 - ".then"
+Cohesion: 0.29
+Nodes (5): _createWithRecovery(), Md(), send(), stream(), Xs()
+
+### Community 57 - "generate_3d_mesh"
 Cohesion: 0.40
-Nodes (4): 1. What is OpenZess Studio?, 2. Core Problem Domains, 3. Technology Stack at a Glance, 🧭 OpenZess Studio — Project Overview & Vision
+Nodes (9): _extract_filepath(), generate_3d_mesh(), _generate_hf_hunyuan(), _generate_hf_shape(), _generate_meshy(), Any, Text-to-3D Mesh Generator for OpenZess CFD. Provider cascade: 1. Meshy v2 REST…, Generate a real 3D .glb mesh from a text prompt. (+1 more)
 
-### Community 54 - "🚀 Quick Start"
-Cohesion: 0.40
-Nodes (5): Frontend development (hot reload), Prerequisites, 🚀 Quick Start, Run, Tests
+### Community 58 - "obstacleGeometry.ts"
+Cohesion: 0.39
+Nodes (5): build(), clamp(), GEOMETRY_SHAPES, ObstacleSpec, primitivesFromObstacleSpec()
 
-### Community 55 - "handleViewportKeydown"
+### Community 59 - "J"
+Cohesion: 0.09
+Nodes (33): aa(), bind(), Ge(), We(), Ea(), findNode(), fromJSON(), Ft() (+25 more)
+
+### Community 60 - ".getNextPage"
+Cohesion: 0.32
+Nodes (4): ce(), getPaginatedItems(), hasNextPage(), nextPageRequestOptions()
+
+### Community 61 - "OpenZess Studio — Verified IEEE Research Benchmark Results"
+Cohesion: 0.50
+Nodes (3): 1. Grid Independence Study (Lid-Driven Cavity, Re = 100, Ghia et al. 1982), 2. RL Ablation Study (6-Prompt CFD Suite on RTX 5050 Laptop GPU), OpenZess Studio — Verified IEEE Research Benchmark Results
+
+### Community 62 - "inferLocalPresetFromPrompt"
+Cohesion: 0.50
+Nodes (5): findLocalPreset(), inferLocalPresetFromPrompt(), routeWithLayaAi(), sendAiChat(), synthesizeCustomPrimitives()
+
+### Community 63 - "handleViewportKeydown"
 Cohesion: 0.40
 Nodes (5): handleViewportKeydown(), orbitCamera(), toggleCalloutPins(), toggleFlowBeads(), zoomCamera()
 
-### Community 56 - "CodeStatsRequest"
-Cohesion: 0.60
-Nodes (4): analyze_code(), CodeStatsRequest, CodeStatsResponse, String
+### Community 64 - "setup"
+Cohesion: 0.03
+Nodes (169): aa(), addEventListener(), aE(), aS(), B(), be(), De(), _e() (+161 more)
 
-### Community 57 - "jC"
-Cohesion: 0.06
-Nodes (44): AC(), aw(), bF(), bw(), cw(), c(), o(), s() (+36 more)
+### Community 67 - ".slice"
+Cohesion: 0.15
+Nodes (17): ec(), getHexString(), l(), ic(), nc(), Qs(), rc(), a() (+9 more)
 
-### Community 58 - "clearUpdateRanges"
-Cohesion: 0.50
-Nodes (4): clearUpdateRanges(), n(), r(), onUploadCallback()
+### Community 68 - "A. Backend Architecture"
+Cohesion: 0.29
+Nodes (7): 1. [`backend/app.py`](../backend/app.py), 2. [`backend/solver.py`](../backend/solver.py), 3. [`backend/projects.py`](../backend/projects.py) *(New File)*, 4. [`backend/rust_bridge.py`](../backend/rust_bridge.py) *(New File)*, 5. [`backend/vtk_writer.py`](../backend/vtk_writer.py), 6. [`main.py`](../main.py), A. Backend Architecture
 
-### Community 59 - "clearUpdateRanges"
-Cohesion: 0.50
-Nodes (4): clearUpdateRanges(), n(), r(), onUploadCallback()
+### Community 69 - "🧭 OpenZess Studio — Project Overview & Vision"
+Cohesion: 0.40
+Nodes (4): 1. What is OpenZess Studio?, 2. Core Problem Domains, 3. Technology Stack at a Glance, 🧭 OpenZess Studio — Project Overview & Vision
 
-### Community 60 - "created"
-Cohesion: 0.14
-Nodes (21): beforeUpdate(), Bo(), bs(), Co(), created(), es(), H(), ho() (+13 more)
+### Community 70 - "🚀 Quick Start"
+Cohesion: 0.40
+Nodes (5): Frontend development (hot reload), Prerequisites, 🚀 Quick Start, Run, Tests
 
-### Community 61 - "📚 OpenZess 3D Studio Documentation"
+### Community 71 - "W"
+Cohesion: 0.29
+Nodes (8): clearUpdateRanges(), onUploadCallback(), ta(), W(), a(), i(), n(), r()
+
+### Community 72 - "n"
+Cohesion: 0.02
+Nodes (218): add(), addScaledVector(), addVectors(), angleTo(), ap(), _applyGGXFilter(), applyMatrix3(), applyMatrix4() (+210 more)
+
+### Community 73 - "📚 OpenZess 3D Studio Documentation"
 Cohesion: 0.67
 Nodes (3): 📑 Documentation Index, 📚 OpenZess 3D Studio Documentation, 🔗 Quick Links
 
-### Community 62 - ".constructor"
-Cohesion: 0.12
-Nodes (16): mp(), Qf(), Wo(), bf(), ca(), gf(), ia(), oa() (+8 more)
+### Community 75 - "verify_backend_limits.py"
+Cohesion: 0.60
+Nodes (4): main(), pinger(), Measure two backend claims from docs/PROJECT_ANALYSIS.md (findings B4 and B6).…, sim()
 
-### Community 63 - "kc"
-Cohesion: 0.67
-Nodes (3): Ac(), kc(), Ac()
-
-### Community 64 - "setup"
-Cohesion: 0.03
-Nodes (176): aa(), add(), addEventListener(), addGroup(), aE(), aS(), B(), De() (+168 more)
-
-### Community 72 - "copy"
-Cohesion: 0.03
-Nodes (186): add(), addScaledVector(), addVectors(), angleTo(), ap(), applyMatrix3(), applyMatrix4(), applyNormalMatrix() (+178 more)
+### Community 76 - "clearUpdateRanges"
+Cohesion: 0.50
+Nodes (4): clearUpdateRanges(), n(), r(), onUploadCallback()
 
 ### Community 77 - "compilerOptions"
 Cohesion: 0.10
 Nodes (19): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, noEmit, noFallthroughCasesInSwitch (+11 more)
 
 ### Community 78 - "copy"
-Cohesion: 0.03
-Nodes (175): Hm(), addScaledVector(), addVectors(), angleTo(), applyMatrix3(), applyMatrix4(), applyNormalMatrix(), attach() (+167 more)
+Cohesion: 0.02
+Nodes (200): Hm(), add(), addScaledVector(), addVectors(), angleTo(), ap(), applyMatrix3(), applyMatrix4() (+192 more)
+
+### Community 79 - "CodeStatsRequest"
+Cohesion: 0.60
+Nodes (4): analyze_code(), CodeStatsRequest, CodeStatsResponse, String
+
+### Community 80 - ".[(Pd=new WeakMap,Fd=new WeakMap,J=new WeakMap,Id=new WeakMap,Y=new WeakMap,Ld=new WeakMap,Rd=new WeakMap,X=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Z=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,q=new WeakSet,Jd=function(e){return S(this,Ud,`f`)?Rt.with(S(this,Ud,`f`),e):e()},Symbol.asyncIterator)]"
+Cohesion: 0.13
+Nodes (13): at(), backgroundRefresh(), bf(), Df(), doRefresh(), gd(), getToken(), If() (+5 more)
+
+### Community 81 - "Ns"
+Cohesion: 0.50
+Nodes (3): is(), Ns(), Ps()
 
 ### Community 82 - "n"
 Cohesion: 0.03
-Nodes (146): eA(), ab(), ce(), o(), B(), bb(), bo(), br() (+138 more)
+Nodes (171): eA(), aI(), ce(), o(), az(), B(), bb(), bH() (+163 more)
 
-### Community 84 - "r"
-Cohesion: 0.05
-Nodes (139): ai(), ao(), Ay(), c(), o(), bind(), Bo(), Br() (+131 more)
+### Community 84 - "setup"
+Cohesion: 0.04
+Nodes (147): DC(), addEventListener(), Ae(), At(), o(), ae(), ne(), oe() (+139 more)
 
 ### Community 85 - "HeaderNavbar.vue"
 Cohesion: 0.08
 Nodes (26): aiModelDisplay, archetypeDropdownRef, archetypes, colabWidgetRef, currentArchetypeInfo, currentEngineInfo, diskText, diskUsage (+18 more)
 
+### Community 86 - "q"
+Cohesion: 0.09
+Nodes (27): ey(), fromJSON(), getDataURL(), getParameter(), $m(), a(), o(), s() (+19 more)
+
+### Community 87 - "paintSketchCell"
+Cohesion: 0.40
+Nodes (5): clearSketchGrid(), drawSketchCanvas(), onSketchPointerDown(), onSketchPointerMove(), paintSketchCell()
+
+### Community 88 - "clearUpdateRanges"
+Cohesion: 0.50
+Nodes (4): clearUpdateRanges(), n(), r(), onUploadCallback()
+
 ### Community 92 - "copy"
 Cohesion: 0.03
-Nodes (169): add(), addScaledVector(), addVectors(), angleTo(), applyMatrix4(), attach(), center(), clampLength() (+161 more)
+Nodes (151): add(), addScaledVector(), addVectors(), angleTo(), ap(), applyMatrix3(), applyMatrix4(), applyNormalMatrix() (+143 more)
 
 ### Community 94 - "copy"
 Cohesion: 0.03
-Nodes (156): Wf(), add(), addScaledVector(), addVectors(), Am(), angleTo(), applyMatrix3(), applyMatrix4() (+148 more)
+Nodes (152): Wf(), add(), addScaledVector(), addVectors(), Am(), applyMatrix3(), applyMatrix4(), applyNormalMatrix() (+144 more)
 
 ### Community 99 - "cfd.ts"
 Cohesion: 0.07
@@ -561,33 +614,29 @@ Nodes (29): isAnalyzing, prompt, props, response, copied, currentFile, dictFiles
 Cohesion: 0.12
 Nodes (15): compilerOptions, allowArbitraryExtensions, erasableSyntaxOnly, noFallthroughCasesInSwitch, noUnusedLocals, noUnusedParameters, tsBuildInfoFile, types (+7 more)
 
-### Community 108 - "join"
-Cohesion: 0.06
-Nodes (28): ax(), Cx(), dx(), dy(), c(), m(), p(), T() (+20 more)
-
-### Community 118 - "push"
+### Community 108 - "constructor"
 Cohesion: 0.03
-Nodes (99): hL(), aD(), AF(), aL(), az(), bF(), He(), create() (+91 more)
+Nodes (98): addGroup(), clearViewOffset(), connect(), constructor(), a(), ae(), ne(), oe() (+90 more)
 
-### Community 120 - "push"
+### Community 118 - "get"
+Cohesion: 0.02
+Nodes (196): Zi(), _a(), addBounds(), aL(), ar(), oe(), AV(), a() (+188 more)
+
+### Community 121 - "r"
 Cohesion: 0.05
-Nodes (54): absellipse(), addGroup(), closePath(), a(), F(), I(), ie(), L() (+46 more)
-
-### Community 121 - "created"
-Cohesion: 0.07
-Nodes (39): as(), beforeMount(), beforeUnmount(), beforeUpdate(), ca(), clone(), concat(), created() (+31 more)
+Nodes (134): ai(), ao(), Bo(), g(), Ke(), n(), deleteProperty(), di() (+126 more)
 
 ### Community 124 - "sdk-Dme12cId.js"
 Cohesion: 0.03
-Nodes (99): active(), Af(), Ao(), As(), attach(), bd(), bind(), br() (+91 more)
+Nodes (88): aa(), active(), Af(), Ao(), bd(), bf(), br(), Bt() (+80 more)
 
 ### Community 126 - "sdk-Cq6IE8uJ.js"
 Cohesion: 0.02
-Nodes (103): Je(), active(), Ad(), Af(), Ai(), approve(), attach(), bo() (+95 more)
+Nodes (110): Je(), vt(), active(), Ad(), Af(), Ai(), attach(), bf() (+102 more)
 
-### Community 127 - "wb"
+### Community 127 - "setup"
 Cohesion: 0.03
-Nodes (116): T(), addEventListener(), ag(), bind(), _blur(), Ce(), clearLayerUpdates(), oe() (+108 more)
+Nodes (156): Mx(), Ox(), addEventListener(), Ai(), ba(), beforeUpdate(), Ca(), y() (+148 more)
 
 ### Community 129 - "OpenFoamTerminal.vue"
 Cohesion: 0.15
@@ -595,125 +644,97 @@ Nodes (12): activeSolverName, formatTime(), generateNextLogStep(), isAutoScroll,
 
 ### Community 130 - "sdk-DUE-lw3x.js"
 Cohesion: 0.02
-Nodes (107): active(), Ad(), Ae(), Af(), Ai(), bc(), bd(), bf() (+99 more)
+Nodes (96): Je(), Ac(), kc(), Ac(), active(), Af(), Ai(), attach() (+88 more)
 
 ### Community 131 - "$e"
 Cohesion: 0.05
-Nodes (25): H(), beforeMount(), beforeUnmount(), Cs(), U(), W(), wo(), at() (+17 more)
+Nodes (33): H(), beforeMount(), beforeUnmount(), Cs(), fp(), G(), mp(), po() (+25 more)
 
-### Community 132 - "$e"
-Cohesion: 0.06
-Nodes (20): Us(), H(), beforeMount(), beforeUnmount(), Cs(), G(), K(), qo() (+12 more)
+### Community 132 - "S"
+Cohesion: 0.05
+Nodes (35): H(), beforeMount(), beforeUnmount(), G(), K(), mp(), Qf(), U() (+27 more)
 
 ### Community 133 - "constructor"
 Cohesion: 0.03
-Nodes (94): clear(), connect(), constructor(), ct(), ee(), it(), j(), lt() (+86 more)
+Nodes (92): _allocateTargets(), _applyGGXFilter(), _applyPMREM(), _blur(), by(), _cleanup(), compileCubemapShader(), compileEquirectangularShader() (+84 more)
 
 ### Community 135 - "$e"
 Cohesion: 0.05
-Nodes (19): G(), K(), q(), H(), setMorphAt(), W(), Ad(), bn() (+11 more)
+Nodes (40): Bs(), G(), ip(), K(), Ks(), q(), H(), rp() (+32 more)
 
 ### Community 140 - "cfd_solver.rs"
 Cohesion: 0.12
 Nodes (25): F, cavity(), cavity_reaches_ghia_primary_vortex_strength(), CfdBenchmarkResult, CfdConfig, CfdStepResult, default_archetype(), finite_or() (+17 more)
 
-### Community 141 - "constructor"
-Cohesion: 0.03
-Nodes (96): A_(), c(), m(), p(), w(), x(), clear(), connect() (+88 more)
+### Community 141 - "created"
+Cohesion: 0.17
+Nodes (15): Bo(), bs(), Co(), created(), es(), ln(), mounted(), ms() (+7 more)
 
 ### Community 146 - "push"
-Cohesion: 0.03
-Nodes (136): aF(), AN(), aO(), aV(), bind(), bL(), bV(), cH() (+128 more)
+Cohesion: 0.02
+Nodes (140): AC(), addEventListener(), aF(), AN(), aw(), bF(), bV(), bw() (+132 more)
 
 ### Community 148 - "b"
-Cohesion: 0.06
-Nodes (16): Ar(), b, dh(), invalidate(), je(), ke(), kh(), Mh() (+8 more)
+Cohesion: 0.07
+Nodes (13): Ar(), b, invalidate(), je(), ke(), kh(), Mh(), O() (+5 more)
 
 ### Community 153 - "k"
-Cohesion: 0.04
-Nodes (51): _a(), aa(), add(), approve(), bc(), bf(), Bi(), ca() (+43 more)
-
-### Community 155 - "push"
 Cohesion: 0.05
-Nodes (49): addGroup(), a(), I(), ie(), L(), ne(), R(), re() (+41 more)
+Nodes (33): _a(), add(), approve(), ca(), create(), delete(), deny(), dh() (+25 more)
 
 ### Community 158 - ".[(Nd=new WeakMap,Pd=new WeakMap,Y=new WeakMap,Fd=new WeakMap,X=new WeakMap,Id=new WeakMap,Ld=new WeakMap,Z=new WeakMap,Rd=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,J=new WeakSet,Jd=function(e){return C(this,Hd,`f`)?Lt.with(C(this,Hd,`f`),e):e()},Symbol.asyncIterator)]"
-Cohesion: 0.11
-Nodes (33): Ai(), At(), debug(), Df(), Di(), Ei(), end(), er() (+25 more)
+Cohesion: 0.09
+Nodes (39): oa(), Yi(), Ai(), At(), debug(), Df(), Di(), ea() (+31 more)
 
 ### Community 159 - "b"
 Cohesion: 0.07
-Nodes (16): Ae(), b, bd(), D(), invalidate(), kh(), Me(), Mh() (+8 more)
+Nodes (17): Ae(), b, bd(), cancel(), Cr(), invalidate(), jh(), kh() (+9 more)
 
 ### Community 160 - "app.py"
-Cohesion: 0.06
-Nodes (51): add_no_cache_headers(), agent_desktop_apps(), agent_desktop_status(), agent_desktop_windows(), _clamp(), delete_project_snapshot(), download_openfoam_case(), download_vtk() (+43 more)
+Cohesion: 0.05
+Nodes (55): add_no_cache_headers(), agent_desktop_apps(), agent_desktop_status(), agent_desktop_windows(), _clamp(), _classify_intent(), delete_project_snapshot(), download_openfoam_case() (+47 more)
 
 ### Community 161 - "b"
-Cohesion: 0.08
-Nodes (19): b, Bi(), Cr(), D(), debug(), c(), Gi(), je() (+11 more)
+Cohesion: 0.07
+Nodes (16): intersectTriangle(), intersectTriangle(), Uh(), Ae(), b, bd(), invalidate(), kh() (+8 more)
 
-### Community 169 - ".constructor"
-Cohesion: 0.08
-Nodes (30): Bs(), ip(), Ks(), rp(), tp(), Uo(), Vs(), Ws() (+22 more)
+### Community 171 - "$e"
+Cohesion: 0.05
+Nodes (29): Us(), Wo(), qo(), approve(), deny(), dh(), download(), $e() (+21 more)
 
-### Community 171 - "O"
-Cohesion: 0.06
-Nodes (30): a(), add(), approve(), create(), delete(), deny(), dh(), download() (+22 more)
-
-### Community 178 - ".[(Pd=new WeakMap,Fd=new WeakMap,J=new WeakMap,Id=new WeakMap,Y=new WeakMap,Ld=new WeakMap,Rd=new WeakMap,X=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Z=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,q=new WeakSet,Jd=function(e){return S(this,Ud,`f`)?Rt.with(S(this,Ud,`f`),e):e()},Symbol.asyncIterator)]"
-Cohesion: 0.12
-Nodes (23): at(), da(), Df(), Di(), ea(), end(), er(), gd() (+15 more)
+### Community 178 - "T"
+Cohesion: 0.09
+Nodes (35): Bi(), Cc(), constructor(), Cr(), D(), da(), debug(), Di() (+27 more)
 
 ### Community 179 - "ParaViewGlanceViewer.vue"
-Cohesion: 0.03
-Nodes (69): activeCalloutPins, activeCaseMeta, activeData, activeDockTab, activeFieldInfo, activeFilters, activeReynolds, boardStageRef (+61 more)
+Cohesion: 0.02
+Nodes (98): activeCalloutPins, activeCaseMeta, activeData, activeDockTab, activeFieldInfo, activeFilters, activeReynolds, addBuilderPrimitive() (+90 more)
 
 ### Community 181 - "T"
-Cohesion: 0.08
-Nodes (37): archive(), bc(), Cc(), constructor(), Cr(), debug(), Di(), c() (+29 more)
+Cohesion: 0.13
+Nodes (31): Bi(), D(), da(), debug(), Df(), Di(), ea(), end() (+23 more)
 
 ### Community 183 - "fvm_solver.js"
 Cohesion: 0.08
 Nodes (25): abort(), assignWasmExports(), convertReturnValue(), createWasm(), receiveInstance(), receiveInstantiationResult(), EmscriptenEH, EmscriptenSjLj (+17 more)
-
-### Community 187 - "te"
-Cohesion: 0.06
-Nodes (39): connect(), it(), nt(), rt(), te(), deleteProperty(), dispatchEvent(), dispose() (+31 more)
-
-### Community 188 - "at"
-Cohesion: 0.13
-Nodes (20): r(), at(), dt(), st(), ut(), entries(), every(), filter() (+12 more)
-
-### Community 195 - "bh"
-Cohesion: 0.18
-Nodes (19): ah(), backgroundRefresh(), bh(), ch(), doRefresh(), Dr(), eh(), getToken() (+11 more)
 
 ### Community 197 - "ensure_frontend_build"
 Cohesion: 0.15
 Nodes (15): build_is_stale(), ensure_frontend_build(), _newest_mtime(), Keep frontend/dist in sync with frontend/src. Called explicitly by the…, True when dist/ is missing or older than any frontend source., Rebuild the Vue bundle if it is missing or stale. Returns True when an up-to-…, _run(), __getattr__() (+7 more)
 
 ### Community 198 - "test_solver.py"
-Cohesion: 0.19
-Nodes (18): parse_dict_overrides(), Extract user-edited numeric values from OpenFOAM dict content. Accepts two…, Ghia et al. (1982) Standard Reference Data for 2D Lid-Driven Cavity Flow…, make(), march(), parametrize, Physics regression tests for backend/solver.py. Several of these pin down bugs…, test_airfoil_lift_follows_aoa_and_is_antisymmetric() (+10 more)
-
-### Community 210 - ".decode"
-Cohesion: 0.12
-Nodes (19): an(), bind(), c(), c(), s(), en(), gc(), Ne() (+11 more)
+Cohesion: 0.11
+Nodes (23): CasePhysics, parse_dict_overrides(), Reynolds number from the actual march viscosity (U*L/nu)., Signed temperature difference (K) driving the plume. Both temperatures are…, Normalized physical case configuration. Bridges what the user selects in the UI…, Extract user-edited numeric values from OpenFOAM dict content. Accepts two…, Ghia et al. (1982) Standard Reference Data for 2D Lid-Driven Cavity Flow…, make() (+15 more)
 
 ### Community 212 - "a"
 Cohesion: 0.10
-Nodes (30): a(), add(), an(), bind(), c(), create(), delete(), c() (+22 more)
+Nodes (32): a(), add(), an(), archive(), bind(), c(), create(), delete() (+24 more)
 
 ### Community 231 - "2. Turn-by-Turn Executive Summary"
 Cohesion: 0.08
 Nodes (22): 🗄️ Obsidian Master Archive: All Antigravity & OpenZess Chat Sessions, 📚 Session Index, 1. Session Overview & Core Objectives, 2. Turn-by-Turn Executive Summary, 3. Language Specialization & Technical Matrix, 4. Verification Proofs & Telemetry Screenshots, 5. Git Commit Audit Trail, Browser UI Verification Screenshot (+14 more)
 
-### Community 233 - "bh"
-Cohesion: 0.14
-Nodes (23): ah(), backgroundRefresh(), bh(), cancel(), ch(), doRefresh(), Dr(), eh() (+15 more)
-
-### Community 238 - "A. Backend Architecture"
+### Community 238 - "B. Frontend Architecture"
 Cohesion: 0.13
 Nodes (15): 1. Executive Summary, 1. [`frontend/src/components/SidebarControls.vue`](../frontend/src/components/SidebarControls.vue), 1. [`sync_and_launch.py`](../sync_and_launch.py) *(New File)*, 2. File-by-File Detailed Breakdown, 2. [`frontend/src/utils/projectStore.ts`](../frontend/src/utils/projectStore.ts) *(New File)*, 2. [`LAUNCH_STUDIO.bat`](../LAUNCH_STUDIO.bat) *(New File)*, 3. [`docs/tasks/PRD.md`](tasks/PRD.md) & [`docs/tasks/progress.txt`](tasks/progress.txt), 3. [`frontend/src/types/cfd.ts`](../frontend/src/types/cfd.ts) (+7 more)
 
@@ -725,17 +746,13 @@ Nodes (15): A 2-D CFD Studio in the Browser, 🙏 Acknowledgments, 🔌 API Refe
 Cohesion: 0.10
 Nodes (19): 1. 🤖 Collapsible AI Slide Bar Drawer, 2. 🌍 Natural Physics & Forces Tab, 3. 🛠️ Manual Repair & Diagnostics Studio, 🛠️ Key Technical Actions, 🛠️ Key Technical Actions, 🛠️ Key Technical Actions, 📸 Live Browser Verification, 🌊 OpenZess 3D Studio & OpenFOAM Real Physics — Current Session Log (+11 more)
 
-### Community 245 - "setup"
-Cohesion: 0.04
-Nodes (78): Mx(), Ox(), At(), ba(), Ca(), clearUpdateRanges(), Cn(), de() (+70 more)
-
 ### Community 246 - "openfoam_icoFoam_wasm.c"
 Cohesion: 0.20
 Nodes (17): WASM_EXPORT, idx(), wasm_free_solver(), wasm_get_continuity_error(), wasm_get_iteration(), wasm_get_max_courant(), wasm_get_mean_courant(), wasm_get_p_ptr() (+9 more)
 
 ### Community 247 - "Json"
-Cohesion: 0.29
-Nodes (12): Bytes, HeaderMap, IntoResponse, Json, Response, cfd_benchmark_handler(), cfd_solve_handler(), code_stats_handler() (+4 more)
+Cohesion: 0.20
+Nodes (15): Bytes, HeaderMap, IntoResponse, Json, Response, cfd_benchmark_handler(), cfd_solve_handler(), code_stats_handler() (+7 more)
 
 ### Community 248 - "projectStore.ts"
 Cohesion: 0.20
@@ -748,14 +765,6 @@ Nodes (16): 10. Final Approved Visual Design & Layout Reference, 1. Initializing
 ### Community 253 - "test_api.py"
 Cohesion: 0.23
 Nodes (10): base_params(), parametrize, End-to-end tests of the FastAPI app (WebSocket stream + REST endpoints)., run_ws(), test_buoyant_cases_stream_real_temperature_field(), test_grid_request_is_clamped(), test_rust_divergence_is_reported(), test_rust_mode_falls_back_to_python_when_sidecar_offline() (+2 more)
-
-### Community 254 - "post"
-Cohesion: 0.11
-Nodes (25): agent_desktop_click(), agent_desktop_launch_paraview(), agent_desktop_screenshot(), agent_desktop_snapshot(), agent_desktop_type(), ai_simulate(), _get_laya_router(), _get_qwen_rl() (+17 more)
-
-### Community 255 - "COLLABORATOR_README.md"
-Cohesion: 0.20
-Nodes (7): ⚡ 10-Second Quickstart (Windows), 📚 Collaborator Documentation Suite, 🤝 Welcome to OpenZess Studio (UR2627GEN317), 1. System Architecture Diagram, 2. Directory & File-by-File Reference, 3. Division of Work: Rust vs. Python, 🏗️ Architecture & Codebase Map
 
 ### Community 257 - "Literature Review & Scope Definition Report"
 Cohesion: 0.13
@@ -778,8 +787,8 @@ Cohesion: 0.23
 Nodes (12): fetch_job_details(), generate_html_dashboard(), load_seen_jobs(), Sector V Kolkata Internship Early-Warning Pipeline & Alert Tracker Author:…, Scans LinkedIn guest job listings for Kolkata / Sector V internships.…, Generates a responsive live HTML dashboard., Fires a native Windows PowerShell toast or balloon notification., Extracts applicant count and precise posted time from the job detail card. (+4 more)
 
 ### Community 265 - "train_openzess_grpo.py"
-Cohesion: 0.16
-Nodes (21): _bf16(), build_sft_pairs(), extract_json(), grpo_reward_fn(), lora_config(), Any, OpenZess RL + Qwen3-0.6B Training Pipeline (GRPO with Verifiable CFD Physics…, Fast 2D incompressible Navier-Stokes (projection method) physics verifier.… (+13 more)
+Cohesion: 0.15
+Nodes (26): evaluate_model(), main(), Runs real quantitative experiments for the OpenZess Studio IEEE Research Paper:…, run_grid_independence(), run_rl_ablation(), _bf16(), build_sft_pairs(), extract_json() (+18 more)
 
 ### Community 269 - "vector.rs"
 Cohesion: 0.32
@@ -802,8 +811,8 @@ Cohesion: 0.18
 Nodes (10): 1. Brand Logo Gradient Specification, 2. Button & Surface Tokens (4-Tier OKLCH), 3. Google Colab-Style Connection Widget, 4. Left OpenFOAM Case Hub (`https://openfoam.org/` Structure), AI Chat & Session Archive — 2026-08-22, 📝 Entry: Button Color Token Updated to oklch(26.9% 0 none), 📝 Entry: Created THINGS_TAKEN_FROM_OPENFOAM.md, 📝 Entry: Final Studio UI Mockup with Colab Widget & OKLCH Buttons (+2 more)
 
 ### Community 274 - "wf"
-Cohesion: 0.24
-Nodes (12): cl(), Io(), jf(), kf(), Mf(), ml(), pl(), sl() (+4 more)
+Cohesion: 0.31
+Nodes (10): cl(), Io(), jf(), kf(), Mf(), ml(), pl(), sl() (+2 more)
 
 ### Community 275 - "test_launch.py"
 Cohesion: 0.24
@@ -813,17 +822,13 @@ Nodes (7): _fake_frontend(), parametrize, Server hardening and launcher tests., 
 Cohesion: 0.20
 Nodes (8): canvasRef, decades, finiteResiduals, iterMax, props, SUPERSCRIPT, xTicks, yLabels
 
-### Community 277 - "OpenFoamWasmEngine"
-Cohesion: 0.18
-Nodes (6): downloadOpenFoamTimeCase(), generateOpenFoamCase(), OpenFoamCaseFiles, OpenFoamWasmEngine, WasmStepOutput, ParsedMeshData
-
 ### Community 278 - "graph.rs"
 Cohesion: 0.42
 Nodes (9): find_shortest_path(), GraphLink, GraphNode, GraphPayload, PathRequest, PathResponse, Option, String (+1 more)
 
 ### Community 279 - "setup"
 Cohesion: 0.03
-Nodes (220): addEventListener(), addGroup(), ar(), aS(), B(), be(), ce(), De() (+212 more)
+Nodes (136): ar(), aS(), B(), be(), ce(), De(), _e(), Ee() (+128 more)
 
 ### Community 281 - "2. Key Highlights of Completed Work"
 Cohesion: 0.22
@@ -837,13 +842,9 @@ Nodes (8): 1. Prioritized Roadmap Overview, 2. Detailed Task Breakdown, 3. Summa
 Cohesion: 0.22
 Nodes (9): 🧩 Architectural Breakdown by Layer, 📂 Directory Tree & File Inventory, Layer 1: Launcher & Server (`main.py` & `backend/app.py`), Layer 2: Mesh Generation (`backend/mesh.py`), Layer 3: Aerothermal CFD Physics (`backend/solver.py`), Layer 4: AI Surrogate Physics (`backend/ai_predictor.py`), Layer 5: Production Exporters (`backend/vtk_writer.py` & `frontend/src/utils/openfoamDicts.ts`), Layer 6: 3D Web Studio UI (`frontend/src/`) (+1 more)
 
-### Community 284 - "loadData"
-Cohesion: 0.20
-Nodes (16): applyColorMapPreset(), applyCustomReynolds(), applyRepresentation(), initPresetPreview(), loadData(), rescaleToDataRange(), resetCamera(), routeWithLayaAi() (+8 more)
-
-### Community 286 - "vtkOpenFoamParser.ts"
-Cohesion: 0.17
-Nodes (12): goToTimeStep(), handleFileDrop(), handleFileUpload(), readFile(), resetSession(), startAnimation(), stepTime(), stopAnimation() (+4 more)
+### Community 284 - "initPresetPreview"
+Cohesion: 0.15
+Nodes (23): applyColorMapPreset(), applyCustomReynolds(), applyRepresentation(), generateReal3dMesh(), goToTimeStep(), initPresetPreview(), loadData(), rescaleToDataRange() (+15 more)
 
 ### Community 288 - "Turn 9: Expanding Simulation Archetypes (Airfoil, Plume, Cylinder, Venturi, Cavity, CAD)"
 Cohesion: 0.22
@@ -1078,19 +1079,19 @@ Cohesion: 0.50
 Nodes (3): 📁 Directory Structure, Saved AI Chats & Session Archives, 🔒 Why Keep Chats Here?
 
 ## Knowledge Gaps
-- **764 isolated node(s):** `C:\Users\ROSHNI\AppData\Local\hermes\node\node.exe`, `npx`, `name`, `private`, `version` (+759 more)
+- **803 isolated node(s):** `C:\Users\ROSHNI\AppData\Local\hermes\node\node.exe`, `npx`, `name`, `private`, `version` (+798 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `setup()` connect `setup` to `index-DWio60ZM.js`, `$e`, `ci`, `constructor`, `$e`, `get`, `J`, `forEach`, `push`, `index-C8zzSVhK.js`, `wf`, `.constructor`, `xx`, `setup`, `k`, `.then`, `push`, `.[(Nd=new WeakMap,Pd=new WeakMap,Y=new WeakMap,Fd=new WeakMap,X=new WeakMap,Id=new WeakMap,Ld=new WeakMap,Z=new WeakMap,Rd=new WeakMap,zd=new WeakMap,Bd=new WeakMap,Vd=new WeakMap,Hd=new WeakMap,Ud=new WeakMap,Wd=new WeakMap,Gd=new WeakMap,Kd=new WeakMap,qd=new WeakMap,J=new WeakSet,Jd=function(e){return C(this,Hd,`f`)?Lt.with(C(this,Hd,`f`),e):e()},Symbol.asyncIterator)]`, `at`, `.[(no=new WeakMap,ro=new WeakMap,I=new WeakMap,io=new WeakMap,ao=new WeakMap,oo=new WeakMap,so=new WeakMap,co=new WeakMap,lo=new WeakMap,Symbol.asyncIterator)]`, `.constructor`, `index-CpCa-dRu.js`, `wf`, `n`, `jC`, `kc`, `r`, `copy`, `copy`, `created`, `sdk-Dme12cId.js`?**
-  _High betweenness centrality (0.046) - this node is a cross-community bridge._
-- **Why does `Yr()` connect `ci` to `index-Yl2o4bhZ.js`, `index-DWio60ZM.js`, `index-C8zzSVhK.js`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
-- **Why does `setup()` connect `setup` to `join`, `index-DWio60ZM.js`, `$e`, `$e`, `ci`, `constructor`, `$e`, `get`, `constructor`, `.slice`, `forEach`, `push`, `wf`, `.constructor`, `xx`, `.constructor`, `wf`, `set`, `at`, `created`, `kc`, `copy`, `n`, `r`, `copy`, `push`, `created`, `sdk-Dme12cId.js`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
+- **Why does `cy()` connect `index-Yl2o4bhZ.js` to `obstacleGeometry.ts`, `constructor`, `r`, `created`?**
+  _High betweenness centrality (0.107) - this node is a cross-community bridge._
+- **Why does `$r()` connect `r` to `index-DWio60ZM.js`, `r`, `n`, `index-C8zzSVhK.js`, `index-Yl2o4bhZ.js`, `r`, `setup`?**
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+- **Why does `Yr()` connect `r` to `index-DWio60ZM.js`, `constructor`, `index-Yl2o4bhZ.js`, `index-C8zzSVhK.js`, `setup`?**
+  _High betweenness centrality (0.042) - this node is a cross-community bridge._
 - **Are the 64 inferred relationships involving `setup()` (e.g. with `BC()` and `cC()`) actually correct?**
   _`setup()` has 64 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 46 inferred relationships involving `setup()` (e.g. with `he()` and `L()`) actually correct?**
@@ -1098,4 +1099,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 43 inferred relationships involving `setup()` (e.g. with `VH()` and `io()`) actually correct?**
   _`setup()` has 43 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `C:\Users\ROSHNI\AppData\Local\hermes\node\node.exe`, `npx`, `name` to the rest of the system?**
-  _764 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _803 weakly-connected nodes found - possible documentation gaps or missing edges._

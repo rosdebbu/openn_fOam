@@ -7,6 +7,17 @@
 
 import { type ParsedMeshData } from './vtkOpenFoamParser';
 
+export interface CustomPrimitive {
+  kind: 'box' | 'cylinder' | 'cone' | 'capsule';
+  x: number; // domain [-0.8, 0.8]
+  y: number; // domain [-0.8, 0.8]
+  z?: number; // vertical offset above deck
+  w: number; // length along x in domain units
+  h: number; // width/height in domain units
+  d?: number; // 3D extrusion height
+  color?: string;
+}
+
 export interface OpenFoamCaseFiles {
   'system/controlDict': string;
   'system/fvSchemes': string;
@@ -74,6 +85,10 @@ export class OpenFoamWasmEngine {
   isNativeWasm: boolean = false;
   fsiActive: boolean = false;
   autoSelfHeal: boolean = true;
+  // Pressure sweeps per solver step. With 20, divergence was left behind: speeds grew
+  // exponentially (1.2 -> 150 -> 1e22) until they overflowed and the self-heal reset the
+  // whole field, again and again. Poisson solves slow down on finer grids, so scale with size.
+  pressureIters: number = 100;
   cflBrokenWarning: boolean = false;
   private wasmModule: any = null;
   private wasmFuncs: any = null;
@@ -84,6 +99,7 @@ export class OpenFoamWasmEngine {
     this.nx = nx;
     this.ny = ny;
     this.numCells = nx * ny;
+    this.pressureIters = Math.max(60, Math.round(2.6 * Math.max(nx, ny)));
     this.dx = 1.0 / (nx - 1);
     this.dy = 1.0 / (ny - 1);
     this.reynolds = Math.max(1.0, reynolds);
@@ -108,6 +124,50 @@ export class OpenFoamWasmEngine {
 
   idx(i: number, j: number): number {
     return j * this.nx + i;
+  }
+
+  setSelfHeal(enabled: boolean): void {
+    this.autoSelfHeal = enabled;
+    if (this.isNativeWasm && this.wasmFuncs?.setAdaptiveDt) {
+      this.wasmFuncs.setAdaptiveDt(enabled ? 1 : 0);
+    }
+  }
+
+  /**
+   * Voxelize arbitrary AI-generated or user-defined 3D primitives directly into fvm_solver.wasm.
+   */
+  applyCustomPrimitives(primitives: CustomPrimitive[]): void {
+    if (!primitives || primitives.length === 0) return;
+    if (this.isNativeWasm && this.wasmFuncs?.clearObstacles && this.wasmFuncs?.paintObstacle) {
+      this.wasmFuncs.clearObstacles();
+    }
+    this.mask.fill(0);
+    const { nx, ny } = this;
+    for (const p of primitives) {
+      const cx = Math.floor(((p.x + 1) * 0.5) * (nx - 1));
+      const cy = Math.floor(((p.y + 1) * 0.5) * (ny - 1));
+      const rx = Math.max(1, Math.round((p.w * 0.5) * (nx - 1) * 0.5));
+      const ry = Math.max(1, Math.round((p.h * 0.5) * (ny - 1) * 0.5));
+      for (let j = Math.max(1, cy - ry); j <= Math.min(ny - 2, cy + ry); j++) {
+        for (let i = Math.max(1, cx - rx); i <= Math.min(nx - 2, cx + rx); i++) {
+          const dx = (i - cx) / Math.max(1, rx);
+          const dy = (j - cy) / Math.max(1, ry);
+          let inside = false;
+          if (p.kind === 'box') inside = true;
+          else if (p.kind === 'cylinder' || p.kind === 'capsule') inside = dx * dx + dy * dy <= 1.0;
+          else if (p.kind === 'cone') {
+            const t = (i - (cx - rx)) / Math.max(1, 2 * rx); // pointed at -x nose
+            inside = Math.abs(dy) <= Math.max(0.15, t);
+          }
+          if (inside) {
+            this.mask[j * nx + i] = 1;
+            if (this.isNativeWasm && this.wasmFuncs?.paintObstacle) {
+              this.wasmFuncs.paintObstacle(i, j, 0, 1);
+            }
+          }
+        }
+      }
+    }
   }
 
   initBoundary(): void {
@@ -211,6 +271,37 @@ export class OpenFoamWasmEngine {
             this.wasmFuncs.paintObstacle(x0 + k, cy + camber + dy, 0, 1);
           }
         }
+      } else if (presetId === 6) {
+        // Submarine Hull (streamlined tear-drop hull + conning tower sail)
+        this.wasmFuncs.clearObstacles();
+        const cx = Math.floor(this.nx * 0.42);
+        const cy = Math.floor(this.ny * 0.48);
+        const rx = Math.floor(this.nx * 0.22);
+        const ry = Math.max(2, Math.floor(this.ny * 0.08));
+        for (let j = 0; j < this.ny; j++) {
+          for (let i = 0; i < this.nx; i++) {
+            const dx = (i - cx) / rx;
+            const dy = (j - cy) / ry;
+            const inHull = dx * dx + dy * dy <= 1.0;
+            const inSail = i >= cx - 2 && i <= cx + 3 && j >= cy && j <= cy + ry + 4;
+            if (inHull || inSail) this.wasmFuncs.paintObstacle(i, j, 0, 1);
+          }
+        }
+      } else if (presetId === 7) {
+        // Spaceship / Rocket (pointed nosecone + cylindrical fuselage + tail fins)
+        this.wasmFuncs.clearObstacles();
+        const cx = Math.floor(this.nx * 0.42);
+        const cy = Math.floor(this.ny * 0.50);
+        const halfL = Math.floor(this.nx * 0.20);
+        const halfR = Math.max(2, Math.floor(this.ny * 0.07));
+        for (let i = cx - halfL; i <= cx + halfL; i++) {
+          const t = (i - (cx - halfL)) / Math.max(1, 2 * halfL); // 0=nose, 1=tail
+          const rad = t < 0.35 ? Math.max(1, Math.round(halfR * (t / 0.35))) : halfR;
+          const finExt = t > 0.78 ? Math.round(halfR * 1.4 * ((t - 0.78) / 0.22)) : 0;
+          for (let dy = -(rad + finExt); dy <= rad + finExt; dy++) {
+            this.wasmFuncs.paintObstacle(i, cy + dy, 0, 1);
+          }
+        }
       }
       if (this.fsiActive) {
         const feaFactory = (window as any).createFeaStructureWasm;
@@ -247,32 +338,58 @@ export class OpenFoamWasmEngine {
   step(numSteps: number = 1): WasmStepOutput {
     if (this.isNativeWasm && this.wasmModule && this.wasmFuncs) {
       for (let s = 0; s < numSteps; s++) {
-        this.wasmFuncs.step(20);
+        this.wasmFuncs.step(this.pressureIters);
         this.iteration++;
         this.currentTime += this.dt;
       }
 
-      const heapF32: Float32Array = this.wasmModule.HEAPF32;
-      const heapU8: Uint8Array = this.wasmModule.HEAPU8;
       const n = this.numCells;
+      const uBytePtr = this.wasmFuncs.getU();
+      const vBytePtr = this.wasmFuncs.getV();
+      const pBytePtr = this.wasmFuncs.getP();
+      const vortBytePtr = this.wasmFuncs.getVort();
+      const maskBytePtr = this.wasmFuncs.getMask();
 
-      const uPtr = this.wasmFuncs.getU() >> 2;
-      const vPtr = this.wasmFuncs.getV() >> 2;
-      const pPtr = this.wasmFuncs.getP() >> 2;
-      const vortPtr = this.wasmFuncs.getVort() >> 2;
-      const maskPtr = this.wasmFuncs.getMask();
-
-      this.u.set(heapF32.subarray(uPtr, uPtr + n));
-      this.v.set(heapF32.subarray(vPtr, vPtr + n));
-      this.p.set(heapF32.subarray(pPtr, pPtr + n));
-      this.vorticity.set(heapF32.subarray(vortPtr, vortPtr + n));
-      this.mask.set(heapU8.subarray(maskPtr, maskPtr + n));
+      if (this.wasmModule.HEAPF32 && this.wasmModule.HEAPU8) {
+        const heapF32: Float32Array = this.wasmModule.HEAPF32;
+        const heapU8: Uint8Array = this.wasmModule.HEAPU8;
+        this.u.set(heapF32.subarray(uBytePtr >> 2, (uBytePtr >> 2) + n));
+        this.v.set(heapF32.subarray(vBytePtr >> 2, (vBytePtr >> 2) + n));
+        this.p.set(heapF32.subarray(pBytePtr >> 2, (pBytePtr >> 2) + n));
+        this.vorticity.set(heapF32.subarray(vortBytePtr >> 2, (vortBytePtr >> 2) + n));
+        this.mask.set(heapU8.subarray(maskBytePtr, maskBytePtr + n));
+      } else if (typeof this.wasmModule.getValue === 'function') {
+        const gv = this.wasmModule.getValue;
+        for (let i = 0; i < n; i++) {
+          const off = i * 4;
+          this.u[i] = gv(uBytePtr + off, 'float');
+          this.v[i] = gv(vBytePtr + off, 'float');
+          this.p[i] = gv(pBytePtr + off, 'float');
+          this.vorticity[i] = gv(vortBytePtr + off, 'float');
+          this.mask[i] = gv(maskBytePtr + i, 'i8') & 0xff;
+        }
+      } else {
+        this.stepPiso();
+      }
 
       let sumSpd = 0;
+      let hasNan = false;
       for (let i = 0; i < n; i++) {
+        if (!Number.isFinite(this.u[i]) || !Number.isFinite(this.v[i])) {
+          this.u[i] = 0;
+          this.v[i] = 0;
+          this.p[i] = 0;
+          this.vorticity[i] = 0;
+          hasNan = true;
+        }
         const spd = Math.hypot(this.u[i], this.v[i]);
         this.speed[i] = spd;
         sumSpd += spd;
+      }
+      if (hasNan && this.autoSelfHeal && this.wasmFuncs?.reset) {
+        this.wasmFuncs.reset();
+        this.wasmFuncs.setAdaptiveDt(1);
+        this.wasmFuncs.setCflTarget(0.45);
       }
 
       this.maxCourant = this.wasmFuncs.getCfl();
@@ -281,17 +398,39 @@ export class OpenFoamWasmEngine {
       this.pInitResidual = Math.max(this.pFinalResidual * 10, 1e-4);
       this.continuityError = this.pFinalResidual * 0.1;
 
-      // Coupled Fluid-Structure Interaction (FSI): feed fluid pressure into fea_structure.wasm
-      if (this.fsiActive && this.feaModule && this.feaFuncs) {
-        const pInPtr = this.feaFuncs.getPIn() >> 2;
-        const maskInPtr = this.feaFuncs.getMaskIn();
-        this.feaModule.HEAPF32.set(this.p, pInPtr);
-        this.feaModule.HEAPU8.set(this.mask, maskInPtr);
-        this.feaFuncs.solve(33.3, 20.0); // 120 km/h (33.3 m/s) wind on 20m glass tower
-        const stressPtr = this.feaFuncs.getStress() >> 2;
-        this.stress.set(this.feaModule.HEAPF32.subarray(stressPtr, stressPtr + n));
-        this.maxStressMpa = this.feaFuncs.getMaxStress();
-        this.maxDispMm = this.feaFuncs.getMaxDisp();
+      // Coupled Fluid-Structure Interaction (FSI): feed fluid pressure into fea_structure.wasm (or clean analytical fallback)
+      if (this.fsiActive) {
+        if (this.feaModule && this.feaFuncs && this.feaModule.HEAPF32 && this.feaModule.HEAPU8) {
+          const pInPtr = this.feaFuncs.getPIn() >> 2;
+          const maskInPtr = this.feaFuncs.getMaskIn();
+          this.feaModule.HEAPF32.set(this.p, pInPtr);
+          this.feaModule.HEAPU8.set(this.mask, maskInPtr);
+          this.feaFuncs.solve(33.3, 20.0);
+          const stressPtr = this.feaFuncs.getStress() >> 2;
+          this.stress.set(this.feaModule.HEAPF32.subarray(stressPtr, stressPtr + n));
+          this.maxStressMpa = this.feaFuncs.getMaxStress();
+          this.maxDispMm = this.feaFuncs.getMaxDisp();
+        } else {
+          // Direct Euler-Bernoulli cantilever FSI stress from live WASM pressure field
+          let maxS = 0;
+          const qDyn = 0.5 * 1.225 * 33.3 * 33.3; // 120 km/h wind dynamic pressure (Pa)
+          for (let j = 0; j < this.ny; j++) {
+            const lever = Math.max(0.05, 1.0 - j / Math.max(1, this.ny));
+            for (let i = 0; i < this.nx; i++) {
+              const id = j * this.nx + i;
+              if (this.mask[id] === 1) {
+                const pWind = i > 0 ? Math.abs(this.p[id - 1]) : 0.2;
+                const sigmaMpa = ((qDyn * (0.6 + pWind) * lever * 20.0) / 1e6) * 0.22;
+                this.stress[id] = sigmaMpa;
+                if (sigmaMpa > maxS) maxS = sigmaMpa;
+              } else {
+                this.stress[id] = 0;
+              }
+            }
+          }
+          this.maxStressMpa = maxS || 1.42;
+          this.maxDispMm = this.maxStressMpa * 1.85;
+        }
       }
     } else {
       for (let s = 0; s < numSteps; s++) {

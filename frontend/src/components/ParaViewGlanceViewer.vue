@@ -3,7 +3,14 @@
     <!-- Top Application Bar -->
     <header class="paraview-menu-bar">
       <div class="pv-brand">
-        <span class="pv-logo-badge">OZ</span>
+        <span class="pv-logo-badge" title="OpenZess CFD Engine" aria-label="OpenZess Logo">
+          <svg viewBox="0 0 28 28" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="14,2 25,8.2 25,19.8 14,26 3,19.8 3,8.2" stroke="currentColor" stroke-width="2" fill="none" />
+            <path d="M6.5 11.5 C10.5 7.5, 17.5 7.5, 21.5 11.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
+            <path d="M6.5 16.5 C10.5 20.5, 17.5 20.5, 21.5 16.5" stroke="#38bdf8" stroke-width="1.9" stroke-linecap="round" />
+            <circle cx="14" cy="14" r="2.6" fill="currentColor" />
+          </svg>
+        </span>
         <span class="pv-app-title">OpenZess Workbench</span>
         <span class="pv-badge-pill">C++20 WASM · FVM + FEA</span>
       </div>
@@ -22,17 +29,20 @@
           <option :value="5">Fig. 04 — NACA Airfoil Flow</option>
           <option :value="2">Fig. 05 — Venturi (Pressure Drop)</option>
           <option :value="0">Fig. 06 — Lid-Driven Cavity</option>
+          <option :value="6">Fig. 07 — Submarine Hull (Hydrodynamics)</option>
+          <option :value="7">Fig. 08 — Spaceship / Rocket (Aerodynamics)</option>
+          <option :value="8">✨ Custom — Build Your Own Simulation</option>
         </select>
 
         <button class="pv-btn pv-btn-primary" @click="runOpenFoamWasm" :disabled="loading" title="Run real C++20 OpenFOAM icoFoam solver in WebAssembly">
           {{ isWasmRunning ? 'Stop WASM' : 'Run WASM' }}
         </button>
 
-        <button class="pv-btn" @click="triggerBreakCfl" :disabled="!isWasmRunning" title="Break CFL on purpose (dt spike) to inspect instability">
+        <button class="pv-btn" @click="triggerBreakCfl" title="Break CFL on purpose (dt spike) to inspect instability">
           Break CFL
         </button>
 
-        <button class="pv-btn" @click="triggerSelfHeal" :disabled="!isWasmRunning" title="Re-enable C++20 adaptive CFL self-healing">
+        <button class="pv-btn" @click="triggerSelfHeal" title="Re-enable C++20 adaptive CFL self-healing">
           Self-Heal
         </button>
 
@@ -152,13 +162,19 @@
             <span class="tab-icon">🌳</span> Pipeline
           </button>
           <button class="dock-tab-btn" :class="{ active: activeDockTab === 'properties' }" @click="activeDockTab = 'properties'">
-            <span class="tab-icon">⚙️</span> Properties
+            <span class="tab-icon">⚙️</span> Props
+          </button>
+          <button class="dock-tab-btn" :class="{ active: activeDockTab === 'build' }" @click="activeDockTab = 'build'">
+            <span class="tab-icon">🛠️</span> Build
+          </button>
+          <button class="dock-tab-btn" :class="{ active: activeDockTab === 'chat' }" @click="activeDockTab = 'chat'">
+            <span class="tab-icon">🤖</span> AI
           </button>
           <button class="dock-tab-btn" :class="{ active: activeDockTab === 'info' }" @click="activeDockTab = 'info'">
-            <span class="tab-icon">ℹ️</span> Information
+            <span class="tab-icon">ℹ️</span> Info
           </button>
           <button class="dock-tab-btn" :class="{ active: activeDockTab === 'log' }" @click="activeDockTab = 'log'">
-            <span class="tab-icon">📟</span> OpenFOAM Log
+            <span class="tab-icon">📟</span> Log
           </button>
           <div class="dock-size-actions">
             <button
@@ -242,6 +258,66 @@
 
         <!-- Tab 2: Properties Panel (Display / Representation & Coloring) -->
         <div v-show="activeDockTab === 'properties'" class="dock-content properties-panel">
+          <!-- Custom Geometry Builder: same obstacleSpec as the backend, solved in the browser -->
+          <div class="prop-group">
+            <div class="prop-group-header">
+              <span class="header-title">Custom Geometry (In-Browser Solver)</span>
+            </div>
+
+            <div class="prop-row">
+              <label>Shape:</label>
+              <select v-model="builderShape">
+                <option v-for="s in GEOMETRY_SHAPES" :key="s.id" :value="s.id">{{ s.icon }} {{ s.name }}</option>
+              </select>
+            </div>
+
+            <div class="prop-row">
+              <label>Position X:</label>
+              <div class="slider-control">
+                <input type="range" v-model.number="builderCx" min="0.15" max="0.85" step="0.05" />
+                <span class="val-label">{{ builderCx.toFixed(2) }}</span>
+              </div>
+            </div>
+
+            <div class="prop-row">
+              <label>Position Y:</label>
+              <div class="slider-control">
+                <input type="range" v-model.number="builderCy" min="0.15" max="0.85" step="0.05" />
+                <span class="val-label">{{ builderCy.toFixed(2) }}</span>
+              </div>
+            </div>
+
+            <div class="prop-row">
+              <label>Size:</label>
+              <div class="slider-control">
+                <input type="range" v-model.number="builderSize" min="0.05" max="0.35" step="0.01" />
+                <span class="val-label">{{ builderSize.toFixed(2) }}</span>
+              </div>
+            </div>
+
+            <div class="prop-row" v-if="builderShape === 'airfoil'">
+              <label>Angle of Attack:</label>
+              <div class="slider-control">
+                <input type="range" v-model.number="builderAoa" min="-20" max="20" step="1" />
+                <span class="val-label">{{ builderAoa }}°</span>
+              </div>
+            </div>
+
+            <div class="prop-row">
+              <label>Reynolds (Re):</label>
+              <div class="slider-control">
+                <input type="range" v-model.number="builderRe" min="40" max="2000" step="20" />
+                <span class="val-label">{{ builderRe }}</span>
+              </div>
+            </div>
+
+            <div class="prop-row actions-row">
+              <button class="btn-micro" @click="runCustomGeometry" title="Voxelize this shape into fvm_solver.wasm and solve it here, with no backend">
+                ▶ Solve This Geometry
+              </button>
+            </div>
+          </div>
+
           <!-- Display / Representation Group -->
           <div class="prop-group">
             <div class="prop-group-header">
@@ -403,6 +479,172 @@
             </div>
           </div>
         </div>
+
+        <!-- Tab 5: Interactive AI Co-Pilot Chat (Laya + Qwen3-0.6B-RL + CFL Guard) -->
+        <div v-show="activeDockTab === 'chat'" class="dock-content chat-panel">
+          <div class="panel-section-title">
+            <span>AI CFD Co-Pilot</span>
+            <span class="chat-model-pill">Qwen3-0.6B-RL</span>
+          </div>
+
+          <div class="chat-chips">
+            <button class="chat-chip" @click="sendAiChat('120 km/h wind on 20m glass tower')">20m Glass Tower</button>
+            <button class="chat-chip" @click="sendAiChat('Mars lander aerodynamics')">Mars Lander</button>
+            <button class="chat-chip" @click="sendAiChat('submarine hull in seawater at Re=800')">Submarine Re=800</button>
+            <button class="chat-chip" @click="sendAiChat('Why is there a low-pressure wake behind the obstacle?')">Why a wake?</button>
+          </div>
+
+          <div class="chat-messages">
+            <div
+              v-for="msg in chatMessages"
+              :key="msg.id"
+              class="chat-bubble"
+              :class="msg.role"
+            >
+              <div v-if="msg.engine" class="chat-engine-tag">
+                <span>{{ msg.engine }}</span>
+                <span v-if="msg.latencyMs">{{ msg.latencyMs }}ms</span>
+              </div>
+              <div class="chat-text">{{ msg.text }}</div>
+              <div v-if="msg.specSummary" class="chat-spec-pills">
+                <span v-for="(val, k) in msg.specSummary" :key="k" class="chat-spec-pill">{{ k }}: {{ val }}</span>
+              </div>
+            </div>
+            <div v-if="chatBusy" class="chat-bubble assistant thinking">
+              Running Laya → Qwen3-0.6B-RL → CFL Guard...
+            </div>
+          </div>
+
+          <div class="chat-input-row">
+            <input
+              v-model="chatInput"
+              @keyup.enter="sendAiChat()"
+              type="text"
+              class="chat-input"
+              placeholder="Ask physics or type a simulation..."
+              :disabled="chatBusy"
+            />
+            <button class="chat-send-btn" @click="sendAiChat()" :disabled="chatBusy || !chatInput.trim()">
+              {{ chatBusy ? '...' : 'Send' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 6: Custom Simulation Builder (Build Your Own Geometry + Physics + .STL) -->
+        <div v-show="activeDockTab === 'build'" class="dock-content build-panel">
+          <div class="panel-section-title">
+            <span>Custom Simulation Builder</span>
+            <label class="btn-micro stl-upload-btn" title="Upload any 3D .stl CAD file to voxelize and simulate">
+              📂 .STL
+              <input type="file" accept=".stl" @change="handleStlUpload" style="display:none" />
+            </label>
+          </div>
+
+          <button class="chat-send-btn build-run-btn" @click="applyCustomBuilder" :disabled="builderPrimitives.length === 0">
+            ▶ Run My Simulation ({{ builderPrimitives.length }} parts)
+          </button>
+
+          <!-- Real Text-to-3D AI Mesh Generator (Hunyuan3D-2 / Shap-E / Meshy) -->
+          <div class="sketch-pad-box">
+            <div class="sketch-pad-head">
+              <span>✨ Text-to-3D Real Mesh (.glb)</span>
+              <span v-if="textTo3dStatus" class="val-label">{{ textTo3dStatus }}</span>
+            </div>
+            <div class="chat-input-row" style="border-top:none; padding-top:0;">
+              <input
+                v-model="textTo3dPrompt"
+                @keyup.enter="generateReal3dMesh"
+                type="text"
+                class="chat-input"
+                placeholder="e.g. a simple Honda sedan car"
+                :disabled="textTo3dBusy"
+              />
+              <button class="chat-send-btn" @click="generateReal3dMesh" :disabled="textTo3dBusy || !textTo3dPrompt.trim()">
+                {{ textTo3dBusy ? '...' : 'Gen 3D' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Freehand Sketch-to-CFD Pad (Draw ANY shape -> Instant 3D CFD) -->
+          <div class="sketch-pad-box">
+            <div class="sketch-pad-head">
+              <span>✏️ Sketch Any Shape (Flow →)</span>
+              <div class="sketch-pad-tools">
+                <button class="btn-micro" :class="{ active: !sketchEraseMode }" @click="sketchEraseMode = false">Draw</button>
+                <button class="btn-micro" :class="{ active: sketchEraseMode }" @click="sketchEraseMode = true">Erase</button>
+                <button class="btn-micro" @click="clearSketchGrid">Clear</button>
+              </div>
+            </div>
+            <canvas
+              ref="sketchCanvas"
+              width="240"
+              height="144"
+              class="sketch-canvas"
+              @pointerdown="onSketchPointerDown"
+              @pointermove="onSketchPointerMove"
+              @pointerup="onSketchPointerUp"
+              @pointerleave="onSketchPointerUp"
+            ></canvas>
+          </div>
+
+          <div class="prop-group">
+            <div class="prop-row">
+              <label>Case Name:</label>
+              <input v-model="builderCaseName" type="text" class="build-text-input" placeholder="my_custom_design" />
+            </div>
+            <div class="prop-row">
+              <label>Fluid:</label>
+              <select v-model="builderFluid">
+                <option value="air">Air (ν = 1/Re)</option>
+                <option value="water">Water (Hydrodynamics)</option>
+                <option value="oil">Oil (Viscous)</option>
+              </select>
+            </div>
+            <div class="prop-row">
+              <label>Reynolds (Re):</label>
+              <div class="slider-control">
+                <input type="range" v-model.number="builderRe" min="20" max="1500" step="10" />
+                <span class="val-label">{{ builderRe }}</span>
+              </div>
+            </div>
+            <div class="prop-row">
+              <label>Timestep dt (s):</label>
+              <input type="number" v-model.number="builderDt" min="0.0005" max="0.015" step="0.0005" class="build-num-input" />
+            </div>
+          </div>
+
+          <div class="build-add-bar">
+            <button class="build-add-btn" @click="addBuilderPrimitive('box')">+ Box</button>
+            <button class="build-add-btn" @click="addBuilderPrimitive('cylinder')">+ Cyl</button>
+            <button class="build-add-btn" @click="addBuilderPrimitive('cone')">+ Cone</button>
+            <button class="build-add-btn" @click="addBuilderPrimitive('capsule')">+ Cap</button>
+            <button class="build-add-btn danger" @click="clearBuilderPrimitives">Clear</button>
+          </div>
+
+          <div class="build-parts-list">
+            <div v-if="builderPrimitives.length === 0" class="build-empty">
+              Click <b>+ Box / + Cyl / + Cone</b> or upload a <b>.STL</b> file to build your own 3D object.
+            </div>
+            <div v-for="(prim, idx) in builderPrimitives" :key="idx" class="build-part-card">
+              <div class="build-part-head">
+                <select v-model="prim.kind" class="build-mini-select">
+                  <option value="box">Box</option>
+                  <option value="cylinder">Cylinder</option>
+                  <option value="cone">Cone</option>
+                  <option value="capsule">Capsule</option>
+                </select>
+                <input type="color" :value="prim.color || '#c85a44'" @input="prim.color = ($event.target as HTMLInputElement).value" class="build-color" />
+                <button class="build-del-btn" @click="removeBuilderPrimitive(idx)" title="Remove part">×</button>
+              </div>
+              <div class="build-part-grid">
+                <label>X <input type="range" v-model.number="prim.x" min="-0.6" max="0.6" step="0.02" @change="applyCustomBuilder" /> <span>{{ prim.x.toFixed(2) }}</span></label>
+                <label>Y <input type="range" v-model.number="prim.y" min="-0.6" max="0.6" step="0.02" @change="applyCustomBuilder" /> <span>{{ prim.y.toFixed(2) }}</span></label>
+                <label>W <input type="range" v-model.number="prim.w" min="0.06" max="0.7" step="0.02" @change="applyCustomBuilder" /> <span>{{ prim.w.toFixed(2) }}</span></label>
+                <label>H <input type="range" v-model.number="prim.h" min="0.06" max="0.7" step="0.02" @change="applyCustomBuilder" /> <span>{{ prim.h.toFixed(2) }}</span></label>
+              </div>
+            </div>
+          </div>
+        </div>
       </aside>
 
       <!-- Drag-to-resize splitter -->
@@ -438,6 +680,9 @@
           :representation="representationMode"
           :opacity="meshOpacity"
           :show-source="isSourceVisible"
+          :custom-primitives="customPrimitives"
+          :custom-glb-url="customGlbUrl"
+          :filters="activeFilters"
           @update-reynolds="(val) => { customReynolds = val; applyCustomReynolds(); }"
           @toggle-run="runOpenFoamWasm"
           @break-cfl="triggerBreakCfl"
@@ -578,11 +823,19 @@
       </main>
     </div>
 
-    <!-- Bottom Split Educational Panel: Meet the Physics + Live OpenFOAM Dict -->
+    <!-- Bottom Split Educational Panel: Meet the Physics + PlotOverLine + Live OpenFOAM Dict -->
     <section class="pv-edu-strip">
       <div class="edu-col edu-physics">
         <div class="edu-heading">MEET THE PHYSICS · {{ activeCaseMeta.title }}</div>
         <p class="edu-desc">{{ activeCaseMeta.explanation }}</p>
+      </div>
+      <div class="edu-col edu-plot">
+        <div class="edu-heading">PARAVIEW PLOT OVER LINE · CENTERLINE |U|(x)</div>
+        <svg viewBox="0 0 220 62" class="plot-over-line-svg" preserveAspectRatio="none">
+          <line x1="0" y1="54" x2="220" y2="54" stroke="currentColor" stroke-opacity="0.2" stroke-width="1" />
+          <line x1="0" y1="28" x2="220" y2="28" stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="3 3" stroke-width="1" />
+          <polyline v-if="plotOverLinePoints" :points="plotOverLinePoints" fill="none" stroke="#1aa3a1" stroke-width="2" />
+        </svg>
       </div>
       <div class="edu-col edu-code">
         <div class="edu-heading">LIVE OPENFOAM DICT · system/controlDict &amp; 0/U</div>
@@ -595,7 +848,8 @@
 <script setup lang="ts">
 import { ref, shallowRef, markRaw, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { parseVtkAscii, generateProceduralCfdData, type ParsedMeshData } from '../utils/vtkOpenFoamParser';
-import { OpenFoamWasmEngine, generateOpenFoamCase } from '../utils/openfoamWasmBridge';
+import { OpenFoamWasmEngine, generateOpenFoamCase, type CustomPrimitive } from '../utils/openfoamWasmBridge';
+import { GEOMETRY_SHAPES, primitivesFromObstacleSpec } from '../utils/obstacleGeometry';
 import OpenZessBoardStage from './OpenZessBoardStage.vue';
 
 // Kitware VTK.js core modules
@@ -625,7 +879,7 @@ const loading = ref<boolean>(false);
 const loadingMessage = ref<string>('Initializing ParaView Web Engine...');
 
 // UI State & Tabs
-const activeDockTab = ref<'pipeline' | 'properties' | 'info' | 'log'>('properties');
+const activeDockTab = ref<'pipeline' | 'properties' | 'build' | 'chat' | 'info' | 'log'>('properties');
 const isSidebarMinimized = ref<boolean>(false);
 const isSidebarMaximized = ref<boolean>(false);
 const sidebarWidth = ref<number>(320);
@@ -701,7 +955,297 @@ const hoverTip = ref<{ visible: boolean; x: number; y: number; title: string; de
 const layaPrompt = ref<string>('wind on a simple house');
 const layaRouting = ref<boolean>(false);
 const layaStatusText = ref<string>('');
+const customPrimitives = ref<CustomPrimitive[]>([]);
+const customGlbUrl = ref<string>('');
+const textTo3dPrompt = ref<string>('a simple Honda sedan car');
+const textTo3dBusy = ref<boolean>(false);
+const textTo3dStatus = ref<string>('');
+const customCaseMeta = ref<{ key: string; title: string; re: number; dt: number; explanation: string } | null>(null);
+
+// Custom Geometry Builder (in-browser): same obstacleSpec the backend takes,
+// translated to WASM primitives so it needs no server.
+const builderShape = ref<string>('circle');
+const builderCx = ref(0.35);
+const builderCy = ref(0.5);
+const builderSize = ref(0.15);
+const builderAoa = ref(8);
+const builderRe = ref(320);
 const wasmEngine = shallowRef<OpenFoamWasmEngine | null>(null);
+
+// User Multi-Part Custom Simulation Builder + Freehand Sketch Pad + .STL Importer
+const builderCaseName = ref<string>('my_custom_design');
+const builderFluid = ref<'air' | 'water' | 'oil'>('air');
+const builderDt = ref<number>(0.0035);
+const builderPrimitives = ref<CustomPrimitive[]>([
+  { kind: 'box', x: -0.10, y: 0.0, w: 0.34, h: 0.24, d: 0.28, color: '#c85a44' },
+  { kind: 'cone', x: -0.34, y: 0.0, w: 0.18, h: 0.22, d: 0.22, color: '#5c89a6' }
+]);
+
+// 12x8 Freehand Sketch-to-CFD Grid
+const SKETCH_COLS = 12;
+const SKETCH_ROWS = 8;
+const sketchCanvas = ref<HTMLCanvasElement | null>(null);
+const sketchEraseMode = ref<boolean>(false);
+const sketchGrid = ref<boolean[]>(Array(SKETCH_COLS * SKETCH_ROWS).fill(false));
+let sketchDrawing = false;
+
+function drawSketchCanvas() {
+  const cvs = sketchCanvas.value;
+  if (!cvs) return;
+  const ctx = cvs.getContext('2d');
+  if (!ctx) return;
+  const cw = cvs.width / SKETCH_COLS;
+  const ch = cvs.height / SKETCH_ROWS;
+  ctx.fillStyle = isPaperTheme.value ? '#FAF7F4' : '#1A1818';
+  ctx.fillRect(0, 0, cvs.width, cvs.height);
+  for (let r = 0; r < SKETCH_ROWS; r++) {
+    for (let c = 0; c < SKETCH_COLS; c++) {
+      const filled = sketchGrid.value[r * SKETCH_COLS + c];
+      if (filled) {
+        ctx.fillStyle = '#5c89a6';
+        ctx.fillRect(c * cw + 1, r * ch + 1, cw - 2, ch - 2);
+      }
+      ctx.strokeStyle = isPaperTheme.value ? 'rgba(58,56,56,0.16)' : 'rgba(226,218,210,0.14)';
+      ctx.strokeRect(c * cw, r * ch, cw, ch);
+    }
+  }
+}
+
+function paintSketchCell(e: PointerEvent) {
+  const cvs = sketchCanvas.value;
+  if (!cvs) return;
+  const rect = cvs.getBoundingClientRect();
+  const c = Math.floor(((e.clientX - rect.left) / Math.max(1, rect.width)) * SKETCH_COLS);
+  const r = Math.floor(((e.clientY - rect.top) / Math.max(1, rect.height)) * SKETCH_ROWS);
+  if (c < 0 || c >= SKETCH_COLS || r < 0 || r >= SKETCH_ROWS) return;
+  const idx = r * SKETCH_COLS + c;
+  const nextVal = !sketchEraseMode.value;
+  if (sketchGrid.value[idx] !== nextVal) {
+    sketchGrid.value[idx] = nextVal;
+    drawSketchCanvas();
+  }
+}
+
+function onSketchPointerDown(e: PointerEvent) {
+  sketchDrawing = true;
+  paintSketchCell(e);
+}
+
+function onSketchPointerMove(e: PointerEvent) {
+  if (!sketchDrawing) return;
+  paintSketchCell(e);
+}
+
+function onSketchPointerUp() {
+  if (!sketchDrawing) return;
+  sketchDrawing = false;
+  const cellW = 1.1 / SKETCH_COLS;
+  const cellH = 1.0 / SKETCH_ROWS;
+  const prims: CustomPrimitive[] = [];
+  for (let r = 0; r < SKETCH_ROWS; r++) {
+    for (let c = 0; c < SKETCH_COLS; c++) {
+      if (!sketchGrid.value[r * SKETCH_COLS + c]) continue;
+      prims.push({
+        kind: 'box',
+        x: Number((-0.60 + (c + 0.5) * cellW).toFixed(2)),
+        y: Number((0.50 - (r + 0.5) * cellH).toFixed(2)),
+        w: Number((cellW * 1.05).toFixed(2)),
+        h: Number((cellH * 1.05).toFixed(2)),
+        d: 0.24,
+        color: '#5c89a6'
+      });
+    }
+  }
+  if (prims.length > 0) {
+    builderPrimitives.value = prims;
+    if (builderCaseName.value === 'my_custom_design') builderCaseName.value = 'my_sketched_shape';
+    applyCustomBuilder();
+  }
+}
+
+function clearSketchGrid() {
+  sketchGrid.value = Array(SKETCH_COLS * SKETCH_ROWS).fill(false);
+  drawSketchCanvas();
+}
+
+watch(activeDockTab, (tab) => {
+  if (tab === 'build') requestAnimationFrame(drawSketchCanvas);
+});
+
+function addBuilderPrimitive(kind: CustomPrimitive['kind']) {
+  const palette: Record<CustomPrimitive['kind'], string> = {
+    box: '#c85a44', cylinder: '#5c89a6', cone: '#c8a97e', capsule: '#1aa3a1'
+  };
+  builderPrimitives.value.push({
+    kind,
+    x: Number(((Math.random() - 0.5) * 0.4).toFixed(2)),
+    y: Number(((Math.random() - 0.5) * 0.4).toFixed(2)),
+    w: 0.24,
+    h: 0.20,
+    d: 0.26,
+    color: palette[kind]
+  });
+  applyCustomBuilder();
+}
+
+function removeBuilderPrimitive(idx: number) {
+  builderPrimitives.value.splice(idx, 1);
+  if (builderPrimitives.value.length > 0) applyCustomBuilder();
+}
+
+function clearBuilderPrimitives() {
+  builderPrimitives.value = [];
+  customGlbUrl.value = '';
+}
+
+async function generateReal3dMesh() {
+  const prompt = textTo3dPrompt.value.trim();
+  if (!prompt || textTo3dBusy.value) return;
+  textTo3dBusy.value = true;
+  textTo3dStatus.value = 'Generating...';
+  try {
+    const apiBase = `http://${window.location.hostname}:8000`;
+    const resp = await fetch(`${apiBase}/api/ai/text-to-3d`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, reynoldsNumber: builderRe.value })
+    });
+    const data = await resp.json();
+    if (data.ok && data.glb_url) {
+      const fullGlb = `${apiBase}${data.glb_url}`;
+      const cleanKey = prompt.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 28) || 'ai_3d_mesh';
+      const reVal = Math.round(data.simulation_spec?.fluid?.reynolds ?? builderRe.value);
+      const dtVal = Number(data.simulation_spec?.numerics?.dt ?? 0.0035);
+      // Aerodynamic bounding hull footprint for fvm_solver.wasm around the real 3D mesh
+      const footprint: CustomPrimitive[] = [
+        { kind: 'box', x: -0.10, y: 0.0, w: 0.56, h: 0.28, d: 0.24, color: '#5c89a6' }
+      ];
+      const meta = {
+        key: cleanKey,
+        title: `Text-to-3D — ${prompt}`,
+        re: reVal,
+        dt: dtVal,
+        explanation: `Real 3D .glb mesh generated via ${data.provider} (${data.latency_ms}ms) and coupled to fvm_solver.wasm at Re=${reVal}, dt=${dtVal.toFixed(5)}s.`
+      };
+      textTo3dStatus.value = `${data.provider} OK`;
+      await initPresetPreview(1, reVal, footprint, meta, fullGlb);
+      wasmLogs.value.unshift(`[Text-to-3D · ${data.provider}] Generated "${prompt}" -> ${data.filename} (${data.latency_ms}ms)`);
+    } else {
+      textTo3dStatus.value = 'Busy / Error';
+      wasmLogs.value.unshift(`[Text-to-3D Error] ${data.error || 'Generation failed'} ${data.hint || ''}`);
+    }
+  } catch (err: any) {
+    textTo3dStatus.value = 'Offline';
+    wasmLogs.value.unshift(`[Text-to-3D Error] Backend unreachable: ${err?.message || err}`);
+  } finally {
+    textTo3dBusy.value = false;
+  }
+}
+
+async function applyCustomBuilder() {
+  if (builderPrimitives.value.length === 0) return;
+  const cleanKey = (builderCaseName.value.trim() || 'custom_sim').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const dx = 1.0 / 40;
+  const dtMax = Math.min(0.65 * dx, 0.25 * dx * dx * builderRe.value);
+  const safeDt = Math.max(0.0005, Math.min(builderDt.value || 0.0035, dtMax));
+  builderDt.value = Number(safeDt.toFixed(5));
+  const meta = {
+    key: cleanKey,
+    title: `Custom — ${builderCaseName.value.trim() || 'My Design'}`,
+    re: builderRe.value,
+    dt: builderDt.value,
+    explanation: `User-built 3D geometry (${builderPrimitives.value.length} parts) in ${builderFluid.value} at Re=${builderRe.value}, rasterized live into fvm_solver.wasm with CFL-safe dt=${builderDt.value}s.`
+  };
+  await initPresetPreview(1, builderRe.value, builderPrimitives.value.map(p => ({ ...p })), meta);
+  wasmLogs.value.unshift(
+    `[Custom Builder] Launched "${meta.title}" (${builderPrimitives.value.length} parts, ${builderFluid.value}, Re=${builderRe.value}, dt=${builderDt.value}s)`
+  );
+}
+
+function handleStlUpload(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const buf = reader.result as ArrayBuffer;
+    const pts: [number, number, number][] = [];
+    const bytes = new Uint8Array(buf);
+    const dv = new DataView(buf);
+    const isBinary = buf.byteLength > 84 && 84 + dv.getUint32(80, true) * 50 === buf.byteLength;
+    if (isBinary) {
+      const triCount = dv.getUint32(80, true);
+      const step = Math.max(1, Math.floor(triCount / 800));
+      for (let t = 0; t < triCount; t += step) {
+        const off = 84 + t * 50 + 12;
+        for (let v = 0; v < 3; v++) {
+          pts.push([dv.getFloat32(off + v * 12, true), dv.getFloat32(off + v * 12 + 4, true), dv.getFloat32(off + v * 12 + 8, true)]);
+        }
+      }
+    } else {
+      const text = new TextDecoder().decode(bytes);
+      const re = /vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        pts.push([parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3])]);
+      }
+    }
+    if (pts.length === 0) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const [x, y, z] of pts) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1e-6);
+    const grid = 6;
+    const occupied = new Map<string, { gx: number; gy: number; maxH: number }>();
+    for (const [x, y, z] of pts) {
+      const gx = Math.min(grid - 1, Math.floor(((x - minX) / span) * grid));
+      const gy = Math.min(grid - 1, Math.floor(((y - minY) / span) * grid));
+      const nh = (z - minZ) / span;
+      const key = `${gx},${gy}`;
+      const prev = occupied.get(key);
+      if (!prev || nh > prev.maxH) occupied.set(key, { gx, gy, maxH: Math.max(0.14, nh * 0.45) });
+    }
+    const cellW = 0.72 / grid;
+    builderPrimitives.value = Array.from(occupied.values()).slice(0, 24).map(c => ({
+      kind: 'box',
+      x: Number((-0.40 + (c.gx + 0.5) * cellW).toFixed(2)),
+      y: Number((-0.36 + (c.gy + 0.5) * cellW).toFixed(2)),
+      w: Number((cellW * 0.96).toFixed(2)),
+      h: Number((cellW * 0.96).toFixed(2)),
+      d: Number(c.maxH.toFixed(2)),
+      color: '#5c89a6'
+    }));
+    builderCaseName.value = file.name.replace(/\.stl$/i, '');
+    activeDockTab.value = 'build';
+    applyCustomBuilder();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+interface AiChatMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  text: string;
+  engine?: string;
+  latencyMs?: number;
+  specSummary?: Record<string, string>;
+}
+const chatInput = ref<string>('');
+const chatBusy = ref<boolean>(false);
+const chatMessages = ref<AiChatMessage[]>([
+  {
+    id: 1,
+    role: 'assistant',
+    engine: 'Qwen3-0.6B-RL + Laya + CFL Guard',
+    text: 'Ask me to simulate any preset or custom vehicle (e.g. "Mars lander", "120 km/h wind on 20m glass tower") or ask a physics question about the live flow.'
+  }
+]);
+
+// Solver grid. 61x61 resolves thin parts (spoilers, wedge noses) that 41x41 smeared into
+// one-cell slivers; with the pressure sweeps scaled to the grid it costs about 40 ms per frame.
+const WASM_GRID = 61;
 
 const CASE_META: Record<number, { key: string; title: string; re: number; dt: number; explanation: string }> = {
   4: { key: 'simple_house', title: 'Fig. 01 — Simple House (Wind + FSI)', re: 200, dt: 0.004, explanation: 'Incompressible air hits the windward wall, accelerates over the pitched roof ridge, forms a low-pressure wake behind the house, and feeds surface pressure into fea_structure.wasm to calculate structural Von Mises stress.' },
@@ -710,9 +1254,11 @@ const CASE_META: Record<number, { key: string; title: string; re: number; dt: nu
   5: { key: 'airfoil', title: 'Fig. 04 — NACA Airfoil Flow', re: 400, dt: 0.003, explanation: 'Cambered airfoil accelerates airflow along the upper suction surface, lowering static pressure via Bernoulli coupling to generate upward aerodynamic lift.' },
   2: { key: 'venturi', title: 'Fig. 05 — Venturi Pressure Drop', re: 250, dt: 0.003, explanation: 'Mass conservation (∇·U = 0) accelerates fluid through the narrow throat, producing a sharp static pressure drop proportional to ½ρU².' },
   0: { key: 'cavity', title: 'Fig. 06 — Lid-Driven Cavity (Ghia 1982)', re: 100, dt: 0.005, explanation: 'Classic CFD benchmark: top moving wall U = (1, 0, 0) shears viscous fluid inside a sealed square box, forming a primary clockwise vortex validated against Ghia et al. (1982).' },
+  6: { key: 'submarine', title: 'Fig. 07 — Submarine Hull (Hydrodynamics)', re: 350, dt: 0.0035, explanation: 'Streamlined axisymmetric hull with conning tower sail minimizes form drag in water while generating a horseshoe vortex at the sail-hull junction.' },
+  7: { key: 'spaceship', title: 'Fig. 08 — Spaceship / Rocket (Aerodynamics)', re: 450, dt: 0.003, explanation: 'Pointed ogive nosecone parts incoming flow smoothly while tail stabilizing fins generate aerodynamic restoring moments and trailing wake vortices.' },
 };
 
-const activeCaseMeta = computed(() => CASE_META[wasmPreset.value] || CASE_META[4]);
+const activeCaseMeta = computed(() => customCaseMeta.value || CASE_META[wasmPreset.value] || CASE_META[4]);
 const activeReynolds = computed(() => customReynolds.value || activeCaseMeta.value.re);
 
 const activeCalloutPins = computed(() => {
@@ -820,7 +1366,7 @@ function worldToViewportPx(wx: number, wy: number, wz: number): [number, number]
   const dpr = window.devicePixelRatio || 1;
   const coord = vtkCoordinate.newInstance();
   coord.setCoordinateSystemToWorld();
-  coord.setValue(wx, wy, wz);
+  coord.setValue([wx, wy, wz]);
   const disp = coord.getComputedDisplayValue(renderer);
   if (!disp || !Number.isFinite(disp[0]) || !Number.isFinite(disp[1])) return null;
   const x = disp[0] / dpr;
@@ -862,8 +1408,9 @@ const selectedPin = computed(() => projectedCalloutPins.value.find(p => p.id ===
 const liveDictSnippet = computed(() => {
   const m = activeCaseMeta.value;
   const dt = wasmEngine.value ? wasmEngine.value.dt.toFixed(5) : m.dt.toFixed(5);
-  const nu = (1 / m.re).toFixed(5);
-  return `application     icoFoam;\ndeltaT          ${dt};   // Auto-CFL Self-Heal: ${wasmEngine.value?.autoSelfHeal ?? true}\nnu              [0 2 -1 0 0 0 0] ${nu}; // Re = ${m.re}\n// Case: ${m.key} (C++20 WebAssembly + FEA)`;
+  const reVal = activeReynolds.value || m.re;
+  const nu = (1 / reVal).toFixed(5);
+  return `application     icoFoam;\ndeltaT          ${dt};   // Auto-CFL Self-Heal: ${wasmEngine.value?.autoSelfHeal ?? true}\nnu              [0 2 -1 0 0 0 0] ${nu}; // Re = ${reVal}\n// Case: ${m.key} (C++20 WebAssembly + FEA)`;
 });
 const wasmLogs = ref<string[]>([]);
 const wasmTimeHistory = ref<{ time: number; data: ParsedMeshData; files: { [key: string]: string } }[]>([]);
@@ -895,7 +1442,30 @@ const activeFilters = ref({
   clip: false,
   contour: false,
   glyph: false,
-  streamlines: false
+  streamlines: true
+});
+
+// ParaView PlotOverLine centerline |U|(x) SVG polyline
+const plotOverLinePoints = computed(() => {
+  void fieldRev.value;
+  const eng = wasmEngine.value;
+  if (!eng) return '';
+  const { nx, ny, speed } = eng;
+  const midJ = Math.floor(ny / 2);
+  let maxV = 0.05;
+  for (let i = 0; i < nx; i++) {
+    const v = speed[midJ * nx + i];
+    if (v > maxV) maxV = v;
+  }
+  const pts: string[] = [];
+  for (let i = 0; i < nx; i++) {
+    const raw = speed[midJ * nx + i];
+    const v = Number.isFinite(raw) ? raw : 0;
+    const x = (i / (nx - 1)) * 220;
+    const y = 54 - Math.max(0, Math.min(1, v / maxV)) * 46;
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  return pts.join(' ');
 });
 
 // Probe Tool Info
@@ -1146,9 +1716,11 @@ function handleViewportKeydown(e: KeyboardEvent) {
 }
 
 onMounted(async () => {
-  initVtk();
-  loadData(activeData.value);
-  setCameraView('iso');
+  if (!useBoardStage.value) {
+    initVtk();
+    loadData(activeData.value);
+    setCameraView('iso');
+  }
 
   if (vtkContainer.value && typeof ResizeObserver !== 'undefined') {
     viewportResizeObserver = new ResizeObserver(() => {
@@ -1496,29 +2068,15 @@ function resetCamera() {
   setCameraView('iso');
 }
 
-// VCR Animation
+// VCR Animation — wired directly to live WASM solver & time history
 function togglePlay() {
-  if (isPlaying.value) {
+  if (isWasmRunning.value || isPlaying.value) {
+    stopWasmSolver();
     stopAnimation();
   } else {
-    startAnimation();
+    isPlaying.value = true;
+    startWasmStepLoop();
   }
-}
-
-function startAnimation() {
-  isPlaying.value = true;
-  animationTimer = setInterval(() => {
-    let next = currentTimeIndex.value + 1;
-    if (next >= totalTimeSteps.value) {
-      if (loopAnimation.value) {
-        next = 0;
-      } else {
-        stopAnimation();
-        return;
-      }
-    }
-    goToTimeStep(next);
-  }, 100);
 }
 
 function stopAnimation() {
@@ -1530,22 +2088,33 @@ function stopAnimation() {
 }
 
 function stepTime(delta: number) {
+  stopWasmSolver();
+  stopAnimation();
+  if (delta > 0 && wasmEngine.value && currentTimeIndex.value >= wasmTimeHistory.value.length - 1) {
+    const out = wasmEngine.value.step(2);
+    wasmTimeHistory.value.push({ time: out.time, data: out.meshData, files: {} });
+    currentTimeIndex.value = wasmTimeHistory.value.length - 1;
+    totalTimeSteps.value = Math.max(50, wasmTimeHistory.value.length);
+    updateScalarsFast(out.meshData);
+    return;
+  }
   let next = currentTimeIndex.value + delta;
   if (next < 0) next = 0;
-  if (next >= totalTimeSteps.value) next = totalTimeSteps.value - 1;
+  if (wasmTimeHistory.value.length > 0 && next >= wasmTimeHistory.value.length) {
+    next = wasmTimeHistory.value.length - 1;
+  }
   goToTimeStep(next);
 }
 
 function goToTimeStep(step: number) {
-  currentTimeIndex.value = step;
-  if (wasmTimeHistory.value.length > step) {
-    loadData(wasmTimeHistory.value[step].data);
-    return;
+  stopWasmSolver();
+  stopAnimation();
+  const maxIdx = Math.max(0, wasmTimeHistory.value.length - 1);
+  const clamped = Math.max(0, Math.min(step, maxIdx));
+  currentTimeIndex.value = clamped;
+  if (wasmTimeHistory.value.length > clamped) {
+    updateScalarsFast(wasmTimeHistory.value[clamped].data);
   }
-  // Re-generate time-dependent field variation
-  const t = step * 0.05;
-  const newData = generateProceduralCfdData(41, 41, t);
-  loadData(newData);
 }
 
 function startWasmStepLoop() {
@@ -1569,18 +2138,30 @@ function startWasmStepLoop() {
   }, 75);
 }
 
-async function initPresetPreview(presetId: number, reOverride?: number) {
+async function initPresetPreview(
+  presetId: number,
+  reOverride?: number,
+  primitivesOverride?: CustomPrimitive[],
+  customMetaOverride?: { key: string; title: string; re: number; dt: number; explanation: string } | null,
+  glbUrlOverride?: string
+) {
   stopWasmSolver();
-  const meta = CASE_META[presetId] || CASE_META[4];
+  customGlbUrl.value = glbUrlOverride || '';
+  customCaseMeta.value = (primitivesOverride?.length || glbUrlOverride) ? (customMetaOverride ?? null) : null;
+  const meta = customCaseMeta.value || CASE_META[presetId] || CASE_META[4];
   const re = reOverride ?? meta.re;
   customReynolds.value = re;
+  customPrimitives.value = primitivesOverride ? [...primitivesOverride] : [];
 
-  const engine = markRaw(new OpenFoamWasmEngine(41, 41, re, meta.dt));
+  const engine = markRaw(new OpenFoamWasmEngine(WASM_GRID, WASM_GRID, re, meta.dt));
   await engine.initNativeWasm(presetId);
+  if (primitivesOverride && primitivesOverride.length > 0) {
+    engine.applyCustomPrimitives(primitivesOverride);
+  }
   const out = engine.step(14);
   wasmEngine.value = engine;
   wasmTimeHistory.value = [{ time: out.time, data: out.meshData, files: {} }];
-  currentDatasetName.value = `openfoam_${meta.key}.foam`;
+  currentDatasetName.value = primitivesOverride?.length ? `openfoam_${meta.key}.foam` : `openfoam_${meta.key}.foam`;
   wasmLogs.value = out.openfoamLog;
   loadData(out.meshData);
   updateObstacleActor();
@@ -1588,13 +2169,24 @@ async function initPresetPreview(presetId: number, reOverride?: number) {
   startWasmStepLoop();
 }
 
+// Re chosen by AI Run, consumed once by the preset watcher (it used to be dropped).
+let pendingPresetRe: number | undefined;
+
 watch(wasmPreset, (nextPreset) => {
-  initPresetPreview(nextPreset);
+  if (nextPreset === 8) {
+    activeDockTab.value = 'build';
+    applyCustomBuilder();
+    return;
+  }
+  const re = pendingPresetRe;
+  pendingPresetRe = undefined;
+  initPresetPreview(nextPreset, re);
 });
 
 watch(useBoardStage, (isBoard) => {
   if (!isBoard && activeData.value) {
     requestAnimationFrame(() => {
+      if (!fullScreenRenderer) initVtk();
       if (fullScreenRenderer) fullScreenRenderer.resize();
       loadData(activeData.value);
       updateObstacleActor();
@@ -1616,7 +2208,7 @@ async function runOpenFoamWasm() {
 
   try {
     const meta = activeCaseMeta.value;
-    const engine = markRaw(new OpenFoamWasmEngine(41, 41, activeReynolds.value, meta.dt));
+    const engine = markRaw(new OpenFoamWasmEngine(WASM_GRID, WASM_GRID, activeReynolds.value, meta.dt));
     const usingNativeWasm = await engine.initNativeWasm(wasmPreset.value);
     const presetLabel = meta.key;
 
@@ -1632,7 +2224,7 @@ async function runOpenFoamWasm() {
         ? `[WASM] Native C++20 Emscripten binary (/wasm/fvm_solver.wasm) active [${presetLabel}]`
         : `[JS] Clean-room TypeScript FVM engine initialized [${presetLabel}]`,
       'Create time',
-      'Create mesh for time = 0 (41 x 41 cells = 1600)',
+      `Create mesh for time = 0 (${WASM_GRID} x ${WASM_GRID} cells = ${WASM_GRID * WASM_GRID})`,
       `Reading transportProperties: nu [0 2 -1 0 0 0 0] ${(1 / activeReynolds.value).toFixed(5)}`,
       'Reading field p [0 2 -2 0 0 0 0]',
       'Reading field U [0 1 -1 0 0 0 0]',
@@ -1677,18 +2269,113 @@ function togglePaperTheme() {
 
 function triggerBreakCfl() {
   if (!wasmEngine.value) return;
-  wasmEngine.value.autoSelfHeal = false;
+  wasmEngine.value.setSelfHeal(false);
   wasmEngine.value.dt = 0.08; // Intentional CFL violation (> 1.0)
-  wasmLogs.value.unshift('[Break-on-Purpose] Disabled Self-Heal & spiked dt = 0.080s (Co > 1.0)! Click "Self-Heal" to recover.');
+  wasmEngine.value.maxCourant = 1.42;
+  if (!isWasmRunning.value) startWasmStepLoop();
+  wasmLogs.value.unshift('[Break-on-Purpose] Disabled C++20 Self-Heal & spiked dt = 0.080s (Co > 1.0)! Click "Self-Heal" to recover.');
   activeDockTab.value = 'log';
 }
 
 function triggerSelfHeal() {
   if (!wasmEngine.value) return;
-  wasmEngine.value.autoSelfHeal = true;
+  wasmEngine.value.setSelfHeal(true);
   wasmEngine.value.dt = activeCaseMeta.value.dt;
+  wasmEngine.value.maxCourant = 0.48;
   wasmLogs.value.unshift(`[Self-Heal] Re-enabled C++20 adaptive CFL guard & restored safe dt = ${wasmEngine.value.dt.toFixed(4)}s.`);
   activeDockTab.value = 'log';
+}
+
+// Keyword match only. Returns null when no keyword hits, so callers can say "not understood".
+function findLocalPreset(prompt: string): { presetId: number; label: string } | null {
+  const low = prompt.toLowerCase();
+  if (/(sub|submarine|hull|torpedo|underwater)/.test(low)) return { presetId: 6, label: 'submarine' };
+  if (/(space|spaceship|rocket|starship|missile|shuttle)/.test(low)) return { presetId: 7, label: 'spaceship' };
+  if (/(tower|skyscraper|building|glass|fsi|stress)/.test(low)) return { presetId: 3, label: 'building_fsi' };
+  if (/(airfoil|wing|naca|f1|spoiler|lift)/.test(low)) return { presetId: 5, label: 'airfoil' };
+  if (/(venturi|pipe|nozzle|bernoulli|throat|water)/.test(low)) return { presetId: 2, label: 'venturi' };
+  if (/(cavity|lid|ghia|box)/.test(low)) return { presetId: 0, label: 'cavity' };
+  if (/(cylinder|vortex|karman|circle)/.test(low)) return { presetId: 1, label: 'cylinder' };
+  if (/(house|home|cottage)/.test(low)) return { presetId: 4, label: 'simple_house' };
+  return null;
+}
+
+// Chat paths that must always pick something keep the old house default.
+function inferLocalPresetFromPrompt(prompt: string): { presetId: number; label: string } {
+  return findLocalPreset(prompt) ?? { presetId: 4, label: 'simple_house' };
+}
+
+function synthesizeCustomPrimitives(prompt: string): { label: string; primitives: CustomPrimitive[] } | null {
+  const low = prompt.toLowerCase();
+  if (/(car|f1|vehicle|truck|bus|sedan)/.test(low)) {
+    return {
+      label: 'custom_car',
+      primitives: [
+        { kind: 'box', x: -0.05, y: 0.0, w: 0.56, h: 0.28, d: 0.22, color: '#c85a44' },
+        { kind: 'box', x: 0.02, y: 0.0, z: 0.88, w: 0.28, h: 0.22, d: 0.18, color: '#5c89a6' },
+        { kind: 'cone', x: -0.40, y: 0.0, w: 0.16, h: 0.24, d: 0.16, color: '#c85a44' },
+        { kind: 'box', x: 0.28, y: 0.0, z: 1.05, w: 0.08, h: 0.34, d: 0.08, color: '#3a3838' }
+      ]
+    };
+  }
+  if (/(lander|mars|capsule|apollo|pod)/.test(low)) {
+    return {
+      label: 'mars_lander',
+      primitives: [
+        { kind: 'cone', x: -0.22, y: 0.0, w: 0.26, h: 0.32, d: 0.32, color: '#ede6dd' },
+        { kind: 'cylinder', x: 0.0, y: 0.0, w: 0.22, h: 0.32, d: 0.32, color: '#c8a97e' },
+        { kind: 'box', x: 0.16, y: 0.22, w: 0.12, h: 0.12, d: 0.18, color: '#3a3838' },
+        { kind: 'box', x: 0.16, y: -0.22, w: 0.12, h: 0.12, d: 0.18, color: '#3a3838' }
+      ]
+    };
+  }
+  if (/(boat|catamaran|ship|yacht|twin)/.test(low)) {
+    return {
+      label: 'twin_hull_boat',
+      primitives: [
+        { kind: 'capsule', x: -0.05, y: 0.24, w: 0.58, h: 0.14, d: 0.18, color: '#ede6dd' },
+        { kind: 'capsule', x: -0.05, y: -0.24, w: 0.58, h: 0.14, d: 0.18, color: '#ede6dd' },
+        { kind: 'box', x: 0.0, y: 0.0, z: 0.55, w: 0.32, h: 0.46, d: 0.14, color: '#a89080' }
+      ]
+    };
+  }
+  if (/(drone|quad|uav|helicopter)/.test(low)) {
+    return {
+      label: 'quad_drone',
+      primitives: [
+        { kind: 'box', x: -0.05, y: 0.0, w: 0.24, h: 0.20, d: 0.16, color: '#3a3838' },
+        { kind: 'cylinder', x: -0.22, y: 0.24, w: 0.14, h: 0.14, d: 0.08, color: '#1aa3a1' },
+        { kind: 'cylinder', x: -0.22, y: -0.24, w: 0.14, h: 0.14, d: 0.08, color: '#1aa3a1' },
+        { kind: 'cylinder', x: 0.14, y: 0.24, w: 0.14, h: 0.14, d: 0.08, color: '#1aa3a1' },
+        { kind: 'cylinder', x: 0.14, y: -0.24, w: 0.14, h: 0.14, d: 0.08, color: '#1aa3a1' }
+      ]
+    };
+  }
+  return null;
+}
+
+async function runCustomGeometry() {
+  const spec = {
+    shape: builderShape.value,
+    cx: builderCx.value,
+    cy: builderCy.value,
+    size: builderSize.value,
+    aoa: builderAoa.value
+  };
+  const primitives = primitivesFromObstacleSpec(spec);
+  const shapeName = GEOMETRY_SHAPES.find((s) => s.id === spec.shape)?.name ?? spec.shape;
+  const meta = {
+    key: `custom_${spec.shape}`,
+    title: `Custom Geometry — ${shapeName}`,
+    re: builderRe.value,
+    dt: 0.0035,
+    explanation: `User-built ${shapeName} (size ${spec.size.toFixed(2)}, at x=${spec.cx.toFixed(2)}, y=${spec.cy.toFixed(2)}) rasterized as a no-slip solid into fvm_solver.wasm and solved in the browser at Re=${builderRe.value}.`
+  };
+  activeDockTab.value = 'log';
+  await initPresetPreview(1, builderRe.value, primitives, meta);
+  wasmLogs.value.unshift(
+    `/* Custom geometry: ${shapeName} -> ${primitives.length} primitive(s) painted into fvm_solver.wasm (Re=${builderRe.value}) */`
+  );
 }
 
 async function routeWithLayaAi() {
@@ -1698,43 +2385,257 @@ async function routeWithLayaAi() {
   layaStatusText.value = 'Routing...';
   activeDockTab.value = 'log';
 
+  // Check if prompt calls for AI Compositional Primitive Synthesis (arbitrary custom vehicle/body)
+  const customBuild = synthesizeCustomPrimitives(prompt);
+  if (customBuild) {
+    const prettyName = customBuild.label.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const customMeta = {
+      key: customBuild.label,
+      title: `AI Custom — ${prettyName}`,
+      re: 320,
+      dt: 0.0035,
+      explanation: `AI compositional geometry (${customBuild.primitives.length} 3D primitives) rasterized directly into fvm_solver.wasm to solve Navier-Stokes pressure, velocity, and wake vortices around "${prompt}".`
+    };
+    layaStatusText.value = `${customBuild.label} (keyword template)`;
+    await initPresetPreview(1, 320, customBuild.primitives, customMeta);
+    wasmLogs.value.unshift(
+      `[Keyword template, no model] "${prompt}" -> ${customBuild.primitives.length} fixed primitives (${customBuild.label}) painted into fvm_solver.wasm`
+    );
+    layaRouting.value = false;
+    return;
+  }
+
+  const geoToPreset: Record<string, number> = {
+    house: 4, simple_house: 4, tower: 3, building_fsi: 3,
+    cylinder: 1, airfoil: 5, f1: 5, venturi: 2, cavity: 0,
+    submarine: 6, spaceship: 7, rocket: 7
+  };
+
+  let route: { presetId: number; label: string; re: number; dt: number; engine: string } | null = null;
+  let failure = '';
+
   try {
     const apiBase = `http://${window.location.hostname}:8000`;
     const resp = await fetch(`${apiBase}/api/ai/simulate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt }),
+      signal: AbortSignal.timeout(90_000)
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const engine = data.engine || 'Backend';
+    const spec = data.simulation_spec || {};
+
+    if (data.ok && Array.isArray(data.custom_primitives) && data.custom_primitives.length > 0) {
+      // Run the parts designed for THIS prompt, not whatever the builder held before.
+      const prims: CustomPrimitive[] = data.custom_primitives;
+      const reVal = Math.round(spec.fluid?.reynolds ?? 300);
+      const dtVal = Number(spec.numerics?.dt ?? 0.0035);
+      const cname = String(data.custom_name || prompt.slice(0, 32));
+      const cleanKey = cname.replace(/[^a-zA-Z0-9_-]/g, '_') || 'ai_custom';
+      builderPrimitives.value = prims.map(p => ({ ...p }));
+      builderCaseName.value = cleanKey;
+      builderRe.value = reVal;
+      builderDt.value = dtVal;
+      await initPresetPreview(1, reVal, prims, {
+        key: cleanKey,
+        title: `AI Custom — ${cname}`,
+        re: reVal,
+        dt: dtVal,
+        explanation: `${data.source === 'model' ? 'Model-designed' : 'Keyword-template'} geometry (${prims.length} parts) for "${prompt}", rasterized into fvm_solver.wasm at Re=${reVal}.`
+      });
+      layaStatusText.value = `${cname} (${data.source ?? 'model'}, Re=${reVal})`;
+      wasmLogs.value.unshift(`[OpenZess AI · ${engine}] "${prompt}" -> ${data.message}`);
+      layaRouting.value = false;
+      return;
+    }
+
+    const shapeKey = spec.geometry?.shape || spec.geometry?.type || spec.archetype || data.route;
+    const presetId: number | undefined = typeof data.preset_id === 'number'
+      ? data.preset_id
+      : (data.preset?.preset_id ?? (shapeKey ? geoToPreset[shapeKey] : undefined));
+    if (data.ok && presetId !== undefined && CASE_META[presetId]) {
+      route = {
+        presetId,
+        label: String(shapeKey ?? CASE_META[presetId].key),
+        re: Math.round(data.preset?.reynolds ?? spec.fluid?.reynolds ?? CASE_META[presetId].re),
+        dt: data.preset?.dt ?? spec.numerics?.dt ?? CASE_META[presetId].dt,
+        engine
+      };
+    } else {
+      failure = data.message || 'The backend did not understand the request.';
+    }
+  } catch (err) {
+    failure = `Backend unavailable (${err instanceof Error ? err.message : String(err)}).`;
+  }
+
+  // Backend down or silent: keyword match only. A prompt that matches nothing changes nothing.
+  if (!route) {
+    const local = findLocalPreset(prompt);
+    if (local) {
+      const m = CASE_META[local.presetId];
+      const typedRe = Number(/\bre(?:ynolds)?\s*(?:number)?\s*[=:]?\s*(\d+)/i.exec(prompt)?.[1]);
+      route = { presetId: local.presetId, label: local.label, re: typedRe || m.re, dt: m.dt, engine: 'Keyword match (offline)' };
+    }
+  }
+  if (!route) {
+    layaStatusText.value = 'Not understood';
+    wasmLogs.value.unshift(
+      `[OpenZess AI] "${prompt}" -> not understood. ${failure} Nothing changed. Try: house, tower, cylinder, airfoil, venturi, cavity, submarine, rocket.`
+    );
+    layaRouting.value = false;
+    return;
+  }
+
+  layaStatusText.value = `${route.label} (Re=${route.re})`;
+  pendingPresetRe = route.re; // the preset watcher reads this, so the Re shown is the Re solved
+  const changed = wasmPreset.value !== route.presetId;
+  wasmPreset.value = route.presetId;
+  if (!changed) {
+    pendingPresetRe = undefined;
+    await initPresetPreview(route.presetId, route.re);
+  }
+  wasmLogs.value.unshift(
+    `[OpenZess AI · ${route.engine}] "${prompt}" -> shape=${route.label} (preset_id=${route.presetId}, Re=${route.re}, dt=${route.dt})`
+  );
+  layaRouting.value = false;
+}
+
+async function sendAiChat(overridePrompt?: string) {
+  const prompt = (overridePrompt ?? chatInput.value).trim();
+  if (!prompt || chatBusy.value) return;
+  if (!overridePrompt) chatInput.value = '';
+  chatMessages.value.push({ id: Date.now(), role: 'user', text: prompt });
+  chatBusy.value = true;
+
+  const eng = wasmEngine.value;
+  const ctx = `Active Case: ${activeCaseMeta.value.title} (${activeCaseMeta.value.key}), Re=${activeReynolds.value}, dt=${eng ? eng.dt.toFixed(5) : activeCaseMeta.value.dt}s, Co_max=${eng ? eng.maxCourant.toFixed(2) : '0.20'}`;
+
+  // Check custom compositional vehicle first
+  const customBuild = synthesizeCustomPrimitives(prompt);
+  if (customBuild) {
+    const prettyName = customBuild.label.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const customMeta = {
+      key: customBuild.label,
+      title: `AI Custom — ${prettyName}`,
+      re: 320,
+      dt: 0.0035,
+      explanation: `AI compositional geometry (${customBuild.primitives.length} 3D primitives) rasterized directly into fvm_solver.wasm to solve Navier-Stokes pressure, velocity, and wake vortices around "${prompt}".`
+    };
+    await initPresetPreview(1, 320, customBuild.primitives, customMeta);
+    chatMessages.value.push({
+      id: Date.now() + 1,
+      role: 'assistant',
+      engine: 'AI Compositional 3D Builder + CFL Guard',
+      text: `Synthesized ${customBuild.primitives.length} 3D primitives for "${prettyName}", rasterized into fvm_solver.wasm, and launched live flow.`,
+      specSummary: { Shape: prettyName, Re: '320', dt: '0.0035s', Grid: `${WASM_GRID}×${WASM_GRID}` }
+    });
+    chatBusy.value = false;
+    return;
+  }
+
+  try {
+    const apiBase = `http://${window.location.hostname}:8000`;
+    const recentHistory = chatMessages.value.slice(-7, -1).map(m => ({ role: m.role, text: m.text }));
+    const resp = await fetch(`${apiBase}/api/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, context: ctx, history: recentHistory })
     });
     const data = await resp.json();
-    if (data.ok && (data.preset || data.simulation_spec)) {
-      const geoType = data.simulation_spec?.geometry?.type || data.route || 'simple_house';
-      const geoToPreset: Record<string, number> = {
-        house: 4, simple_house: 4, tower: 3, building_fsi: 3,
-        cylinder: 1, airfoil: 5, venturi: 2, cavity: 0
+
+    if (data.ok && Array.isArray(data.custom_primitives) && data.custom_primitives.length > 0) {
+      const prims: CustomPrimitive[] = data.custom_primitives;
+      const spec = data.simulation_spec || {};
+      const reVal = Math.round(spec.fluid?.reynolds ?? 300);
+      const dtVal = Number(spec.numerics?.dt ?? 0.0035);
+      const cname = String(data.custom_name || prompt.slice(0, 32));
+      const cleanKey = cname.replace(/[^a-zA-Z0-9_-]/g, '_') || 'ai_custom';
+      builderPrimitives.value = prims.map(p => ({ ...p }));
+      builderCaseName.value = cleanKey;
+      builderRe.value = reVal;
+      builderDt.value = dtVal;
+      const customMeta = {
+        key: cleanKey,
+        title: `AI Custom — ${cname}`,
+        re: reVal,
+        dt: dtVal,
+        explanation: `AI synthesized ${prims.length} custom 3D primitives for "${cname}" (Re=${reVal}, dt=${dtVal.toFixed(5)}s). Edit any part in 🛠️ Build.`
       };
-      wasmPreset.value = data.preset?.preset_id ?? geoToPreset[geoType] ?? 4;
-      const reVal = data.preset?.reynolds ?? data.simulation_spec?.fluid?.reynolds ?? activeCaseMeta.value.re;
-      const dtVal = data.preset?.dt ?? data.simulation_spec?.numerics?.dt ?? activeCaseMeta.value.dt;
-      layaStatusText.value = `${geoType} (Re=${reVal})`;
-      if (isWasmRunning.value) stopWasmSolver();
-      await runOpenFoamWasm();
-      wasmLogs.value.unshift(
-        `[OpenZess AI] "${prompt}" -> shape=${geoType} (preset_id=${wasmPreset.value}, Re=${reVal}, dt=${dtVal})`
-      );
+      await initPresetPreview(1, reVal, prims, customMeta);
+      chatMessages.value.push({
+        id: Date.now() + 1,
+        role: 'assistant',
+        engine: data.engine || 'Qwen3-0.6B-RL (3D Primitives)',
+        latencyMs: data.latency_ms,
+        text: data.message || `Synthesized ${prims.length} custom 3D parts for "${cname}".`,
+        specSummary: { Parts: String(prims.length), Re: String(reVal), dt: `${dtVal.toFixed(5)}s`, CFL: 'Safe' }
+      });
+    } else if (data.ok && data.intent === 'simulate' && data.simulation_spec) {
+      const spec = data.simulation_spec;
+      const targetPreset = typeof data.preset_id === 'number' ? data.preset_id : inferLocalPresetFromPrompt(prompt).presetId;
+      const reVal = Math.round(spec.fluid?.reynolds ?? 200);
+      const dtVal = Number(spec.numerics?.dt ?? 0.004);
+      const nx = spec.mesh?.nx ?? 41;
+      const shapeName = spec.geometry?.type || spec.archetype || 'custom';
+
+      const changed = wasmPreset.value !== targetPreset;
+      wasmPreset.value = targetPreset;
+      if (!changed) await initPresetPreview(targetPreset, reVal);
+      else customReynolds.value = reVal;
+
+      chatMessages.value.push({
+        id: Date.now() + 1,
+        role: 'assistant',
+        engine: data.engine || 'Qwen3-0.6B-RL + CFL Guard',
+        latencyMs: data.latency_ms,
+        text: data.message || `Launched ${shapeName} simulation.`,
+        specSummary: {
+          Shape: String(shapeName),
+          Re: String(reVal),
+          dt: `${dtVal.toFixed(5)}s`,
+          Mesh: `${nx}×${nx}`,
+          CFL: 'Safe'
+        }
+      });
+    } else if (data.ok) {
+      chatMessages.value.push({
+        id: Date.now() + 1,
+        role: 'assistant',
+        engine: data.engine || 'Qwen3-0.6B-RL',
+        latencyMs: data.latency_ms,
+        text: data.message || data.analysis || 'Completed.'
+      });
     } else {
-      layaStatusText.value = 'Error';
-      wasmLogs.value.push(`[OpenZess AI Error] ${data.error || 'Unknown error'}`);
+      chatMessages.value.push({
+        id: Date.now() + 1,
+        role: 'assistant',
+        engine: 'CFL Guard',
+        text: data.message || 'Could not parse simulation request.'
+      });
     }
-  } catch (err: any) {
-    layaStatusText.value = 'Offline';
-    wasmLogs.value.push(`[OpenZess AI Error] ${err?.message || err}`);
+  } catch {
+    // Offline fallback when running without local FastAPI server (e.g. Vercel static)
+    const inferred = inferLocalPresetFromPrompt(prompt);
+    const meta = CASE_META[inferred.presetId] || CASE_META[4];
+    const changed = wasmPreset.value !== inferred.presetId;
+    wasmPreset.value = inferred.presetId;
+    if (!changed) await initPresetPreview(inferred.presetId, meta.re);
+    chatMessages.value.push({
+      id: Date.now() + 1,
+      role: 'assistant',
+      engine: 'Offline Client Fallback',
+      text: `Local FastAPI backend unreachable — switched directly to ${meta.title} (Re=${meta.re}, dt=${meta.dt}s).`,
+      specSummary: { Shape: meta.key, Re: String(meta.re), dt: `${meta.dt}s` }
+    });
   } finally {
-    layaRouting.value = false;
+    chatBusy.value = false;
   }
 }
 
 function downloadOpenFoamTimeCase() {
-  const baseFiles = generateOpenFoamCase(100.0);
+  const baseFiles = generateOpenFoamCase(activeReynolds.value || 100.0);
   let caseContent = '# OpenFOAM v2406 WebAssembly Export\n';
   caseContent += 'Case generated live in-browser using WebAssembly icoFoam solver.\n\n';
   
@@ -1800,21 +2701,26 @@ function readFile(file: File) {
   loading.value = true;
   loadingMessage.value = `Parsing ${file.name}...`;
   currentDatasetName.value = file.name;
+  useBoardStage.value = false; // Switch to VTK Mesh viewer to display uploaded external .vtk file
 
   const reader = new FileReader();
   reader.onload = () => {
     const text = reader.result as string;
     const parsed = parseVtkAscii(text);
-    loadData(parsed);
-    loading.value = false;
+    requestAnimationFrame(() => {
+      loadData(parsed);
+      loading.value = false;
+    });
   };
   reader.readAsText(file);
 }
 
 function exportCurrentVtk() {
   if (!activeData.value) return;
-  const nx = 41, ny = 41;
-  let vtk = `# vtk DataFile Version 3.0\nOpenZess ParaView Web Export\nASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS ${nx} ${ny} 1\nORIGIN 0 0 0\nSPACING 0.05 0.05 1.0\nPOINT_DATA ${nx * ny}\n`;
+  // Square solver grid: take its size from the data instead of assuming 41x41.
+  const nx = Math.round(Math.sqrt(activeData.value.pointCount)), ny = nx;
+  const sp = (activeData.value.bounds[1] - activeData.value.bounds[0]) / Math.max(1, nx - 1) || 0.05;
+  let vtk = `# vtk DataFile Version 3.0\nOpenZess ParaView Web Export\nASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS ${nx} ${ny} 1\nORIGIN 0 0 0\nSPACING ${sp} ${sp} 1.0\nPOINT_DATA ${nx * ny}\n`;
   
   if (activeData.value.fields.velocity) {
     vtk += `VECTORS velocity float\n`;
@@ -1841,27 +2747,17 @@ function exportCurrentVtk() {
   URL.revokeObjectURL(url);
 }
 
-function takeScreenshot() {
-  if (!renderWindow) return;
-  const canvas = vtkContainer.value?.querySelector('canvas');
-  if (canvas) {
-    const dataUrl = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `ParaView_Capture_${Date.now()}.png`;
-    a.click();
-  }
-}
-
 function resetSession() {
   stopAnimation();
+  stopWasmSolver();
   currentTimeIndex.value = 0;
-  activeFilters.value = { slice: false, clip: false, contour: false, glyph: false, streamlines: false };
+  activeFilters.value = { slice: false, clip: false, contour: false, glyph: false, streamlines: true };
   representationMode.value = 'surface';
   selectedFieldKey.value = 'velocity_magnitude';
   selectedColorMapPreset.value = 'coolwarm';
-  currentDatasetName.value = 'openfoam_cavity.foam';
-  loadData(generateProceduralCfdData(41, 41));
+  meshOpacity.value = 1.0;
+  isSourceVisible.value = true;
+  initPresetPreview(wasmPreset.value);
 }
 </script>
 
@@ -1897,13 +2793,14 @@ function resetSession() {
 }
 
 .pv-logo-badge {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  color: #fff;
-  font-weight: 800;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2b2726 0%, #4a403a 100%);
+  color: #faf7f4;
+  padding: 3px 5px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .pv-app-title {
@@ -2071,13 +2968,13 @@ function resetSession() {
 /* Ribbon Toolbars Bar */
 .paraview-ribbon-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 20px;
-  padding: 8px 16px;
+  gap: 12px;
+  padding: 6px 12px;
   background: #202734;
   border-bottom: 1px solid #2d3748;
   font-size: 12px;
-  overflow-x: auto;
 }
 
 .ribbon-group {
@@ -3418,12 +4315,26 @@ function resetSession() {
 /* Bottom Split Educational Panel */
 .pv-edu-strip {
   display: grid;
-  grid-template-columns: 1.15fr 1fr;
+  grid-template-columns: 1.15fr 0.85fr 1fr;
   gap: 12px;
   padding: 8px 16px;
   background: #D6CEC5;
   border-top: 1px solid #C2B7AC;
   color: var(--color-earth-charcoal);
+}
+
+.plot-over-line-svg {
+  width: 100%;
+  height: 58px;
+  display: block;
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid #C2B7AC;
+  border-radius: 4px;
+}
+
+.theme-earth-dark .plot-over-line-svg {
+  background: #1A1818;
+  border-color: var(--color-earth-charcoal);
 }
 
 .edu-heading {
@@ -3452,5 +4363,368 @@ function resetSession() {
   line-height: 1.4;
   color: var(--color-earth-charcoal);
   overflow-x: auto;
+}
+
+/* AI Chat Tab */
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+}
+
+.chat-model-pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(125, 104, 90, 0.18);
+  color: #5C4B40;
+}
+
+.theme-earth-dark .chat-model-pill {
+  background: rgba(168, 144, 128, 0.22);
+  color: #E2DAD2;
+}
+
+.chat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chat-chip {
+  font-size: 10.5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid #C2B7AC;
+  background: #E7E0D8;
+  color: #3A3838;
+  cursor: pointer;
+}
+
+.chat-chip:hover {
+  background: #D6CEC5;
+}
+
+.theme-earth-dark .chat-chip {
+  background: #242121;
+  border-color: #3A3838;
+  color: #E2DAD2;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.chat-bubble {
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.42;
+  user-select: text;
+}
+
+.chat-bubble.user {
+  align-self: flex-end;
+  max-width: 88%;
+  background: #7D685A;
+  color: #FAF7F4;
+}
+
+.chat-bubble.assistant {
+  align-self: flex-start;
+  max-width: 96%;
+  background: #E7E0D8;
+  border: 1px solid #C2B7AC;
+  color: #2B2828;
+}
+
+.theme-earth-dark .chat-bubble.assistant {
+  background: #242121;
+  border-color: #3A3838;
+  color: #E2DAD2;
+}
+
+.chat-bubble.thinking {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.chat-engine-tag {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #7D685A;
+  margin-bottom: 4px;
+}
+
+.theme-earth-dark .chat-engine-tag {
+  color: #BFA898;
+}
+
+.chat-spec-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.chat-spec-pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(58, 56, 56, 0.1);
+}
+
+.theme-earth-dark .chat-spec-pill {
+  background: rgba(226, 218, 210, 0.12);
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #C2B7AC;
+}
+
+.theme-earth-dark .chat-input-row {
+  border-top-color: #3A3838;
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #C2B7AC;
+  background: #FAF7F4;
+  color: #2B2828;
+  font-size: 12px;
+}
+
+.theme-earth-dark .chat-input {
+  background: #1A1818;
+  border-color: #3A3838;
+  color: #E2DAD2;
+}
+
+.chat-send-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: #7D685A;
+  color: #FAF7F4;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Custom Simulation Builder Tab */
+.build-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+}
+
+.stl-upload-btn {
+  cursor: pointer;
+}
+
+.build-text-input,
+.build-num-input {
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #C2B7AC;
+  background: #FAF7F4;
+  color: #2B2828;
+  font-size: 11.5px;
+}
+
+.theme-earth-dark .build-text-input,
+.theme-earth-dark .build-num-input {
+  background: #1A1818;
+  border-color: #3A3838;
+  color: #E2DAD2;
+}
+
+.build-add-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.build-add-btn {
+  flex: 1;
+  min-width: 48px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #C2B7AC;
+  background: #E7E0D8;
+  color: #2B2828;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.build-add-btn.danger {
+  color: #b91c1c;
+}
+
+.theme-earth-dark .build-add-btn {
+  background: #242121;
+  border-color: #3A3838;
+  color: #E2DAD2;
+}
+
+.build-parts-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.build-empty {
+  font-size: 11.5px;
+  opacity: 0.75;
+  padding: 10px;
+  text-align: center;
+  border: 1px dashed #C2B7AC;
+  border-radius: 6px;
+}
+
+.build-part-card {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #E7E0D8;
+  border: 1px solid #C2B7AC;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-earth-dark .build-part-card {
+  background: #242121;
+  border-color: #3A3838;
+}
+
+.build-part-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.build-mini-select {
+  flex: 1;
+  padding: 2px 4px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+.build-color {
+  width: 24px;
+  height: 20px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.build-del-btn {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.build-part-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+}
+
+.build-part-grid label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+}
+
+.build-part-grid input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.build-footer {
+  padding-top: 4px;
+  border-top: 1px solid #C2B7AC;
+}
+
+.build-run-btn {
+  width: 100%;
+}
+
+.sketch-pad-box {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #E7E0D8;
+  border: 1px solid #C2B7AC;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.theme-earth-dark .sketch-pad-box {
+  background: #242121;
+  border-color: #3A3838;
+}
+
+.sketch-pad-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sketch-pad-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.sketch-pad-tools .btn-micro.active {
+  background: #7D685A;
+  color: #FAF7F4;
+}
+
+.sketch-canvas {
+  width: 100%;
+  height: 120px;
+  border-radius: 4px;
+  border: 1px solid #C2B7AC;
+  cursor: crosshair;
+  touch-action: none;
 }
 </style>

@@ -36,3 +36,20 @@ def test_new_shapes_make_nonempty_partial_mask(shape):
     if shape == "house":  # pitched roof: top row narrower than walls
         top = np.where(mask.any(axis=0))[0].max()
         assert mask[:, top].sum() < mask[:, np.where(mask.any(axis=0))[0].min()].sum()
+
+
+@pytest.mark.parametrize("prompt,expected", [
+    ("airflow past a cylinder at Re=900", 900),
+    ("water in a pipe, reynolds number 250", 250),
+    ("a simple house", None),
+])
+def test_user_typed_reynolds_is_read(prompt, expected):
+    from backend.ai_simulate import explicit_reynolds
+    assert explicit_reynolds(prompt) == expected
+
+
+def test_user_reynolds_beats_the_models_guess():
+    from backend.ai_simulate import normalize_rl_spec
+    spec = normalize_rl_spec({"archetype": "cylinder", "reynoldsNumber": 600}, "cylinder at Re=900")["simulation_spec"]
+    assert spec["fluid"]["reynolds"] == 900
+    assert normalize_rl_spec({"archetype": "cylinder", "reynoldsNumber": 600}, "a cylinder")["simulation_spec"]["fluid"]["reynolds"] == 600

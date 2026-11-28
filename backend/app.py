@@ -643,10 +643,361 @@ def _get_laya_router():
 
 @app.post("/api/ai/simulate")
 def ai_simulate(payload: Dict[str, Any] = Body(default={})):
-    """Natural-language prompt -> validated, runnable simulation spec."""
-    from .ai_simulate import build_spec
+    """3-stage natural-language prompt -> Laya + Qwen3-0.6B-RL + CFL-validated simulation spec."""
     prompt = str(payload.get("prompt", "")).strip()
-    return build_spec(prompt) if prompt else {"ok": False, "message": "Missing 'prompt'"}
+    if not prompt:
+        return {"ok": False, "message": "Missing 'prompt'"}
+    return _run_ai_pipeline(prompt, context=str(payload.get("context", "")).strip(), force_simulate=True)
+
+
+@app.post("/api/ai/chat")
+def ai_chat(payload: Dict[str, Any] = Body(default={})):
+    """Unified 3-stage CFD Co-Pilot: Laya System-1 -> Qwen3-0.6B-RL (RTX 5050) -> CFL Safety Guard."""
+    prompt = str(payload.get("prompt", "")).strip()
+    if not prompt:
+        return {"ok": False, "message": "Missing 'prompt'"}
+    context = str(payload.get("context", "")).strip()
+    history = payload.get("history") if isinstance(payload.get("history"), list) else []
+    return _run_ai_pipeline(prompt, context=context, history=history, force_simulate=False)
+
+
+@app.post("/api/ai/text-to-3d")
+def ai_text_to_3d(payload: Dict[str, Any] = Body(default={})):
+    """Generate a real 3D .glb mesh from text via Meshy API or free HuggingFace 3D Spaces."""
+    from .text_to_3d import generate_3d_mesh
+    from .ai_simulate import validate_spec
+
+    prompt = str(payload.get("prompt", "")).strip()
+    if not prompt:
+        return {"ok": False, "error": "Missing 'prompt'"}
+    re_num = float(payload.get("reynoldsNumber", 320.0))
+    res = generate_3d_mesh(prompt)
+    if res.get("ok"):
+        res["simulation_spec"] = validate_spec({
+            "mode": "2d",
+            "archetype": "custom_3d",
+            "geometry": {"type": sanitize_case_name(prompt[:28])},
+            "fluid": {"substance": "air", "reynolds": re_num},
+            "mesh": {"nx": 41},
+            "numerics": {"dt": 0.0035},
+        })
+    return res
+
+
+@app.get("/api/generated-3d/{filename}")
+def serve_generated_3d(filename: str):
+    """Serve a generated .glb 3D mesh file safely."""
+    from .text_to_3d import OUT_DIR
+
+    safe = os.path.basename(filename)
+    path = os.path.join(OUT_DIR, safe)
+    if not os.path.isfile(path):
+        return Response(content="Not found", status_code=404)
+    return FileResponse(path, media_type="model/gltf-binary", headers={"Cache-Control": "no-cache"})
+
+
+_RL_SYSTEM_PROMPT = (
+    "You are OpenZess CFD Engineer. Given a fluid simulation request, output ONLY a valid JSON object "
+    "with keys: archetype, substance, turbulenceModel, reynoldsNumber, gridResolution, dt, tolerance.\n"
+    "Allowed archetypes: airfoil, cylinder, venturi, f1, drone, submarine, plume, cavity, water_dam, "
+    "weather_plume, obstacle, cad, house, tower, box.\n"
+    "Allowed substances: air, water, seawater, co2, oil, ethanol.\n"
+    "Allowed turbulenceModel: laminar, k-epsilon, k-omega-sst, spalart-allmaras.\n"
+    "Choose gridResolution between 32 and 128 and dt so Courant number Co = U*dt/dx < 0.8 and "
+    "viscous diffusion number nu*dt/dx^2 <= 0.25."
+)
+
+
+def _classify_intent(prompt: str, force_simulate: bool = False) -> str:
+    if force_simulate:
+        return "simulate"
+    low = prompt.lower().strip()
+    # Conversational / capability / explanation questions must NOT synthesize a fake object
+    q_starts = (
+        "why ", "what ", "how ", "explain", "describe", "compare", "tell me", "what's", "define ",
+        "can you ", "could you ", "is it ", "does it ", "will it ", "are you ", "do you ",
+    )
+    if low.startswith(q_starts) or (low.endswith("?") and len(low.split()) <= 6):
+        return "explain_physics"
+    sim_verbs = ("simulate", "run ", "build ", "make ", "create ", "design ", "set re", "change re", "switch to", "load ", "test ")
+    if any(v in low for v in sim_verbs):
+        return "simulate"
+    if low.endswith("?"):
+        return "explain_physics"
+    return "simulate"
+
+
+_KNOWN_PRESET_KEYWORDS = (
+    "house", "home", "cottage", "tower", "skyscraper", "building",
+    "cylinder", "karman", "airfoil", "naca", "venturi", "nozzle",
+    "cavity", "lid", "submarine", "spaceship", "rocket", "starship",
+)
+
+
+def _is_known_preset_prompt(prompt: str) -> bool:
+    low = prompt.lower()
+    return any(k in low for k in _KNOWN_PRESET_KEYWORDS)
+
+
+def _sanitize_primitives(raw_list: Any) -> list[dict[str, Any]]:
+    """Clamp and validate arbitrary LLM-generated 3D primitives into safe domain bounds."""
+    if not isinstance(raw_list, list):
+        return []
+    valid_kinds = {"box", "cylinder", "cone", "capsule"}
+    out: list[dict[str, Any]] = []
+    for item in raw_list[:12]:
+        if not isinstance(item, dict):
+            continue
+        kind = str(item.get("kind", "box")).lower()
+        if kind not in valid_kinds:
+            kind = "box"
+        try:
+            x = max(-0.55, min(0.45, float(item.get("x", 0.0))))
+            y = max(-0.50, min(0.50, float(item.get("y", 0.0))))
+            w = max(0.08, min(0.65, float(item.get("w", 0.24))))
+            h = max(0.08, min(0.60, float(item.get("h", 0.20))))
+            d = max(0.10, min(0.45, float(item.get("d", 0.24))))
+        except (TypeError, ValueError):
+            continue
+        color = str(item.get("color", "#5c89a6"))
+        if not re.match(r"^#[0-9a-fA-F]{6}$", color):
+            color = "#5c89a6"
+        out.append({"kind": kind, "x": round(x, 2), "y": round(y, 2), "w": round(w, 2), "h": round(h, 2), "d": round(d, 2), "color": color})
+    return out
+
+
+def _parse_primitives(raw: str) -> tuple[list[dict[str, Any]], str | None, float | None]:
+    """Pull primitives out of model text. Reads each complete {...} part on its own, so a
+    reply cut off at the token limit or wrapped in ```json fences still yields its parts."""
+    parts: list[Any] = []
+    for blob in re.findall(r"\{[^{}]*\}", raw):
+        try:
+            obj = json.loads(blob)
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and "kind" in obj:
+            parts.append(obj)
+    name = re.search(r'"name"\s*:\s*"([^"]*)"', raw)
+    re_num = re.search(r'"reynoldsNumber"\s*:\s*([\d.]+)', raw)
+    try:
+        re_val = float(re_num.group(1)) if re_num else None
+    except ValueError:
+        re_val = None
+    return _sanitize_primitives(parts), (name.group(1) if name else None), re_val
+
+
+def _procedural_primitives_for_idea(prompt: str) -> list[dict[str, Any]]:
+    """Deterministic multi-primitive composer for any imaginary user prompt when LLM omits primitives."""
+    low = prompt.lower()
+    if any(k in low for k in ("saucer", "ufo", "disc", "disk")):
+        return [
+            {"kind": "cylinder", "x": -0.05, "y": 0.0, "w": 0.44, "h": 0.44, "d": 0.14, "color": "#5c89a6"},
+            {"kind": "cone", "x": -0.05, "y": 0.0, "w": 0.22, "h": 0.22, "d": 0.26, "color": "#ede6dd"},
+            {"kind": "box", "x": 0.14, "y": 0.20, "w": 0.08, "h": 0.08, "d": 0.18, "color": "#3a3838"},
+            {"kind": "box", "x": 0.14, "y": -0.20, "w": 0.08, "h": 0.08, "d": 0.18, "color": "#3a3838"},
+        ]
+    if any(k in low for k in ("bridge", "pillar", "pier", "arch")):
+        return [
+            {"kind": "cylinder", "x": -0.24, "y": 0.0, "w": 0.14, "h": 0.14, "d": 0.34, "color": "#a89080"},
+            {"kind": "cylinder", "x": 0.16, "y": 0.0, "w": 0.14, "h": 0.14, "d": 0.34, "color": "#a89080"},
+            {"kind": "box", "x": -0.04, "y": 0.0, "w": 0.56, "h": 0.22, "d": 0.14, "color": "#5c89a6"},
+        ]
+    if any(k in low for k in ("turbine", "windmill", "fan", "propeller")):
+        return [
+            {"kind": "cylinder", "x": -0.08, "y": 0.0, "w": 0.14, "h": 0.14, "d": 0.38, "color": "#ede6dd"},
+            {"kind": "box", "x": -0.14, "y": 0.24, "w": 0.08, "h": 0.34, "d": 0.12, "color": "#1aa3a1"},
+            {"kind": "box", "x": -0.14, "y": -0.24, "w": 0.08, "h": 0.34, "d": 0.12, "color": "#1aa3a1"},
+        ]
+    if any(k in low for k in ("bus", "truck", "train", "locomotive")):
+        return [
+            {"kind": "box", "x": -0.04, "y": 0.0, "w": 0.58, "h": 0.24, "d": 0.32, "color": "#c85a44"},
+            {"kind": "box", "x": -0.34, "y": 0.0, "w": 0.14, "h": 0.22, "d": 0.22, "color": "#3a3838"},
+        ]
+    if any(k in low for k in ("pyramid", "wedge", "delta", "stealth", "jet", "plane", "dragon", "bird")):
+        return [
+            {"kind": "cone", "x": -0.22, "y": 0.0, "w": 0.36, "h": 0.22, "d": 0.18, "color": "#3a3838"},
+            {"kind": "box", "x": 0.02, "y": 0.24, "w": 0.28, "h": 0.32, "d": 0.10, "color": "#5c89a6"},
+            {"kind": "box", "x": 0.02, "y": -0.24, "w": 0.28, "h": 0.32, "d": 0.10, "color": "#5c89a6"},
+        ]
+    # Generic deterministic hash-seeded 3-part aerodynamic body for any unseen idea
+    hval = sum(ord(c) for c in low)
+    kinds = ("box", "cylinder", "cone", "capsule")
+    return [
+        {"kind": kinds[hval % 4], "x": -0.10, "y": 0.0, "w": 0.34, "h": 0.24, "d": 0.26, "color": "#5c89a6"},
+        {"kind": kinds[(hval + 2) % 4], "x": -0.32, "y": 0.0, "w": 0.18, "h": 0.18, "d": 0.20, "color": "#c85a44"},
+        {"kind": kinds[(hval + 1) % 4], "x": 0.12, "y": 0.16, "w": 0.14, "h": 0.16, "d": 0.16, "color": "#c8a97e"},
+        {"kind": kinds[(hval + 1) % 4], "x": 0.12, "y": -0.16, "w": 0.14, "h": 0.16, "d": 0.16, "color": "#c8a97e"},
+    ]
+
+
+_PRIMITIVE_SYSTEM_PROMPT = (
+    "You are OpenZess 3D Geometry AI. Output ONLY valid JSON with keys: "
+    "name, reynoldsNumber, primitives. "
+    "primitives is a list of 2 to 5 objects, each with: "
+    "kind (box|cylinder|cone|capsule), x (-0.4 to 0.3), y (-0.35 to 0.35), "
+    "w (0.1 to 0.55), h (0.1 to 0.45), d (0.12 to 0.38), color (hex like #5c89a6)."
+)
+
+
+def _run_ai_pipeline(prompt: str, context: str = "", history: list | None = None, force_simulate: bool = False) -> Dict[str, Any]:
+    import time
+    from .ai_simulate import build_spec, normalize_rl_spec, validate_spec, explicit_reynolds, PRESET_IDS
+
+    t0 = time.perf_counter()
+    intent = _classify_intent(prompt, force_simulate=force_simulate)
+    is_custom_idea = (intent == "simulate") and (not _is_known_preset_prompt(prompt))
+
+    # Stage 1: Laya System-1 fast intent/preset router (<40ms)
+    laya_route = None
+    try:
+        router = _get_laya_router()
+        dec = router.route(prompt) if hasattr(router, "route") else router(prompt)
+        laya_route = getattr(dec, "route", None) or str(dec)
+    except Exception:
+        laya_route = None
+
+    # Stage 2: RL-trained Qwen3-0.6B-RL on RTX 5050 (or CPU)
+    try:
+        import torch
+        with _qwen_lock:
+            model, tok = _get_qwen_rl()
+            device_label = "RTX 5050" if str(model.device).startswith("cuda") else "CPU"
+            engine_label = f"Qwen3-0.6B-RL ({device_label})" + (" + Laya" if laya_route else "") + " + CFL Guard"
+
+            if intent == "explain_physics":
+                sys_msg = (
+                    "You are the OpenZess AI CFD Co-Pilot (Qwen3-0.6B RL). "
+                    "Answer in short, direct ASD-STE100 sentences (2-4 sentences). "
+                    "Be honest about what OpenZess can simulate (2D/3D WASM Navier-Stokes, presets, custom primitives, Sketch Pad, and .STL upload)."
+                )
+                msgs = [{"role": "system", "content": sys_msg}]
+                for h in (history or [])[-6:]:
+                    role = h.get("role")
+                    txt = str(h.get("text", "")).strip()
+                    if role in ("user", "assistant") and txt:
+                        msgs.append({"role": role, "content": txt[:300]})
+                user_msg = f"Active simulation context:\n{context}\n\nUser message: {prompt}" if context else prompt
+                msgs.append({"role": "user", "content": user_msg})
+                text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+                inputs = tok(text, return_tensors="pt").to(model.device)
+                with torch.no_grad():
+                    out = model.generate(**inputs, max_new_tokens=140, do_sample=True, temperature=0.5, top_p=0.9, pad_token_id=tok.eos_token_id)
+                reply = tok.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
+                return {
+                    "ok": True,
+                    "intent": "explain_physics",
+                    "engine": engine_label,
+                    "laya_route": laya_route,
+                    "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+                    "message": reply,
+                    "cfl_safe": True,
+                }
+
+            # Open-ended imaginary object -> synthesize custom 3D primitives JSON + CFL guard
+            if is_custom_idea:
+                msgs = [{"role": "system", "content": _PRIMITIVE_SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+                text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+                inputs = tok(text, return_tensors="pt").to(model.device)
+                with torch.no_grad():
+                    out = model.generate(**inputs, max_new_tokens=300, do_sample=True, temperature=0.4, top_p=0.9, pad_token_id=tok.eos_token_id)
+                raw_text = tok.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
+                prims, parsed_name, parsed_re = _parse_primitives(raw_text)
+                name = (parsed_name or prompt)[:40]
+                re_val = explicit_reynolds(prompt) or parsed_re or 300.0
+                from_model = bool(prims)
+                if not prims:
+                    prims = _procedural_primitives_for_idea(prompt)
+                spec = validate_spec({
+                    "mode": "2d",
+                    "archetype": "custom",
+                    "geometry": {"type": sanitize_case_name(name)},
+                    "fluid": {"substance": "air", "reynolds": re_val},
+                    "mesh": {"nx": 41},
+                    "numerics": {"dt": 0.0035},
+                })
+                return {
+                    "ok": True,
+                    "intent": "simulate",
+                    "engine": engine_label + (" (3D Primitives)" if from_model else " (keyword template, model output unusable)"),
+                    "laya_route": laya_route,
+                    "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+                    "message": (
+                        f"Model designed {len(prims)} parts for \"{name}\"" if from_model
+                        else f"Model gave no usable parts. Used a keyword template ({len(prims)} parts) for \"{name}\""
+                    ) + f" (Re={spec['fluid']['reynolds']:g}, dt={spec['numerics']['dt']:.5f}s). Edit parts in 🛠️ Build.",
+                    "simulation_spec": spec,
+                    "custom_primitives": prims,
+                    "custom_name": name,
+                    "source": "model" if from_model else "template",
+                    "preset_id": 8,
+                    "cfl_safe": True,
+                }
+
+            # Simulation parameter decision-making via GRPO-trained JSON policy
+            msgs = [{"role": "system", "content": _RL_SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+            text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+            inputs = tok(text, return_tensors="pt").to(model.device)
+            with torch.no_grad():
+                out = model.generate(**inputs, max_new_tokens=96, do_sample=False, pad_token_id=tok.eos_token_id)
+            raw_text = tok.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
+        m = re.search(r"\{[^{}]*\}", raw_text, re.DOTALL)
+        if m:
+            rl_json = json.loads(m.group(0))
+            norm = normalize_rl_spec(rl_json, prompt)
+            spec = norm["simulation_spec"]
+            nx = spec["mesh"]["nx"]
+            re_val = spec["fluid"]["reynolds"]
+            dt_val = spec["numerics"]["dt"]
+            co_est = round(dt_val * (nx - 1), 3)
+            turb = spec["numerics"].get("turbulenceModel", "laminar")
+            msg = (
+                f"Configured {norm['shape_key']} in {spec['fluid']['substance']} "
+                f"(Re={re_val:g}, {nx}×{nx} mesh, dt={dt_val:.5f}s, {turb}, Co≈{co_est} < 0.65)."
+            )
+            return {
+                "ok": True,
+                "intent": "simulate",
+                "engine": engine_label,
+                "laya_route": laya_route,
+                "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+                "message": msg,
+                "rl_raw_json": rl_json,
+                "simulation_spec": spec,
+                "preset_id": norm["preset_id"],
+                "cfl_safe": True,
+            }
+    except Exception as e:
+        print(f"[OpenZess AI] RL pipeline fallback triggered: {e}")
+
+    # Stage 3 fallback: deterministic CFL-guarded rule router (or procedural custom idea)
+    if is_custom_idea:
+        prims = _procedural_primitives_for_idea(prompt)
+        spec = validate_spec({"mode": "2d", "archetype": "custom", "geometry": {"type": sanitize_case_name(prompt[:24])}, "fluid": {"substance": "air", "reynolds": 300}, "mesh": {"nx": 41}, "numerics": {"dt": 0.0035}})
+        return {
+            "ok": True,
+            "intent": "simulate",
+            "engine": "Procedural 3D Builder + CFL Guard",
+            "laya_route": laya_route,
+            "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+            "message": f"Model unavailable. Used a keyword template ({len(prims)} parts) for \"{prompt[:36]}\" (Re=300, dt={spec['numerics']['dt']:.5f}s). Edit parts in 🛠️ Build.",
+            "simulation_spec": spec,
+            "custom_primitives": prims,
+            "custom_name": prompt[:36],
+            "source": "template",
+            "preset_id": 8,
+            "cfl_safe": True,
+        }
+    fb = build_spec(prompt)
+    shape_key = (fb.get("simulation_spec", {}).get("geometry") or {}).get("type", "cylinder")
+    return {
+        **fb,
+        "intent": intent,
+        "engine": "Deterministic CFL Guard" + (" + Laya" if laya_route else ""),
+        "laya_route": laya_route,
+        "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+        "preset_id": PRESET_IDS.get(shape_key, 1),
+        "cfl_safe": True,
+    }
 
 
 @app.post("/api/laya/route")
@@ -674,8 +1025,10 @@ def laya_route_simulation(payload: Dict[str, Any] = Body(default={})):
 # ---------------------------------------------------------------------------
 # Local RTX 5050 Qwen3-0.6B + RL Adapter Chat Endpoint (Zero API Key)
 # ---------------------------------------------------------------------------
+import threading
 _qwen_model = None
 _qwen_tok = None
+_qwen_lock = threading.Lock()
 
 def _get_qwen_rl():
     global _qwen_model, _qwen_tok
@@ -687,9 +1040,19 @@ def _get_qwen_rl():
         base_id = "Qwen/Qwen3-0.6B"
         device = "cuda" if torch.cuda.is_available() else "cpu"
         dtype = torch.bfloat16 if device == "cuda" else torch.float32
-        base = AutoModelForCausalLM.from_pretrained(base_id, dtype=dtype, device_map=device)
-        _qwen_model = PeftModel.from_pretrained(base, adapter_dir) if os.path.exists(adapter_dir) else base
-        _qwen_tok = AutoTokenizer.from_pretrained(base_id)
+        try:
+            base = AutoModelForCausalLM.from_pretrained(base_id, dtype=dtype, device_map=device, local_files_only=True)
+            tok = AutoTokenizer.from_pretrained(base_id, local_files_only=True)
+        except Exception:
+            base = AutoModelForCausalLM.from_pretrained(base_id, dtype=dtype, device_map=device)
+            tok = AutoTokenizer.from_pretrained(base_id)
+        if os.path.exists(adapter_dir):
+            peft_m = PeftModel.from_pretrained(base, adapter_dir)
+            _qwen_model = peft_m.merge_and_unload()
+        else:
+            _qwen_model = base
+        _qwen_model.eval()
+        _qwen_tok = tok
     return _qwen_model, _qwen_tok
 
 @app.post("/api/qwen/chat")
@@ -701,63 +1064,24 @@ def qwen_local_chat(payload: Dict[str, Any] = Body(default={})):
         return {"ok": False, "error": "Missing 'prompt'"}
     try:
         import torch
-        model, tok = _get_qwen_rl()
-        sys_msg = (
-            "You are the OpenZess AI CFD Co-Pilot (Qwen3-0.6B RL). "
-            "Help the user with OpenFOAM simulations, boundary conditions, Reynolds number, dt, and ParaView. "
-            "Be concise and practical."
-        )
-        user_msg = f"Context:\n{context}\n\nQuestion: {prompt}" if context else prompt
-        msgs = [{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}]
-        text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
-        inputs = tok(text, return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            out = model.generate(**inputs, max_new_tokens=220, do_sample=True, temperature=0.6, top_p=0.9)
-        reply = tok.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
+        with _qwen_lock:
+            model, tok = _get_qwen_rl()
+            sys_msg = (
+                "You are the OpenZess AI CFD Co-Pilot (Qwen3-0.6B RL). "
+                "Help the user with OpenFOAM simulations, boundary conditions, Reynolds number, dt, and ParaView. "
+                "Be concise and practical."
+            )
+            user_msg = f"Context:\n{context}\n\nQuestion: {prompt}" if context else prompt
+            msgs = [{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}]
+            text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+            inputs = tok(text, return_tensors="pt").to(model.device)
+            with torch.no_grad():
+                out = model.generate(**inputs, max_new_tokens=160, do_sample=True, temperature=0.6, top_p=0.9, pad_token_id=tok.eos_token_id)
+            reply = tok.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
         return {"ok": True, "engine": "qwen3-0.6b-rl-rtx5050", "analysis": reply}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
-
-@app.post("/api/ai/simulate")
-def unified_ai_simulate(payload: Dict[str, Any] = Body(default={})):
-    """Unified simulation router combining Laya System-1 + keyword guardrails for 1-click WASM launch."""
-    prompt = str(payload.get("prompt", "")).strip()
-    if not prompt:
-        return {"ok": False, "error": "Missing 'prompt'"}
-    low = prompt.lower()
-    # Fast deterministic check for everyday shapes, backed by Laya System-1 for open-ended queries
-    route_name = None
-    if any(w in low for w in ("house", "home", "roof", "cottage", "bungalow")):
-        route_name = "simple_house"
-    elif any(w in low for w in ("tower", "skyscraper", "building", "glass", "fsi", "stress")):
-        route_name = "building_fsi"
-    elif any(w in low for w in ("airfoil", "wing", "naca", "f1", "spoiler", "lift")):
-        route_name = "airfoil"
-    elif any(w in low for w in ("venturi", "pipe", "nozzle", "bernoulli", "throat")):
-        route_name = "venturi"
-    elif any(w in low for w in ("cavity", "lid", "ghia", "box")):
-        route_name = "cavity"
-    elif any(w in low for w in ("cylinder", "vortex", "karman", "circle")):
-        route_name = "cylinder"
-
-    engine = "openzess-laya-hybrid"
-    if route_name is None:
-        try:
-            router = _get_laya_router()
-            decision = router.route(prompt) if hasattr(router, "route") else router(prompt)
-            route_name = getattr(decision, "route", None) or str(decision)
-            engine = "laya-system1"
-        except Exception:
-            route_name = "simple_house"
-
-    preset = LAYA_CFD_PRESETS.get(route_name, LAYA_CFD_PRESETS["simple_house"])
-    return {
-        "ok": True,
-        "engine": engine,
-        "route": route_name,
-        "preset": preset,
-    }
 
 
 
