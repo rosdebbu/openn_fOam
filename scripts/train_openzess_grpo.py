@@ -71,6 +71,15 @@ SFT_TEMPLATES = [
     ("Formula 1 front wing", "f1", "air", 1200), ("submarine hull in seawater", "submarine", "water", 800),
 ]
 
+# Honest refusal targets so Qwen3-0.6B learns to say "cannot simulate" on unsupported physics or non-CFD input
+REFUSAL_TEMPLATES = [
+    ("tell me a joke", "Not a CFD simulation request."),
+    ("qwerty zzz", "Unrecognized object or fluid prompt."),
+    ("supersonic Mach 3 shockwave", "OpenZess only solves subsonic incompressible Navier-Stokes."),
+    ("jet engine combustion flame", "OpenZess does not solve reacting combustion chemistry."),
+    ("electromagnetic plasma field", "OpenZess only solves incompressible fluid dynamics."),
+]
+
 
 def safe_dt(n: int, re_num: float) -> float:
     dx = 1.0 / (n - 1)
@@ -91,6 +100,8 @@ def build_sft_pairs(copies: int = 40, seed: int = 0) -> list[tuple[str, str]]:
                 "archetype": arch, "substance": sub, "turbulenceModel": "laminar" if re_j < 500 else "k-omega-sst",
                 "reynoldsNumber": re_j, "gridResolution": n, "dt": safe_dt(n, re_j), "tolerance": "1e-06",
             })))
+        for bad_prompt, reason in REFUSAL_TEMPLATES:
+            pairs.append((bad_prompt, json.dumps({"error": "unsupported", "reason": reason})))
     return pairs
 
 
