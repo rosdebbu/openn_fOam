@@ -50,7 +50,7 @@ Also changed: `graphify-out/*` (auto-generated knowledge graph; safe to ignore o
 | Python packages | `requirements.txt` + `requirements-dev.txt` | fastapi, uvicorn, numpy, scipy, matplotlib, websockets, pytest, httpx2 |
 | **For the AI model (optional)** | | `torch`, `transformers`, `peft` — NOT in `requirements.txt`; install by hand |
 | Base model | `Qwen/Qwen3-0.6B` (Hugging Face) | auto-downloads on first run (about 1.2 GB). |
-| RL adapter | folder `openzess_qwen3_0.6b_rl/` | The backend loads THIS folder (`backend/app.py` `_get_qwen_rl`). It is git-ignored, so it is NOT in the branch. The folder `openzess_qwen3_0.6b_rl_sft/` (in the branch) is the older SFT warm-up. Code does not use it. If the RL folder is missing, the backend uses the plain base model (no training). Get the 6 top-level files (about 50 MB) from the first laptop. Do not copy the `checkpoint-*` folders (about 500 MB). |
+| RL adapter | folder `openzess_qwen3_0.6b_rl/` | The backend loads THIS folder (`backend/app.py` `_get_qwen_rl`). The folder is git-ignored, but the 6 top-level files (about 50 MB: adapter, tokenizer, config) were force-added to this branch. The `checkpoint-*` folders (about 500 MB) and `training_args.bin` were NOT added. The folder `openzess_qwen3_0.6b_rl_sft/` is the older SFT warm-up. Code does not use it. If the RL folder is missing, the backend uses the plain base model (no training). |
 | GPU | optional | Code mentions an RTX 5050. CPU works but is slow. |
 | Editor / agent | VS Code or Claude Code | |
 
@@ -76,7 +76,8 @@ Windows tip: do NOT keep the repo inside OneDrive. OneDrive locks files in `node
 ## 3b. What is NOT in this branch (git-ignored on purpose)
 | Item | Size | Action on new laptop |
 |---|---|---|
-| `openzess_qwen3_0.6b_rl/` (RL adapter + checkpoints) | 557 MB | Copy the top-level files only (see section 3). Needed for the real AI mode. |
+| `openzess_qwen3_0.6b_rl/checkpoint-*` and `training_args.bin` | about 500 MB | Not needed to run. The final adapter and tokenizer ARE in the branch (force-added). Ask the first laptop owner if you need the checkpoints. |
+| Base model `Qwen/Qwen3-0.6B` (about 1.2 GB) | 1.2 GB | Not in git (too big). It downloads from Hugging Face on first run. To pre-download: `python -c "from huggingface_hub import snapshot_download as d; d('Qwen/Qwen3-0.6B')"` |
 | 62 report PDFs (root and `docs/`) | — | Removed from git on purpose (commit `2f148df`). Get them from the owners. |
 | `frontend/node_modules`, `frontend/dist` | 175 MB, 2 MB | Run `npm ci` and `npm run build`. |
 | `graphify-out/<date>/`, `graphify-out/cache/`, `scratch/`, `experiments/output/`, `wasm-solver/target/`, `__pycache__`, `.pytest_cache` | small | Regenerated. Ignore. |
