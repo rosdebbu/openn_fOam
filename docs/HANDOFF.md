@@ -49,7 +49,8 @@ Also changed: `graphify-out/*` (auto-generated knowledge graph; safe to ignore o
 | Python | 3.12 (3.12.10) | |
 | Python packages | `requirements.txt` + `requirements-dev.txt` | fastapi, uvicorn, numpy, scipy, matplotlib, websockets, pytest, httpx2 |
 | **For the AI model (optional)** | | `torch`, `transformers`, `peft` — NOT in `requirements.txt`; install by hand |
-| Base model | `Qwen/Qwen3-0.6B` (Hugging Face) | auto-downloads on first run (about 1.2 GB). The LoRA adapter is in `openzess_qwen3_0.6b_rl_sft/` in this repo. |
+| Base model | `Qwen/Qwen3-0.6B` (Hugging Face) | auto-downloads on first run (about 1.2 GB). |
+| RL adapter | folder `openzess_qwen3_0.6b_rl/` | The backend loads THIS folder (`backend/app.py` `_get_qwen_rl`). It is git-ignored, so it is NOT in the branch. The folder `openzess_qwen3_0.6b_rl_sft/` (in the branch) is the older SFT warm-up. Code does not use it. If the RL folder is missing, the backend uses the plain base model (no training). Get the 6 top-level files (about 50 MB) from the first laptop. Do not copy the `checkpoint-*` folders (about 500 MB). |
 | GPU | optional | Code mentions an RTX 5050. CPU works but is slow. |
 | Editor / agent | VS Code or Claude Code | |
 
@@ -71,6 +72,24 @@ npm ci
 ```
 
 Windows tip: do NOT keep the repo inside OneDrive. OneDrive locks files in `node_modules` and causes `EPERM` errors on `npm ci` (this is what damaged the first laptop). Use a path such as `C:\dev\openn_fOam`.
+
+## 3b. What is NOT in this branch (git-ignored on purpose)
+| Item | Size | Action on new laptop |
+|---|---|---|
+| `openzess_qwen3_0.6b_rl/` (RL adapter + checkpoints) | 557 MB | Copy the top-level files only (see section 3). Needed for the real AI mode. |
+| 62 report PDFs (root and `docs/`) | — | Removed from git on purpose (commit `2f148df`). Get them from the owners. |
+| `frontend/node_modules`, `frontend/dist` | 175 MB, 2 MB | Run `npm ci` and `npm run build`. |
+| `graphify-out/<date>/`, `graphify-out/cache/`, `scratch/`, `experiments/output/`, `wasm-solver/target/`, `__pycache__`, `.pytest_cache` | small | Regenerated. Ignore. |
+| `.kilo/` | 0 | Only a `.gitignore`. Ignore. |
+| `.env` files | — | None exist. Nothing secret was left out. |
+| Antigravity / Claude chat history | — | Lives on the first laptop only (`C:\Users\<user>\.gemini\antigravity`). Not part of git. |
+
+Hidden files that ARE in the branch: `.gitignore`, `.gitattributes`, `.github/workflows/ci.yml`, `.vscode/*`, `.agents/*`, `.claude/launch.json`, `graphify-out/.graphify_*`, `rust-sidecar/.cargo/*`. The branch has 2,386 tracked files.
+
+Source of the `fvm_*` WASM functions (`fvm_init`, `fvm_step`) is NOT in `wasm-solver/`. That folder holds an older C file with `wasm_step_piso`, `fea_structure.cpp`, and `src/lib.rs`. Only the compiled `frontend/public/wasm/fvm_solver.wasm` has `fvm_step`.
+
+## 3c. Planned work (from `feature/openzess-studio-v2`, docs/handbook/04_PENDING_ROADMAP_AND_TODO.md — dated Oct 2026, may be old)
+k-epsilon turbulence (Task 2.1), 3-D STL ingestion and voxel mask (2.2), wire the Save/Load buttons to `projectStore.ts` (2.5), two-phase VOF free surface (3.1), snappyHexMesh live generation.
 
 ## 4. The `node_modules` problem on the first laptop
 `frontend/node_modules` is half-deleted after a failed `npm ci` (EPERM on `@rolldown/binding-win32-x64-msvc`). A Vite process (PID 40540) held the lock. Fix there: stop Vite, delete `frontend\node_modules`, run `npm ci`. On a new laptop this does not apply.
