@@ -712,19 +712,48 @@ def _classify_intent(prompt: str, force_simulate: bool = False) -> str:
     if force_simulate:
         return "simulate"
     low = prompt.lower().strip()
-    # Conversational / capability / explanation questions must NOT synthesize a fake object
+    # Any question or capability inquiry must route to honest conversational chat, never fake 3D parts
     q_starts = (
         "why ", "what ", "how ", "explain", "describe", "compare", "tell me", "what's", "define ",
-        "can you ", "could you ", "is it ", "does it ", "will it ", "are you ", "do you ",
+        "can you ", "can it ", "could you ", "is it ", "does it ", "will it ", "are you ", "do you ",
     )
-    if low.startswith(q_starts) or (low.endswith("?") and len(low.split()) <= 6):
+    q_phrases = ("possible", "posible", "able to", "can you", "can it", "does it", "is it possible")
+    if low.endswith("?") or low.startswith(q_starts) or any(p in low for p in q_phrases):
         return "explain_physics"
     sim_verbs = ("simulate", "run ", "build ", "make ", "create ", "design ", "set re", "change re", "switch to", "load ", "test ")
     if any(v in low for v in sim_verbs):
         return "simulate"
-    if low.endswith("?"):
-        return "explain_physics"
     return "simulate"
+
+
+_UNSUPPORTED_PHYSICS_WORDS = (
+    "supersonic", "hypersonic", "mach ", "combustion", "flame", "explosion",
+    "plasma", "electromagnetic", "quantum", "chemical reaction", "joke", "poem", "recipe",
+)
+
+
+def _refusal_reason(prompt: str) -> str | None:
+    """Return an honest refusal string if the prompt is unsupported physics or gibberish."""
+    low = prompt.lower().strip()
+    for bad in _UNSUPPORTED_PHYSICS_WORDS:
+        if bad in low:
+            return (
+                f"No — OpenZess cannot simulate '{bad.strip()}' yet. "
+                "It only runs 2D/quasi-3D incompressible Navier-Stokes (subsonic air, water, oil) in browser WASM."
+            )
+    # Reject gibberish / keyboard mashing (no vowels, keyboard runs, or mostly nonsense short tokens)
+    if any(mash in low for mash in ("qwerty", "asdf", "zxcv", "hjkl", "zzz")):
+        return (
+            "No — I cannot build a simulation from that text. "
+            "Try a physical object or flow case (example: 'cylinder at Re=400', '20m glass tower', or 'stone bridge')."
+        )
+    words = re.findall(r"[a-zA-Z]+", low)
+    if not words or (len(words) <= 3 and all(not re.search(r"[aeiouy]", w) or len(w) <= 2 for w in words)):
+        return (
+            "No — I cannot build a simulation from that text. "
+            "Try a physical object or flow case (example: 'cylinder at Re=400', '20m glass tower', or 'stone bridge')."
+        )
+    return None
 
 
 _KNOWN_PRESET_KEYWORDS = (
@@ -845,6 +874,17 @@ def _run_ai_pipeline(prompt: str, context: str = "", history: list | None = None
 
     t0 = time.perf_counter()
     intent = _classify_intent(prompt, force_simulate=force_simulate)
+    if intent == "simulate":
+        refusal = _refusal_reason(prompt)
+        if refusal:
+            return {
+                "ok": False,
+                "intent": "refuse",
+                "engine": "OpenZess Honesty & CFL Guard",
+                "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+                "message": refusal,
+                "cfl_safe": True,
+            }
     is_custom_idea = (intent == "simulate") and (not _is_known_preset_prompt(prompt))
 
     # Stage 1: Laya System-1 fast intent/preset router (<40ms)
@@ -867,8 +907,13 @@ def _run_ai_pipeline(prompt: str, context: str = "", history: list | None = None
             if intent == "explain_physics":
                 sys_msg = (
                     "You are the OpenZess AI CFD Co-Pilot (Qwen3-0.6B RL). "
-                    "Answer in short, direct ASD-STE100 sentences (2-4 sentences). "
-                    "Be honest about what OpenZess can simulate (2D/3D WASM Navier-Stokes, presets, custom primitives, Sketch Pad, and .STL upload)."
+                    "Answer in 2-4 short, honest ASD-STE100 sentences. "
+                    "STRICT HONESTY RULE: Never claim you can simulate something OpenZess cannot do. "
+                    "OpenZess CAN do: 2D/quasi-3D incompressible laminar/viscous Navier-Stokes in browser WASM, "
+                    "8 presets (house, tower, cylinder, airfoil, venturi, cavity, submarine, rocket), "
+                    "2-5 simple 3D block parts, Freehand Sketch Pad, .STL upload, and Text-to-3D (.glb) in the Build tab. "
+                    "OpenZess CANNOT do: detailed CAD cars/aircraft from chat alone, supersonic/compressible shocks, combustion, or full 3D HPC OpenFOAM. "
+                    "If the user asks for something unsupported, say 'No, OpenZess cannot do that yet' and suggest the closest real option."
                 )
                 msgs = [{"role": "system", "content": sys_msg}]
                 for h in (history or [])[-6:]:
