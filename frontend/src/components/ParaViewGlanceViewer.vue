@@ -603,8 +603,8 @@
             <div class="prop-row">
               <label>Reynolds (Re):</label>
               <div class="slider-control">
-                <input type="range" v-model.number="builderRe" min="20" max="1500" step="10" />
-                <span class="val-label">{{ builderRe }}</span>
+                <input type="range" v-model.number="buildTabRe" min="20" max="1500" step="10" />
+                <span class="val-label">{{ buildTabRe }}</span>
               </div>
             </div>
             <div class="prop-row">
@@ -975,6 +975,7 @@ const wasmEngine = shallowRef<OpenFoamWasmEngine | null>(null);
 // User Multi-Part Custom Simulation Builder + Freehand Sketch Pad + .STL Importer
 const builderCaseName = ref<string>('my_custom_design');
 const builderFluid = ref<'air' | 'water' | 'oil'>('air');
+const buildTabRe = ref<number>(300);
 const builderDt = ref<number>(0.0035);
 const builderPrimitives = ref<CustomPrimitive[]>([
   { kind: 'box', x: -0.10, y: 0.0, w: 0.34, h: 0.24, d: 0.28, color: '#c85a44' },
@@ -1108,13 +1109,13 @@ async function generateReal3dMesh() {
     const resp = await fetch(`${apiBase}/api/ai/text-to-3d`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, reynoldsNumber: builderRe.value })
+      body: JSON.stringify({ prompt, reynoldsNumber: buildTabRe.value })
     });
     const data = await resp.json();
     if (data.ok && data.glb_url) {
       const fullGlb = `${apiBase}${data.glb_url}`;
       const cleanKey = prompt.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 28) || 'ai_3d_mesh';
-      const reVal = Math.round(data.simulation_spec?.fluid?.reynolds ?? builderRe.value);
+      const reVal = Math.round(data.simulation_spec?.fluid?.reynolds ?? buildTabRe.value);
       const dtVal = Number(data.simulation_spec?.numerics?.dt ?? 0.0035);
       // Aerodynamic bounding hull footprint for fvm_solver.wasm around the real 3D mesh
       const footprint: CustomPrimitive[] = [
@@ -1146,19 +1147,19 @@ async function applyCustomBuilder() {
   if (builderPrimitives.value.length === 0) return;
   const cleanKey = (builderCaseName.value.trim() || 'custom_sim').replace(/[^a-zA-Z0-9_-]/g, '_');
   const dx = 1.0 / 40;
-  const dtMax = Math.min(0.65 * dx, 0.25 * dx * dx * builderRe.value);
+  const dtMax = Math.min(0.65 * dx, 0.25 * dx * dx * buildTabRe.value);
   const safeDt = Math.max(0.0005, Math.min(builderDt.value || 0.0035, dtMax));
   builderDt.value = Number(safeDt.toFixed(5));
   const meta = {
     key: cleanKey,
     title: `Custom — ${builderCaseName.value.trim() || 'My Design'}`,
-    re: builderRe.value,
+    re: buildTabRe.value,
     dt: builderDt.value,
-    explanation: `User-built 3D geometry (${builderPrimitives.value.length} parts) in ${builderFluid.value} at Re=${builderRe.value}, rasterized live into fvm_solver.wasm with CFL-safe dt=${builderDt.value}s.`
+    explanation: `User-built 3D geometry (${builderPrimitives.value.length} parts) in ${builderFluid.value} at Re=${buildTabRe.value}, rasterized live into fvm_solver.wasm with CFL-safe dt=${builderDt.value}s.`
   };
-  await initPresetPreview(1, builderRe.value, builderPrimitives.value.map(p => ({ ...p })), meta);
+  await initPresetPreview(1, buildTabRe.value, builderPrimitives.value.map(p => ({ ...p })), meta);
   wasmLogs.value.unshift(
-    `[Custom Builder] Launched "${meta.title}" (${builderPrimitives.value.length} parts, ${builderFluid.value}, Re=${builderRe.value}, dt=${builderDt.value}s)`
+    `[Custom Builder] Launched "${meta.title}" (${builderPrimitives.value.length} parts, ${builderFluid.value}, Re=${buildTabRe.value}, dt=${builderDt.value}s)`
   );
 }
 
